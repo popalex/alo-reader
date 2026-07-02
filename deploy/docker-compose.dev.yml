@@ -13,19 +13,34 @@ services:
       - web
 
   api:
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    # Bypass the image entrypoint (api/worker dispatch) to run uvicorn with reload.
+    entrypoint: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    command: !reset null
     volumes:
       - ../api:/app
 
   web:
     image: node:24-slim
     working_dir: /web
-    command: sh -c "corepack enable && pnpm install && pnpm dev --host"
+    # CI=true makes pnpm non-interactive (no purge prompt).
+    environment:
+      CI: "true"
+    # pnpm installs node_modules INSIDE the container: node_modules lives in the
+    # web_node_modules volume and the content store in the pnpm_store volume (via
+    # --store-dir). The host's ./web is bind-mounted for source only — its
+    # node_modules and any store are shadowed by volumes and never written.
+    command: sh -c "corepack enable && pnpm install --store-dir /pnpm-store && pnpm dev --host"
     volumes:
       - ../web:/web
+      - web_node_modules:/web/node_modules
+      - pnpm_store:/pnpm-store
     expose:
       - "5173"
 
   postgres:
     # Disposable: no named volume, data lives only for the container's lifetime.
     volumes: !reset []
+
+volumes:
+  web_node_modules:
+  pnpm_store:
