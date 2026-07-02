@@ -1,0 +1,96 @@
+"""Store functions for ``subscriptions`` — all user-scoped (``user_id`` required)."""
+
+from collections.abc import Sequence
+
+from sqlalchemy import Row, select
+from sqlalchemy import delete as sql_delete
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models import Feed, Subscription
+from app.store import rowcount
+
+
+async def create(
+    session: AsyncSession,
+    user_id: int,
+    *,
+    feed_id: int,
+    folder_id: int | None = None,
+    title_override: str | None = None,
+    since_entry_id: int = 0,
+) -> Subscription:
+    sub = Subscription(
+        user_id=user_id,
+        feed_id=feed_id,
+        folder_id=folder_id,
+        title_override=title_override,
+        since_entry_id=since_entry_id,
+    )
+    session.add(sub)
+    await session.flush()
+    return sub
+
+
+async def get(session: AsyncSession, user_id: int, sub_id: int) -> Subscription | None:
+    result = await session.scalars(
+        select(Subscription).where(Subscription.id == sub_id, Subscription.user_id == user_id)
+    )
+    return result.first()
+
+
+async def get_by_feed(session: AsyncSession, user_id: int, feed_id: int) -> Subscription | None:
+    result = await session.scalars(
+        select(Subscription).where(Subscription.user_id == user_id, Subscription.feed_id == feed_id)
+    )
+    return result.first()
+
+
+async def list_all(session: AsyncSession, user_id: int) -> list[Subscription]:
+    result = await session.scalars(
+        select(Subscription).where(Subscription.user_id == user_id).order_by(Subscription.id)
+    )
+    return list(result.all())
+
+
+async def list_with_feed(
+    session: AsyncSession, user_id: int
+) -> Sequence[Row[tuple[Subscription, Feed]]]:
+    """Subscriptions joined to their (global) feed for metadata like ``last_error``
+    and ``last_fetched_at``. The HTTP shaping lives in WP-06."""
+    result = await session.execute(
+        select(Subscription, Feed)
+        .join(Feed, Feed.id == Subscription.feed_id)
+        .where(Subscription.user_id == user_id)
+        .order_by(Subscription.id)
+    )
+    return result.all()
+
+
+async def update(
+    session: AsyncSession,
+    user_id: int,
+    sub_id: int,
+    *,
+    title_override: str | None = None,
+    folder_id: int | None = None,
+    set_title_override: bool = False,
+    set_folder_id: bool = False,
+) -> Subscription | None:
+    """Patch a subscription. ``set_*`` flags distinguish "leave unchanged" from
+    "explicitly set to NULL" for the nullable fields."""
+    sub = await get(session, user_id, sub_id)
+    if sub is None:
+        return None
+    if set_title_override:
+        sub.title_override = title_override
+    if set_folder_id:
+        sub.folder_id = folder_id
+    await session.flush()
+    return sub
+
+
+async def delete(session: AsyncSession, user_id: int, sub_id: int) -> bool:
+    result = await session.execute(
+        sql_delete(Subscription).where(Subscription.id == sub_id, Subscription.user_id == user_id)
+    )
+    return rowcount(result) > 0

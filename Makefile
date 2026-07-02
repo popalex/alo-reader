@@ -7,7 +7,11 @@ PIP := $(VENV)/bin/pip
 COMPOSE := docker compose -f deploy/docker-compose.yml
 COMPOSE_DEV := docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml
 
-.PHONY: venv lint typecheck test-api test-web e2e up dev down migrate
+# Host-run alembic/pytest talk to the dockerized Postgres over its localhost port
+# (see `make db`). Postgres itself is never installed on the host.
+TEST_DATABASE_URL ?= postgresql+asyncpg://alo:alo@localhost:5432/alo
+
+.PHONY: venv lint typecheck test-api test-web e2e up dev down db db-down migrate
 
 ## Create the virtualenv and install the api project (editable, with dev tools).
 venv:
@@ -23,6 +27,8 @@ typecheck:
 	$(VENV)/bin/mypy api
 	pnpm -C web tsc
 
+## Tests provision their own throwaway Postgres via Testcontainers — no `make db`
+## needed, and the real/dev DB is never touched.
 test-api:
 	$(VENV)/bin/pytest api
 
@@ -44,6 +50,13 @@ dev:
 down:
 	$(COMPOSE) down
 
-## Placeholder until WP-01 adds Alembic migrations.
+## Start ONLY the dockerized Postgres (exposed on localhost:5432) for migrate/tests.
+db:
+	$(COMPOSE_DEV) up -d postgres
+
+db-down:
+	$(COMPOSE_DEV) down
+
+## Apply Alembic migrations against the dockerized Postgres.
 migrate:
-	@echo "migrate: no migrations yet (added in WP-01)"
+	cd api && DATABASE_URL=$(TEST_DATABASE_URL) ../$(VENV)/bin/alembic upgrade head

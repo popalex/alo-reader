@@ -32,7 +32,7 @@ You are implementing one work package of alo-reader, a chronological RSS reader.
 1. Implement ONLY what this work package specifies. If something is ambiguous or seems missing, STOP and ask; do not invent a solution.
 2. Do not add any dependency not listed in this brief.
 3. Do not modify files outside the areas this brief lists, except tiny mechanical edits it explicitly allows (e.g., registering a router in `main.py`).
-4. All tests run against real Postgres (the compose service). Never mock the database or the store layer.
+4. All tests run against a **real Postgres provisioned by Testcontainers** — an ephemeral throwaway container spun up by the test session, never the developer's real/dev DB and never mocks. Always prefer Testcontainers for anything that needs a service (DB, etc.) when it can be used. (`make migrate` still targets the real dockerized Postgres; that is not a test.)
 5. Nothing outside `api/app/auth/` may import or reference Clerk.
 6. Every store/repository function touching user-scoped data takes `user_id: int` as a required argument.
 7. Feed content is hostile input: sanitize at ingest with nh3; entry titles are plain text everywhere, never rendered or stored as HTML.
@@ -40,7 +40,7 @@ You are implementing one work package of alo-reader, a chronological RSS reader.
 9. API errors always use the envelope `{"error": {"code": "...", "message": "..."}}`.
 10. When done, run every command in the Acceptance block and include the real output.
 
-**Pinned stack** — Python 3.12, managed with a local `.venv` + pip (a `pyproject.toml` project; **not** uv); FastAPI, uvicorn, SQLAlchemy ≥2.0 (async) + asyncpg + greenlet, Alembic, Pydantic v2 + pydantic-settings + python-dotenv, httpx, feedparser, nh3, zstandard, PyJWT[crypto], svix; pytest + pytest-asyncio; ruff (lint+format), mypy. Node 24 + pnpm; React 18, TypeScript strict, Vite; react-router, @tanstack/react-query, @tanstack/react-virtual, @clerk/clerk-react, vite-plugin-pwa; Playwright; size-limit.
+**Pinned stack** — Python 3.12, managed with a local `.venv` + pip (a `pyproject.toml` project; **not** uv); FastAPI, uvicorn, SQLAlchemy ≥2.0 (async) + asyncpg + greenlet, Alembic, Pydantic v2 + pydantic-settings + python-dotenv, httpx, feedparser, nh3, zstandard, PyJWT[crypto], svix; pytest + pytest-asyncio + testcontainers[postgres]; ruff (lint+format), mypy. Node 24 + pnpm; React 18, TypeScript strict, Vite; react-router, @tanstack/react-query, @tanstack/react-virtual, @clerk/clerk-react, vite-plugin-pwa; Playwright; size-limit.
 
 **Configuration** — no secret or connection string is hardcoded. Config is read from the environment (via python-dotenv loading a repo-root `.env`; real env vars win). `DATABASE_URL` is the single source of truth for the DB connection; compose supplies it (with sensible local defaults) and `.env.example` documents it.
 
@@ -62,7 +62,7 @@ Makefile   MILESTONES.md   DESIGN.md
 ### WP-00 · Scaffold, compose stack, CI — ✅ DONE (branch `wp-00-scaffold`)
 **Depends:** nothing. **Read:** DESIGN.md §1.2, §1.5.
 **Status:** complete. Acceptance verified locally: `make lint typecheck test-api test-web` pass; `make up` + `curl localhost/api/v1/healthz` → `{"status":"ok"}` through Caddy (prod :80); `make dev` serves on **http://localhost:3000** and hot-reloads both sides.
-**Deliverables:** repo layout above; `api` as a pip/`.venv` project (`pyproject.toml`, installed with `pip install -e "./api[dev]"`) with FastAPI app serving `GET /api/v1/healthz` → `{"status":"ok"}`; `web` as Vite+React+TS scaffold showing a placeholder page; `Dockerfile.api` (one image, `api`/`worker` commands — worker may be a stub loop logging "tick"); `Dockerfile.caddy` (multi-stage: pnpm build → Caddy serving `dist/`, proxying `/api/*` to `api:8000`); base + dev compose files (dev overlay: uvicorn --reload, Vite dev server, disposable Postgres 16; the `backup` service from DESIGN.md §1.5 is deferred to WP-16); Makefile with the standard commands; GitHub Actions running lint, typecheck, test-api, test-web, and image builds; ruff/mypy/tsconfig-strict configured.
+**Deliverables:** repo layout above; `api` as a pip/`.venv` project (`pyproject.toml`, installed with `pip install -e "./api[dev]"`) with FastAPI app serving `GET /api/v1/healthz` → `{"status":"ok"}`; `web` as Vite+React+TS scaffold showing a placeholder page; `Dockerfile.api` (one image, `api`/`worker` commands — worker may be a stub loop logging "tick"); `Dockerfile.caddy` (multi-stage: pnpm build → Caddy serving `dist/`, proxying `/api/*` to `api:8000`); base + dev compose files (dev overlay: uvicorn --reload, Vite dev server, disposable Postgres 18; the `backup` service from DESIGN.md §1.5 is deferred to WP-16); Makefile with the standard commands; GitHub Actions running lint, typecheck, test-api, test-web, and image builds; ruff/mypy/tsconfig-strict configured.
 **Acceptance:** `make up` then `curl -s localhost/api/v1/healthz` returns ok through Caddy; `make dev` hot-reloads both sides; `make lint typecheck test-api test-web` all pass; CI green on the branch.
 **Out of scope:** any schema, any auth, any real worker logic.
 
@@ -120,14 +120,14 @@ Makefile   MILESTONES.md   DESIGN.md
 ## M2 — Daily driver
 
 ### WP-09 · Frontend foundation: config boot, auth, layout, data layer
-**Depends:** WP-07. **Read:** DESIGN.md §1.2 frontend row, §0.1 (config boot).
+**Depends:** WP-07. **Read:** DESIGN.md §1.2 frontend row, §0.1 (config boot), §1.7 (UI shape — "early Gmail for RSS").
 **Deliverables:** `web/src/`: boot sequence — fetch `/api/v1/config`; mode `clerk` → lazy-load `@clerk/clerk-react`, ClerkProvider, sign-in/up routes, token injected into every request; mode `none` → straight to app, no Clerk code fetched (verify via dynamic import + separate chunk); typed API client generated from the FastAPI OpenAPI schema (`openapi-typescript` in `make generate-client`; **CI fails if generated output is stale**); TanStack Query setup (staleTime 30s, retry 1, error toasts); react-router routes `/`, `/feed/:id`, `/folder/:id`, `/starred`; responsive three-pane layout per DESIGN.md (CSS grid; ≤768px collapses to single-pane stack with back navigation); sidebar: folders + subscriptions + unread badges from `/counts`, error dot for feeds with `last_error`; placeholder center/right panes; size-limit config: main chunk ≤180 KB gz.
 **New deps:** `openapi-typescript` (dev).
 **Acceptance:** `make e2e` (Playwright, `AUTH_MODE=none` compose profile): boots to app with real sidebar data; `make test-web` component tests for boot branching (clerk vs none, mocked config); size-limit passes; Lighthouse perf ≥90 on the built app (`make lighthouse` script).
 **Out of scope:** entry list, reading pane, any mutation.
 
 ### WP-10 · Entry list + reading pane
-**Depends:** WP-09. **Read:** DESIGN.md §0.3 ordering.
+**Depends:** WP-09. **Read:** DESIGN.md §0.3 ordering, §1.7 (UI shape — "early Gmail for RSS").
 **Deliverables:** virtualized entry list (@tanstack/react-virtual) with infinite cursor pagination via the streams endpoint; row = feed favicon, feed name, title, summary line, relative time (from `created_at`, tooltip shows `published_at`); list/expanded view toggle (persisted in localStorage); reading pane: sanitized `content_html` rendered inside a container with CSS containment, image `loading=lazy` and `max-width:100%`, external links open new tab; unread rows visually distinct; empty/error/loading states for every query; entry selection state lives in a single `useReducer` store (the keyboard WP will drive it).
 **Acceptance:** `make e2e`: seed script (`scripts/seed_dev.py`, part of this WP: 20 feeds / 5k entries) → scroll through 5k entries smoothly (Playwright trace: no frame >50 ms during scripted scroll), open entry, content renders, XSS fixture entry renders inert (assert no dialog, no script node); mobile viewport E2E: list→entry→back works.
 **Out of scope:** marking read, refresh, keyboard.
