@@ -25,6 +25,7 @@ dependencies = [
 dev = [
     "pytest>=8.2",
     "pytest-asyncio>=0.23",
+    "testcontainers[postgres]>=4.5",
     "ruff>=0.5",
     "mypy>=1.10",
 ]
@@ -48,6 +49,7 @@ select = ["E", "F", "I", "UP", "B", "W"]
 python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
+
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

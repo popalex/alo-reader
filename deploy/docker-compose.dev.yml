@@ -44,6 +44,10 @@ services:
   postgres:
     # Disposable: no named volume, data lives only for the container's lifetime.
     volumes: !reset []
+    # Expose on localhost only so host-run alembic/pytest (in .venv) can connect.
+    # Postgres is never installed on the host — this is just the container's port.
+    ports:
+      - "127.0.0.1:5432:5432"
 
 volumes:
   web_node_modules:
