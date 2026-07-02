@@ -21,7 +21,7 @@ make up                   # build + start the stack (SPA + API via Caddy on :80)
 curl -s localhost/api/v1/healthz   # -> {"status":"ok"}
 ```
 
-Local development (hot-reload both sides on http://localhost):
+Local development (hot-reload both sides on http://localhost:3000):
 
 ```sh
 make dev
