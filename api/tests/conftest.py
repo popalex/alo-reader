@@ -10,11 +10,12 @@ import os
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 
+import httpx
 import pytest
 import pytest_asyncio
 from alembic import command
 from alembic.config import Config
-from fastapi.testclient import TestClient
+from httpx import ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 from testcontainers.postgres import PostgresContainer  # type: ignore[import-untyped]
@@ -24,9 +25,11 @@ from app.main import app
 API_DIR = Path(__file__).resolve().parents[1]
 
 
-@pytest.fixture
-def client() -> TestClient:
-    return TestClient(app)
+@pytest_asyncio.fixture
+async def client() -> AsyncIterator[httpx.AsyncClient]:
+    transport = ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
 
 
 @pytest.fixture(scope="session")
