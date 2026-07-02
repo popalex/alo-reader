@@ -1,0 +1,12 @@
+# Dev / `make dev`: proxy the API to the api service and everything else to the
+# Vite dev server (so HMR works through a single http://localhost origin).
+:80 {
+	@api path /api/*
+	handle @api {
+		reverse_proxy api:8000
+	}
+
+	handle {
+		reverse_proxy web:5173
+	}
+}

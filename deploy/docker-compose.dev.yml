@@ -1,0 +1,31 @@
+# Dev overlay: hot-reload both sides, disposable Postgres.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up  (`make dev`)
+
+services:
+  caddy:
+    # No frontend build in dev — plain Caddy proxying to the Vite dev server.
+    build: !reset null
+    image: caddy:2-alpine
+    volumes:
+      - ./Caddyfile.dev:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - api
+      - web
+
+  api:
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    volumes:
+      - ../api:/app
+
+  web:
+    image: node:24-slim
+    working_dir: /web
+    command: sh -c "corepack enable && pnpm install && pnpm dev --host"
+    volumes:
+      - ../web:/web
+    expose:
+      - "5173"
+
+  postgres:
+    # Disposable: no named volume, data lives only for the container's lifetime.
+    volumes: !reset []

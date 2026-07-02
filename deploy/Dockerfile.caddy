@@ -1,0 +1,13 @@
+# Multi-stage: build the SPA with pnpm, then serve it from Caddy.
+# Build context is the repo root.
+FROM node:24-slim AS build
+WORKDIR /web
+RUN corepack enable
+COPY web/package.json web/pnpm-workspace.yaml ./
+RUN pnpm install
+COPY web/ ./
+RUN pnpm build
+
+FROM caddy:2-alpine
+COPY --from=build /web/dist /srv
+COPY deploy/Caddyfile /etc/caddy/Caddyfile
