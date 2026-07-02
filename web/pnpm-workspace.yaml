@@ -1,0 +1,6 @@
+# pnpm 11 reads settings from here (no longer from the package.json "pnpm" field).
+# Allow esbuild (a vite/vitest dependency) to run its install script, and skip the
+# sync install check that pnpm otherwise runs before every `pnpm run` script.
+allowBuilds:
+  esbuild: true
+verifyDepsBeforeRun: false

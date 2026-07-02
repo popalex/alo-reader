@@ -1,0 +1,16 @@
+# Production / `make up`: serve the built SPA and reverse-proxy the API.
+# Listens on :80 (HTTP). Automatic TLS on a real domain is wired in WP-16.
+:80 {
+	encode gzip
+
+	@api path /api/*
+	handle @api {
+		reverse_proxy api:8000
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

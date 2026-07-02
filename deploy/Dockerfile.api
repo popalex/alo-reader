@@ -1,0 +1,18 @@
+# One image, two commands (api / worker). Build context is the repo root.
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+WORKDIR /app
+
+COPY api/pyproject.toml ./pyproject.toml
+COPY api/app ./app
+RUN pip install --no-cache-dir .
+
+COPY deploy/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+EXPOSE 8000
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["api"]
