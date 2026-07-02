@@ -6,6 +6,10 @@ services:
     # No frontend build in dev — plain Caddy proxying to the Vite dev server.
     build: !reset null
     image: caddy:2-alpine
+    # Dev is served on http://localhost:3000 (prod uses :80). Caddy listens on
+    # :3000 in dev (see Caddyfile.dev). !override replaces the base 80:80 mapping.
+    ports: !override
+      - "3000:3000"
     volumes:
       - ./Caddyfile.dev:/etc/caddy/Caddyfile:ro
     depends_on:

@@ -59,8 +59,9 @@ Makefile   MILESTONES.md   DESIGN.md
 
 ## M1 — Headless reader
 
-### WP-00 · Scaffold, compose stack, CI
+### WP-00 · Scaffold, compose stack, CI — ✅ DONE (branch `wp-00-scaffold`)
 **Depends:** nothing. **Read:** DESIGN.md §1.2, §1.5.
+**Status:** complete. Acceptance verified locally: `make lint typecheck test-api test-web` pass; `make up` + `curl localhost/api/v1/healthz` → `{"status":"ok"}` through Caddy (prod :80); `make dev` serves on **http://localhost:3000** and hot-reloads both sides.
 **Deliverables:** repo layout above; `api` as a pip/`.venv` project (`pyproject.toml`, installed with `pip install -e "./api[dev]"`) with FastAPI app serving `GET /api/v1/healthz` → `{"status":"ok"}`; `web` as Vite+React+TS scaffold showing a placeholder page; `Dockerfile.api` (one image, `api`/`worker` commands — worker may be a stub loop logging "tick"); `Dockerfile.caddy` (multi-stage: pnpm build → Caddy serving `dist/`, proxying `/api/*` to `api:8000`); base + dev compose files (dev overlay: uvicorn --reload, Vite dev server, disposable Postgres 16; the `backup` service from DESIGN.md §1.5 is deferred to WP-16); Makefile with the standard commands; GitHub Actions running lint, typecheck, test-api, test-web, and image builds; ruff/mypy/tsconfig-strict configured.
 **Acceptance:** `make up` then `curl -s localhost/api/v1/healthz` returns ok through Caddy; `make dev` hot-reloads both sides; `make lint typecheck test-api test-web` all pass; CI green on the branch.
 **Out of scope:** any schema, any auth, any real worker logic.
