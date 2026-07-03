@@ -125,7 +125,7 @@ services:
               # + reverse-proxies /api → api
   api:        # image: alo-reader, command: api      (uvicorn, scale: N)
   worker:     # image: alo-reader, command: worker   (poller, scale: 1..N)
-  postgres:   # postgres:16, named volume
+  postgres:   # postgres:18, named volume
   backup:     # nightly pg_dump to a mounted/off-site target (see below)
 ```
 
@@ -139,6 +139,34 @@ services:
 ### 1.6 Security posture
 
 Sanitize once at ingest (allowlist, nh3), strict CSP on the SPA, Clerk JWT verification with issuer/audience/expiry checks, svix signature verification on webhooks, SSRF guard as above, secrets only via environment. All feed content is hostile input, always.
+
+### 1.7 Web UI — "early Gmail, for RSS"
+
+The look-and-feel target is **early Gmail (circa 2004–2010): dense, fast, information-first, no chrome, no cards, no social styling.** It reads as a mail client whose "messages" are articles. This is the guiding aesthetic for the M2/M3 frontend WPs (WP-09/10/11/12); it refines, and does not replace, the layout notes in those briefs.
+
+**Three-pane layout** (desktop; collapses to a single pane with back-navigation ≤768px):
+
+```
+┌───────────────┬───────────────────────────┬───────────────────────────┐
+│  SIDEBAR      │  ARTICLE LIST             │  READING / PREVIEW PANE   │
+│  (labels)     │  (the "inbox")            │                           │
+│               │                           │                           │
+│  All (12)     │  ● BBC   Title of item    │  Title                    │
+│  Starred      │    hello world snippet…3h │  Source · author · date   │
+│  ─ Folders ─  │  ● Verge  Another title   │                           │
+│  ▸ Tech (5)   │    summary line here …·5h │  <sanitized article       │
+│  ▾ News (7)   │    Older read item    ·1d │   body renders here,      │
+│     BBC (3)   │  …virtualized, infinite…  │   images lazy, links new  │
+│     Verge(4)  │                           │   tab>                    │
+└───────────────┴───────────────────────────┴───────────────────────────┘
+```
+
+- **Sidebar = Gmail's label rail.** Categories (folders) are collapsible groups, each listing its feeds; **unread shows as bold text + a right-aligned count** exactly like Gmail's unread labels. Fixed views on top: `All`, `Starred`. A feed with `last_error` shows a small error dot.
+- **Article list = the inbox.** Dense, single-line-ish rows (virtualized, infinite scroll), **newest-received first** (never re-sorted — §0.3). Each row: unread dot, source/feed name, article title, a dim snippet, right-aligned relative time (`created_at`; tooltip = `published_at`). **Unread rows are bold; read rows dim** — the core Gmail read/unread affordance. A list/expanded density toggle is persisted.
+- **Reading/preview pane = Gmail's preview pane.** Selecting a row renders the sanitized `content_html` on the right (or full-width on mobile); open-in-place, mark-read-on-open, star, and "open original in new tab".
+- **Calm and keyboard-first:** muted palette, generous but tight spacing, no infinite-scroll "engagement" tricks; full `j/k/o/s/m/…` keyboard model (WP-12). The vibe is a **tool that gets out of the way**, not a magazine.
+
+Concrete visual design (typography, exact palette, spacing scale) is decided during WP-09 using the `frontend-design` guidance; this section fixes the *shape and behavior*, not the pixels.
 
 ---
 
@@ -172,7 +200,7 @@ Sanitize once at ingest (allowlist, nh3), strict CSP on the SPA, Clerk JWT verif
 
 ## 4. Database design
 
-Postgres 16. `BIGSERIAL` entry ids preserve the v1 trick: **insertion order ≈ chronological "received" order**, so the primary key doubles as sort key and pagination cursor. Timestamps are `timestamptz`.
+Postgres 18. `BIGSERIAL` entry ids preserve the v1 trick: **insertion order ≈ chronological "received" order**, so the primary key doubles as sort key and pagination cursor. Timestamps are `timestamptz`.
 
 ```sql
 -- ── Identity (Clerk-synced) ─────────────────────────────────
@@ -267,7 +295,19 @@ entry_states (
 )
 CREATE INDEX idx_states_read    ON entry_states (user_id, entry_id) WHERE is_read;
 CREATE INDEX idx_states_starred ON entry_states (user_id, entry_id) WHERE is_starred;
+
+-- ── Supplementary indexes: Postgres does not auto-index foreign keys, so every
+--    FK that participates in a cascade (or is filtered on directly) gets one.
+--    Unindexed FKs turn a parent DELETE into a full child scan.
+CREATE INDEX idx_api_tokens_user  ON api_tokens   (user_id);          -- user delete cascade + token listing
+CREATE INDEX idx_subs_folder      ON subscriptions(folder_id);        -- folder SET NULL cascade + folder streams
+CREATE INDEX idx_states_entry     ON entry_states (entry_id);         -- entry delete cascade (PK is user_id-first)
+CREATE INDEX idx_folders_user_pos ON folders      (user_id, position);-- ordered per-user folder listing
 ```
+
+> **Indexing rule (project-wide):** every foreign key involved in a cascade and
+> every column a query filters/sorts on must be backed by an index. Add the index in
+> the same migration as the query — don't ship a scan.
 
 **Semantics (unchanged from v1, restated because they're the product):**
 
@@ -372,11 +412,13 @@ Principles that govern the plan: small strictly-ordered packages; every design d
 
 **Principle unchanged: test weight goes where risk lives** — ingest (hostile input), tenant isolation (new #1), and read-state semantics (trust-critical).
 
+**Test infrastructure rule: always use Testcontainers when a test needs a real service.** Anything requiring Postgres (or any other backing service) spins up an **ephemeral throwaway container** via `testcontainers[postgres]`, provisioned by the test session and discarded after — never the developer's real/dev database, never a shared instance, never mocks. This keeps tests hermetic and parallel-safe and guarantees a test run can never touch real data. (`make migrate` still runs against the real dockerized Postgres — that is an ops command, not a test.)
+
 | Layer | What | How |
 |---|---|---|
 | **Unit — ingest** | Parser normalization, GUID chain, dates, summaries | Golden files over the append-only fixture corpus; every prod parsing bug becomes a fixture first. |
 | **Unit — sanitizer** | XSS resistance | Adversarial corpus (scripts, handlers, `javascript:`/data URIs, SVG, encoding tricks) → exact allowlist output. |
-| **Integration — API** | Every endpoint, auth matrix, **cross-tenant isolation probes**, pagination stability, count exactness | Real Postgres per test run (transactional rollback), no DB mocks ever; counts property-tested vs brute force on randomized data. |
+| **Integration — API** | Every endpoint, auth matrix, **cross-tenant isolation probes**, pagination stability, count exactness | Testcontainers Postgres per test session (transactional rollback per test), no DB mocks ever; counts property-tested vs brute force on randomized data. |
 | **Integration — worker** | 304/429/301/timeout/oversize, SSRF bypass classes, claim-loop exclusivity, lease expiry | httpx MockTransport / local test server; two concurrent workers in the claim test. |
 | **Contract** | SPA ↔ API drift | OpenAPI schema exported from FastAPI; frontend client types generated from it in CI — drift fails the build. |
 | **E2E — web** | Sign-up→subscribe→read→keyboard-only→offline queue→account deletion | Playwright vs real stack (Clerk dev instance + `AUTH_MODE=none` profile), ~12 journeys, zero flake tolerance. |
