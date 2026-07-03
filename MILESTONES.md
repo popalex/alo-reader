@@ -66,7 +66,7 @@ Makefile   MILESTONES.md   DESIGN.md
 **Acceptance:** `make up` then `curl -s localhost/api/v1/healthz` returns ok through Caddy; `make dev` hot-reloads both sides; `make lint typecheck test-api test-web` all pass; CI green on the branch.
 **Out of scope:** any schema, any auth, any real worker logic.
 
-### WP-01 · Schema, migrations, store layer
+### WP-01 · Schema, migrations, store layer — ✅ DONE (branch `wp-01-schema`, PR #1)
 **Depends:** WP-00. **Read:** DESIGN.md §4 (the schema is copied, not reinterpreted).
 **Deliverables:** Alembic baseline migration containing the full §4 schema exactly (all tables, indexes, the `strip_html` SQL function, the generated `search_tsv` column); SQLAlchemy models in `api/app/models.py`; store layer in `api/app/store/` — one module per aggregate (`users.py`, `feeds.py`, `subscriptions.py`, `folders.py`, `entries.py`, `entry_states.py`) with typed async functions (create/get/list/update/delete plus: claim-due-feeds stub signature, unread-count query per DESIGN.md §4 semantics, cursor-paginated entry listing by stream); pytest harness: session-scoped engine against compose Postgres, each test inside a rolled-back transaction; factory helpers for test data.
 **Acceptance:** `make migrate` applies from an empty DB and is a no-op on re-run; `make test-api` passes with store CRUD + unread-count tests (count asserted against a brute-force recomputation on ≥3 randomized seedings); grep confirms every user-scoped store function requires `user_id`.
@@ -76,6 +76,7 @@ Makefile   MILESTONES.md   DESIGN.md
 **Depends:** WP-01. **Read:** DESIGN.md §0.1, §1.2 auth row.
 **Deliverables:** `api/app/auth/` containing: `provider.py` (`AuthProvider` protocol: `authenticate(request) -> AuthedUser | None`), `clerk.py` (JWKS fetch + 1h in-process cache, JWT verification of iss/aud/exp, maps `clerk_user_id` → local user row), `none.py` (auto-provisions and returns the single local user), `pat.py` (personal access tokens: `alo_pat_<random>`, sha256 stored, constant-time compare); `AUTH_MODE` config — **server exits with a clear error if unset**; FastAPI dependency `current_user`; routes: `GET /api/v1/config` (public: `{"auth_mode": ...}` + Clerk publishable key when mode=clerk), `GET /me`, `GET/POST/DELETE /tokens`; `POST /api/v1/webhooks/clerk` with svix signature verification handling user.created/updated/deleted (delete cascades locally); naive in-process per-user token-bucket rate-limit middleware (defaults from config).
 **New deps:** none beyond preamble pins.
+**Pinned decisions (operator, 2026-07-03):** a valid, verified Clerk JWT whose local `users` row is missing (webhook lag/loss) **auto-provisions** the row with empty email — the `user.created`/`user.updated` webhook fills the email later. Also pinned during implementation: PATs authenticate in *every* AUTH_MODE (they're the curl/script path); `/me.counts_summary` = `{"total_unread": n}`; webhook responds 204, invalid svix signature → 401; `/healthz`, `/config`, and the webhook are public paths that skip auth entirely; `CLERK_AUDIENCE` is verified only when set (Clerk session tokens carry `aud` only when a JWT template adds one).
 **Acceptance:** `make test-api` covering: valid/expired/wrong-aud/garbage JWT (use test RSA keys, mock JWKS via httpx MockTransport), PAT happy+revoked+deleted-user paths, webhook with valid/invalid svix signature, `AUTH_MODE=none` auto-user, server refuses to boot without `AUTH_MODE`; entire suite green under both `AUTH_MODE=clerk` and `AUTH_MODE=none`; `rg -l clerk api/app | grep -v auth` → empty.
 **Out of scope:** frontend, any subscription/entry endpoint.
 
@@ -181,4 +182,4 @@ Makefile   MILESTONES.md   DESIGN.md
 ## Discovered-work parking lot
 (Items found mid-WP that were out of scope. Operator triages into future WPs.)
 
-- _empty_
+- **(fixed in wp-02-auth, flagged for review)** Current `postgres:18` images refuse any volume mounted at `/var/lib/postgresql/data` — the base compose stack no longer booted at all. Changed the mount to `pgdata:/var/lib/postgresql` per the image's guidance. A pre-existing `deploy_pgdata` volume initialized under the old layout will need `docker volume rm deploy_pgdata` (dev data only).

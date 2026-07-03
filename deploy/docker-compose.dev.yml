@@ -20,6 +20,9 @@ services:
     # Bypass the image entrypoint (api/worker dispatch) to run uvicorn with reload.
     entrypoint: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     command: !reset null
+    environment:
+      # Dev is explicitly local: default to single-user no-auth mode.
+      AUTH_MODE: ${AUTH_MODE:-none}
     volumes:
       - ../api:/app
 

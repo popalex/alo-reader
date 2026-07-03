@@ -1,10 +1,19 @@
 """Application configuration.
 
-The database connection string is never hardcoded: it is read from the
-``DATABASE_URL`` environment variable. For local (non-Docker) runs, a repo-root
-``.env`` file is loaded via python-dotenv; inside Docker/compose the variable is
-injected from the same ``.env`` and always takes precedence.
+Nothing is hardcoded: settings are read from the environment. For local
+(non-Docker) runs, a repo-root ``.env`` file is loaded via python-dotenv; inside
+Docker/compose the variables are injected from the same ``.env`` and always take
+precedence.
+
+Settings are constructed lazily via :func:`get_settings` so importing this module
+never requires the environment to be populated (tests set ``DATABASE_URL`` only
+after their throwaway Postgres container is up).
+
+Auth-provider-specific settings (e.g. the hosted-auth SaaS keys) live inside
+``app/auth/`` — this module knows only the mode switch.
 """
+
+from functools import lru_cache
 
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -13,6 +22,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # variables (e.g. those set by docker compose) are not overridden.
 load_dotenv()
 
+AUTH_MODES = ("clerk", "none")
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore")
@@ -20,5 +31,27 @@ class Settings(BaseSettings):
     # Sourced from DATABASE_URL; required, no default (no hardcoded credentials).
     database_url: str
 
+    # AUTH_MODE has deliberately no default: the server refuses to boot without
+    # an explicit choice (DESIGN.md §0.1 — "none" must never be implicit).
+    auth_mode: str | None = None
 
-settings = Settings()  # type: ignore[call-arg]
+    # Per-user token-bucket rate limit (DESIGN.md §1.4): refill rate and burst
+    # capacity, per API replica.
+    rate_limit_rps: float = 10.0
+    rate_limit_burst: int = 30
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()  # type: ignore[call-arg]
+
+
+def validate_boot_config() -> None:
+    """Refuse to boot without an explicit, valid AUTH_MODE (DESIGN.md §0.1)."""
+    mode = get_settings().auth_mode
+    if mode not in AUTH_MODES:
+        raise SystemExit(
+            f"AUTH_MODE must be set to one of {'|'.join(AUTH_MODES)} (got {mode!r}). "
+            "There is no default: 'none' disables auth entirely and must only be "
+            "used behind a private network (see DESIGN.md §0.1)."
+        )
