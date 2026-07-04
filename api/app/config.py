@@ -40,6 +40,18 @@ class Settings(BaseSettings):
     rate_limit_rps: float = 10.0
     rate_limit_burst: int = 30
 
+    # Fetcher / poller (DESIGN.md §1.3). The contact URL goes into an honest
+    # crawler User-Agent so hosts can reach us; the caps bound cost and abuse.
+    fetch_contact_url: str = "https://github.com/popalex/alo-reader"
+    fetch_timeout_s: float = 30.0
+    fetch_max_bytes: int = 5 * 1024 * 1024
+    fetch_max_redirects: int = 5
+
+    @property
+    def user_agent(self) -> str:
+        """Honest, contactable crawler UA (DESIGN.md §1.3)."""
+        return f"alo-reader/1.0 (+{self.fetch_contact_url})"
+
 
 @lru_cache
 def get_settings() -> Settings:
