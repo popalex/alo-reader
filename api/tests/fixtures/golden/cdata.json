@@ -1,0 +1,23 @@
+{
+  "entries": [
+    {
+      "author": null,
+      "content_html": "<div><p>Full <em>encoded</em> content.</p><p>Second paragraph &amp; more.</p></div>",
+      "content_html_len": 83,
+      "guid_hash": "040072f652da9b784d8c7f7aff356de6a0afa932d9f5bb1b8074db3016163ea9",
+      "guid_source": "guid",
+      "published_at": null,
+      "summary": "Full encoded content.Second paragraph & more.",
+      "title": "Title in with bold & ampersand",
+      "url": "https://cdata.example.com/one"
+    }
+  ],
+  "feed": {
+    "bozo": false,
+    "encoding": "utf-8",
+    "entry_count": 1,
+    "site_url": "https://cdata.example.com/",
+    "title": "CDATA Wrapped Feed",
+    "version": "rss20"
+  }
+}

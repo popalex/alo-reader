@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Feed With Missing GUIDs</title>
+    <link>https://noguid.example.com/</link>
+    <description>Exercises the guid -> link -> hash(title+date) fallback chain.</description>
+    <item>
+      <title>Has a link but no guid</title>
+      <link>https://noguid.example.com/a</link>
+      <description>Dedup key comes from the link.</description>
+    </item>
+    <item>
+      <title>No guid and no link, only a date</title>
+      <pubDate>Mon, 30 Jun 2025 10:00:00 GMT</pubDate>
+      <description>Dedup key is synthesized from title + published date.</description>
+    </item>
+    <item>
+      <title>No guid, no link, no date</title>
+      <description>Dedup key is synthesized from the title alone.</description>
+    </item>
+  </channel>
+</rss>

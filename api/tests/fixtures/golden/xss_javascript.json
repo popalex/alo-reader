@@ -1,0 +1,23 @@
+{
+  "entries": [
+    {
+      "author": null,
+      "content_html": "<p><a href=\"\" target=\"_blank\" rel=\"noopener noreferrer\">js link</a>, <a href=\"\" target=\"_blank\" rel=\"noopener noreferrer\">mixed case</a>, <a href=\"\" target=\"_blank\" rel=\"noopener noreferrer\">vb</a>, and a <a href=\"https://safe.example/ok\" target=\"_blank\" rel=\"noopener noreferrer\">safe one</a>.</p>",
+      "content_html_len": 298,
+      "guid_hash": "4489fc6dee0956b8533ed8be5281c8c743f252d53d2abbaa7ea688e59d8b8ce7",
+      "guid_source": "guid",
+      "published_at": null,
+      "summary": "js link, mixed case, vb, and a safe one.",
+      "title": "Only http/https schemes may survive",
+      "url": "https://xss.example.com/jsscheme"
+    }
+  ],
+  "feed": {
+    "bozo": false,
+    "encoding": "utf-8",
+    "entry_count": 1,
+    "site_url": "https://xss.example.com/",
+    "title": "XSS: javascript: URL scheme",
+    "version": "rss20"
+  }
+}

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>XSS: SVG-based vectors</title>
+    <link>https://xss.example.com/</link>
+    <description>Hostile feed using SVG script/animation vectors.</description>
+    <item>
+      <title>SVG must be dropped entirely</title>
+      <link>https://xss.example.com/svg</link>
+      <guid>https://xss.example.com/svg</guid>
+      <content:encoded><![CDATA[<p>Intro.</p><svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script><a xlink:href="javascript:alert(2)"><text>x</text></a><animate onbegin="alert(3)"/></svg><p>Outro.</p>]]></content:encoded>
+    </item>
+  </channel>
+</rss>

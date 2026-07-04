@@ -1,0 +1,23 @@
+{
+  "entries": [
+    {
+      "author": null,
+      "content_html": "Smart quotes “like these”, an em—dash, and © symbols stored as UTF-8 bytes.",
+      "content_html_len": 75,
+      "guid_hash": "165491d45b83074d5338221d1f7fa0de535ed8618c4319bb9c3f784f3579e916",
+      "guid_source": "guid",
+      "published_at": null,
+      "summary": "Smart quotes “like these”, an em—dash, and © symbols stored as UTF-8 bytes.",
+      "title": "Piñata & jalapeño — a résumé of clichés",
+      "url": "https://cafe.example.com/pinata"
+    }
+  ],
+  "feed": {
+    "bozo": true,
+    "encoding": "iso-8859-1",
+    "entry_count": 1,
+    "site_url": "https://cafe.example.com/",
+    "title": "Café Culture — naïve façade",
+    "version": "rss20"
+  }
+}

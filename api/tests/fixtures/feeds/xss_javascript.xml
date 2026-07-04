@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>XSS: javascript: URL scheme</title>
+    <link>https://xss.example.com/</link>
+    <description>Hostile feed using javascript: and vbscript: URLs.</description>
+    <item>
+      <title>Only http/https schemes may survive</title>
+      <link>https://xss.example.com/jsscheme</link>
+      <guid>https://xss.example.com/jsscheme</guid>
+      <content:encoded><![CDATA[<p><a href="javascript:alert(1)">js link</a>, <a href="JavaScript:alert(2)">mixed case</a>, <a href="vbscript:msgbox(1)">vb</a>, and a <a href="https://safe.example/ok">safe one</a>.</p>]]></content:encoded>
+    </item>
+  </channel>
+</rss>

@@ -1,0 +1,34 @@
+{
+  "entries": [
+    {
+      "author": null,
+      "content_html": "A typo'd year that must not be honored.",
+      "content_html_len": 39,
+      "guid_hash": "cae9a86ff60d9d66916c578dbe15108f458c8b79cfc67cb91e1935f83ce67821",
+      "guid_source": "guid",
+      "published_at": null,
+      "summary": "A typo'd year that must not be honored.",
+      "title": "Dated far in the future",
+      "url": "https://future.example.com/2099"
+    },
+    {
+      "author": null,
+      "content_html": "Within the 48h grace window, so it is kept.",
+      "content_html_len": 43,
+      "guid_hash": "d03673859219f939505a29d80b1cbd59f7d6d3712010d8815d15b0dabe490dfb",
+      "guid_source": "guid",
+      "published_at": "2026-07-04T00:30:00+00:00",
+      "summary": "Within the 48h grace window, so it is kept.",
+      "title": "Dated a few minutes from the reference clock",
+      "url": "https://future.example.com/soon"
+    }
+  ],
+  "feed": {
+    "bozo": false,
+    "encoding": "utf-8",
+    "entry_count": 2,
+    "site_url": "https://future.example.com/",
+    "title": "Feed With Bogus Future Dates",
+    "version": "rss20"
+  }
+}

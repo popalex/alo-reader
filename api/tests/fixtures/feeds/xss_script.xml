@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>XSS: inline &lt;script&gt; tags</title>
+    <link>https://xss.example.com/</link>
+    <description>Hostile feed embedding script tags in body and title.</description>
+    <item>
+      <title>Click &lt;script&gt;alert('title')&lt;/script&gt; me</title>
+      <link>https://xss.example.com/script</link>
+      <guid>https://xss.example.com/script</guid>
+      <description><![CDATA[<p>Before</p><script>alert(document.cookie)</script><p>After</p>]]></description>
+      <content:encoded><![CDATA[<div>Story<script src="https://evil.example/x.js"></script> continues<style>body{display:none}</style> here.</div>]]></content:encoded>
+    </item>
+  </channel>
+</rss>

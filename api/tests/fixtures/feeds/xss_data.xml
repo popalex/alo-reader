@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>XSS: data: URI scheme</title>
+    <link>https://xss.example.com/</link>
+    <description>Hostile feed using data: URIs in links and images.</description>
+    <item>
+      <title>data: URIs must not survive</title>
+      <link>https://xss.example.com/datauri</link>
+      <guid>https://xss.example.com/datauri</guid>
+      <content:encoded><![CDATA[<p><a href="data:text/html,<script>alert(1)</script>">html data link</a> and <img src="data:image/svg+xml,<svg onload=alert(1)>" alt="pixel"> and <img src="https://ok.example/real.png" alt="real"></p>]]></content:encoded>
+    </item>
+  </channel>
+</rss>

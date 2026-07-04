@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE rss PUBLIC "-//Netscape Communications//DTD RSS 0.91//EN"
+ "http://my.netscape.com/publish/formats/rss-0.91.dtd">
+<rss version="0.91">
+  <channel>
+    <title>Scripting News (0.91)</title>
+    <link>http://www.scripting.com/</link>
+    <description>An early weblog feed.</description>
+    <language>en-us</language>
+    <item>
+      <title>RSS 0.91 has no guid</title>
+      <link>http://www.scripting.com/2000/06/01.html</link>
+      <description>The oldest format still in the wild. Dedup falls back to the link.</description>
+    </item>
+    <item>
+      <title>Second post</title>
+      <link>http://www.scripting.com/2000/06/02.html</link>
+      <description>Plain description, no HTML.</description>
+    </item>
+  </channel>
+</rss>

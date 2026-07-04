@@ -1,0 +1,34 @@
+{
+  "entries": [
+    {
+      "author": "Jane Author",
+      "content_html": "Content described via RDF resources.",
+      "content_html_len": 36,
+      "guid_hash": "a57d347dda16dc85ec6fdf463e8938ff2650282bdd90ae5e5cb07e6504c894ca",
+      "guid_source": "guid",
+      "published_at": "2025-06-15T09:30:00+00:00",
+      "summary": "Content described via RDF resources.",
+      "title": "RDF item one",
+      "url": "http://example.org/item/1"
+    },
+    {
+      "author": null,
+      "content_html": "Second RDF item.",
+      "content_html_len": 16,
+      "guid_hash": "40e77c1fc9a387a4b412776f6f4db77962bfa0e19fd46dc21b08ae5e03ea77a9",
+      "guid_source": "guid",
+      "published_at": "2025-06-16T09:00:00+00:00",
+      "summary": "Second RDF item.",
+      "title": "RDF item two",
+      "url": "http://example.org/item/2"
+    }
+  ],
+  "feed": {
+    "bozo": false,
+    "encoding": "utf-8",
+    "entry_count": 2,
+    "site_url": "http://example.org/",
+    "title": "Example RSS 1.0 / RDF",
+    "version": "rss10"
+  }
+}

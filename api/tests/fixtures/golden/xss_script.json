@@ -1,0 +1,23 @@
+{
+  "entries": [
+    {
+      "author": null,
+      "content_html": "<div>Story continues here.</div>",
+      "content_html_len": 32,
+      "guid_hash": "0549f5f8a69ebd590e2755e45177b28d9ac87452e00261c804d1c6c785e747ee",
+      "guid_source": "guid",
+      "published_at": null,
+      "summary": "Story continues here.",
+      "title": "Click me",
+      "url": "https://xss.example.com/script"
+    }
+  ],
+  "feed": {
+    "bozo": false,
+    "encoding": "utf-8",
+    "entry_count": 1,
+    "site_url": "https://xss.example.com/",
+    "title": "XSS: inline",
+    "version": "rss20"
+  }
+}

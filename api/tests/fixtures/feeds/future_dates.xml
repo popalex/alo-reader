@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Feed With Bogus Future Dates</title>
+    <link>https://future.example.com/</link>
+    <description>Dates more than 48h in the future are rejected (normalized to unknown).</description>
+    <item>
+      <title>Dated far in the future</title>
+      <link>https://future.example.com/2099</link>
+      <guid>https://future.example.com/2099</guid>
+      <pubDate>Fri, 01 Jan 2099 00:00:00 GMT</pubDate>
+      <description>A typo'd year that must not be honored.</description>
+    </item>
+    <item>
+      <title>Dated a few minutes from the reference clock</title>
+      <link>https://future.example.com/soon</link>
+      <guid>https://future.example.com/soon</guid>
+      <pubDate>Sat, 04 Jul 2026 00:30:00 GMT</pubDate>
+      <description>Within the 48h grace window, so it is kept.</description>
+    </item>
+  </channel>
+</rss>

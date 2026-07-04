@@ -1,0 +1,45 @@
+{
+  "entries": [
+    {
+      "author": null,
+      "content_html": "Dedup key comes from the link.",
+      "content_html_len": 30,
+      "guid_hash": "13fbdb18a5796b2800a4af45318674e55d729cad83d4505cf1c72d76f318bf34",
+      "guid_source": "link",
+      "published_at": null,
+      "summary": "Dedup key comes from the link.",
+      "title": "Has a link but no guid",
+      "url": "https://noguid.example.com/a"
+    },
+    {
+      "author": null,
+      "content_html": "Dedup key is synthesized from title + published date.",
+      "content_html_len": 53,
+      "guid_hash": "737fa584b0a324a25f23d6d93b3d1948d1f27bc925865cc7938c30e4ef6957fa",
+      "guid_source": "synthetic",
+      "published_at": "2025-06-30T10:00:00+00:00",
+      "summary": "Dedup key is synthesized from title + published date.",
+      "title": "No guid and no link, only a date",
+      "url": null
+    },
+    {
+      "author": null,
+      "content_html": "Dedup key is synthesized from the title alone.",
+      "content_html_len": 46,
+      "guid_hash": "c26494202e827ddb4924cbbafd76de654b7bbb0046709b0085a8e7357b537b4f",
+      "guid_source": "synthetic",
+      "published_at": null,
+      "summary": "Dedup key is synthesized from the title alone.",
+      "title": "No guid, no link, no date",
+      "url": null
+    }
+  ],
+  "feed": {
+    "bozo": false,
+    "encoding": "utf-8",
+    "entry_count": 3,
+    "site_url": "https://noguid.example.com/",
+    "title": "Feed With Missing GUIDs",
+    "version": "rss20"
+  }
+}

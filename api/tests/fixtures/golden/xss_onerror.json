@@ -1,0 +1,23 @@
+{
+  "entries": [
+    {
+      "author": null,
+      "content_html": "<p><img src=\"x\"> and <a href=\"https://ok.example\" target=\"_blank\" rel=\"noopener noreferrer\">link</a> and </p><div>hover</div><p></p>",
+      "content_html_len": 132,
+      "guid_hash": "664342acc4aa7978d234db01e2dd4de87f55c7b766ff66511cc63a351c799990",
+      "guid_source": "guid",
+      "published_at": null,
+      "summary": "and link and hover",
+      "title": "Handler attributes must be stripped",
+      "url": "https://xss.example.com/onerror"
+    }
+  ],
+  "feed": {
+    "bozo": false,
+    "encoding": "utf-8",
+    "entry_count": 1,
+    "site_url": "https://xss.example.com/",
+    "title": "XSS: event handler attributes",
+    "version": "rss20"
+  }
+}
