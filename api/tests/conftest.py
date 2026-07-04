@@ -162,3 +162,14 @@ async def make_pat_user(email: str = "pat@example.com") -> PatUser:
 @pytest_asyncio.fixture
 async def pat_user(api_db: str) -> PatUser:
     return await make_pat_user()
+
+
+@pytest.fixture
+def public_dns(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make the SSRF resolver treat every host as a public IP (worker/fetch tests)."""
+    from app.worker import ssrf
+
+    async def fake(host: str, port: int) -> list[str]:
+        return ["93.184.216.34"]
+
+    monkeypatch.setattr(ssrf, "resolve", fake)
