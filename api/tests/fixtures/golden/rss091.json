@@ -1,0 +1,34 @@
+{
+  "entries": [
+    {
+      "author": null,
+      "content_html": "The oldest format still in the wild. Dedup falls back to the link.",
+      "content_html_len": 66,
+      "guid_hash": "2c1e8d21f2cdb99b111ef05989bb06773474c13787a047a39710f32bdfe46f7c",
+      "guid_source": "link",
+      "published_at": null,
+      "summary": "The oldest format still in the wild. Dedup falls back to the link.",
+      "title": "RSS 0.91 has no guid",
+      "url": "http://www.scripting.com/2000/06/01.html"
+    },
+    {
+      "author": null,
+      "content_html": "Plain description, no HTML.",
+      "content_html_len": 27,
+      "guid_hash": "5da4d9f62d24243c710fed888a930099e14a46f69ab81ad30aac410f29bc5235",
+      "guid_source": "link",
+      "published_at": null,
+      "summary": "Plain description, no HTML.",
+      "title": "Second post",
+      "url": "http://www.scripting.com/2000/06/02.html"
+    }
+  ],
+  "feed": {
+    "bozo": false,
+    "encoding": "utf-8",
+    "entry_count": 2,
+    "site_url": "http://www.scripting.com/",
+    "title": "Scripting News (0.91)",
+    "version": "rss091n"
+  }
+}

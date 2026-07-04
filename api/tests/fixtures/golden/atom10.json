@@ -1,0 +1,34 @@
+{
+  "entries": [
+    {
+      "author": "Contributor Two",
+      "content_html": "<p>HTML content with an <em>emphasis</em> and a <a href=\"https://atom.example.com/x\" target=\"_blank\" rel=\"noopener noreferrer\">link</a>.</p>",
+      "content_html_len": 140,
+      "guid_hash": "dad969e7692d5789f779060bd3e21e7becbf75e4b40a358a8d186f332e06fd96",
+      "guid_source": "guid",
+      "published_at": "2025-07-03T18:00:00+00:00",
+      "summary": "HTML content with an emphasis and a link.",
+      "title": "Atom entry with HTML content",
+      "url": "https://atom.example.com/entry/1"
+    },
+    {
+      "author": null,
+      "content_html": "<p>XHTML body content.</p>",
+      "content_html_len": 26,
+      "guid_hash": "37d221e5542638ad6653cee6e951dd8205d8d63f3ec6bf564b9b3bffc696b15b",
+      "guid_source": "guid",
+      "published_at": "2025-07-02T09:00:00+00:00",
+      "summary": "XHTML body content.",
+      "title": "Atom entry with XHTML content",
+      "url": "https://atom.example.com/entry/2"
+    }
+  ],
+  "feed": {
+    "bozo": false,
+    "encoding": "utf-8",
+    "entry_count": 2,
+    "site_url": "https://atom.example.com/",
+    "title": "Example Atom Feed",
+    "version": "atom10"
+  }
+}

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xml:base="https://relative.example.com/blog/">
+  <title>Feed With Relative URLs</title>
+  <link href="https://relative.example.com/blog/" rel="alternate"/>
+  <id>urn:uuid:relative-feed</id>
+  <updated>2025-07-01T00:00:00Z</updated>
+  <entry xml:base="https://relative.example.com/blog/posts/">
+    <title>Post with relative links and images</title>
+    <link href="intro" rel="alternate"/>
+    <id>urn:uuid:relative-entry-1</id>
+    <updated>2025-07-01T00:00:00Z</updated>
+    <content type="html">&lt;p&gt;See &lt;a href="../about"&gt;about&lt;/a&gt; and &lt;img src="/img/hero.png" alt="hero"&gt; and &lt;a href="deep/page"&gt;deep&lt;/a&gt;.&lt;/p&gt;</content>
+  </entry>
+</feed>

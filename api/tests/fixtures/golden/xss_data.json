@@ -1,0 +1,23 @@
+{
+  "entries": [
+    {
+      "author": null,
+      "content_html": "<p><a href=\"\" target=\"_blank\" rel=\"noopener noreferrer\">html data link</a> and <img alt=\"pixel\"> and <img alt=\"real\" src=\"https://ok.example/real.png\"></p>",
+      "content_html_len": 155,
+      "guid_hash": "6d8733ab5a83e4b6223dd13a7f733f570e6fe7b9fb1f75021e8818c59853f365",
+      "guid_source": "guid",
+      "published_at": null,
+      "summary": "html data link and and",
+      "title": "data: URIs must not survive",
+      "url": "https://xss.example.com/datauri"
+    }
+  ],
+  "feed": {
+    "bozo": false,
+    "encoding": "utf-8",
+    "entry_count": 1,
+    "site_url": "https://xss.example.com/",
+    "title": "XSS: data: URI scheme",
+    "version": "rss20"
+  }
+}

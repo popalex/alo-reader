@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<rss version="2.0">
+  <channel>
+    <title>Café Culture — naïve façade</title>
+    <link>https://cafe.example.com/</link>
+    <description>Declares ISO-8859-1 but the bytes are actually UTF-8 (a common misconfiguration).</description>
+    <item>
+      <title>Piñata & jalapeño — a résumé of clichés</title>
+      <link>https://cafe.example.com/pinata</link>
+      <guid>https://cafe.example.com/pinata</guid>
+      <description>Smart quotes “like these”, an em—dash, and © symbols stored as UTF-8 bytes.</description>
+    </item>
+  </channel>
+</rss>

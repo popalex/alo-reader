@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title><![CDATA[CDATA Wrapped Feed]]></title>
+    <link>https://cdata.example.com/</link>
+    <description><![CDATA[Feed whose fields are wrapped in <CDATA> blocks.]]></description>
+    <item>
+      <title><![CDATA[Title in <CDATA> with <b>bold</b> & ampersand]]></title>
+      <link>https://cdata.example.com/one</link>
+      <guid>https://cdata.example.com/one</guid>
+      <description><![CDATA[<p>Body in CDATA with a <a href="https://cdata.example.com/x">link</a> and <b>bold</b>.</p>]]></description>
+      <content:encoded><![CDATA[<div><p>Full <em>encoded</em> content.</p><p>Second paragraph &amp; more.</p></div>]]></content:encoded>
+    </item>
+  </channel>
+</rss>

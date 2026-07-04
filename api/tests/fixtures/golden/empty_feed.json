@@ -1,0 +1,11 @@
+{
+  "entries": [],
+  "feed": {
+    "bozo": false,
+    "encoding": "utf-8",
+    "entry_count": 0,
+    "site_url": "https://empty.example.com/",
+    "title": "An Empty But Valid Feed",
+    "version": "rss20"
+  }
+}

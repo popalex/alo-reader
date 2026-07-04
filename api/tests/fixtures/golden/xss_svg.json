@@ -1,0 +1,23 @@
+{
+  "entries": [
+    {
+      "author": null,
+      "content_html": "<p>Intro.</p><p>Outro.</p>",
+      "content_html_len": 26,
+      "guid_hash": "2316829d5ea3d52249ec070529dd3aadd2f4b5cabebeef31c0ed835cf460e73a",
+      "guid_source": "guid",
+      "published_at": null,
+      "summary": "Intro.Outro.",
+      "title": "SVG must be dropped entirely",
+      "url": "https://xss.example.com/svg"
+    }
+  ],
+  "feed": {
+    "bozo": false,
+    "encoding": "utf-8",
+    "entry_count": 1,
+    "site_url": "https://xss.example.com/",
+    "title": "XSS: SVG-based vectors",
+    "version": "rss20"
+  }
+}

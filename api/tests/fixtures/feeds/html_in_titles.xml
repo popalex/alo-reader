@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Titles Full Of &lt;b&gt;Markup&lt;/b&gt; &amp; Entities</title>
+    <link>https://titles.example.com/</link>
+    <description>Titles must be reduced to plain text everywhere.</description>
+    <item>
+      <title>Breaking: &lt;strong&gt;Markets&lt;/strong&gt; up 5% &amp; rising</title>
+      <link>https://titles.example.com/markets</link>
+      <guid>https://titles.example.com/markets</guid>
+      <description>The title carries escaped HTML that must be stripped to text.</description>
+    </item>
+    <item>
+      <title>Ampersands &amp; &lt;i&gt;italics&lt;/i&gt; &amp;amp; double-escapes</title>
+      <link>https://titles.example.com/amp</link>
+      <guid>https://titles.example.com/amp</guid>
+      <description>Nested entity encoding in the title.</description>
+    </item>
+  </channel>
+</rss>

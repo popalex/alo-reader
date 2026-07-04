@@ -1,0 +1,34 @@
+{
+  "entries": [
+    {
+      "author": "editor@example.com (The Editor)",
+      "content_html": "<p>The <strong>full</strong> article body with a <a href=\"https://example.com/more\" target=\"_blank\" rel=\"noopener noreferrer\">link</a>.</p>",
+      "content_html_len": 139,
+      "guid_hash": "888ff7e757c50876eca53eac7d9cce4636cb3f86f6bf9a38745393d3e59e1eab",
+      "guid_source": "guid",
+      "published_at": "2025-07-01T12:00:00+00:00",
+      "summary": "The full article body with a link.",
+      "title": "First real post",
+      "url": "https://blog.example.com/posts/first"
+    },
+    {
+      "author": null,
+      "content_html": "Just a plain description, no encoded content.",
+      "content_html_len": 45,
+      "guid_hash": "aa44d7127795755f726a5a992f5ef5ed6011707872216122c80b7d3ccc63616f",
+      "guid_source": "guid",
+      "published_at": "2025-07-02T07:45:00+00:00",
+      "summary": "Just a plain description, no encoded content.",
+      "title": "Second real post",
+      "url": "https://blog.example.com/posts/second"
+    }
+  ],
+  "feed": {
+    "bozo": false,
+    "encoding": "utf-8",
+    "entry_count": 2,
+    "site_url": "https://blog.example.com/",
+    "title": "Example RSS 2.0 Blog",
+    "version": "rss20"
+  }
+}

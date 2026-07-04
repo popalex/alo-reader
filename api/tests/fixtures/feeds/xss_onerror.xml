@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>XSS: event handler attributes</title>
+    <link>https://xss.example.com/</link>
+    <description>Hostile feed using onerror/onload/onclick handlers.</description>
+    <item>
+      <title>Handler attributes must be stripped</title>
+      <link>https://xss.example.com/onerror</link>
+      <guid>https://xss.example.com/onerror</guid>
+      <content:encoded><![CDATA[<p><img src="x" onerror="alert(1)" onload="evil()"> and <a href="https://ok.example" onclick="steal()">link</a> and <div onmouseover="x()">hover</div></p>]]></content:encoded>
+    </item>
+  </channel>
+</rss>

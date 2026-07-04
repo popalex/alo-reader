@@ -1,0 +1,34 @@
+{
+  "entries": [
+    {
+      "author": null,
+      "content_html": "The title carries escaped HTML that must be stripped to text.",
+      "content_html_len": 61,
+      "guid_hash": "ecf92af479559bd3bddd12e7b06ef13fe82696cd3052e9ee28576cb74142b88e",
+      "guid_source": "guid",
+      "published_at": null,
+      "summary": "The title carries escaped HTML that must be stripped to text.",
+      "title": "Breaking: Markets up 5% & rising",
+      "url": "https://titles.example.com/markets"
+    },
+    {
+      "author": null,
+      "content_html": "Nested entity encoding in the title.",
+      "content_html_len": 36,
+      "guid_hash": "755f4092ef78ac5cd7f97783151ab3b7cd8e0a2e0e0d98bb2a0a5b4c72aca07d",
+      "guid_source": "guid",
+      "published_at": null,
+      "summary": "Nested entity encoding in the title.",
+      "title": "Ampersands & italics & double-escapes",
+      "url": "https://titles.example.com/amp"
+    }
+  ],
+  "feed": {
+    "bozo": false,
+    "encoding": "utf-8",
+    "entry_count": 2,
+    "site_url": "https://titles.example.com/",
+    "title": "Titles Full Of Markup & Entities",
+    "version": "rss20"
+  }
+}
