@@ -47,8 +47,11 @@ up:
 dev:
 	$(COMPOSE_DEV) up --build
 
+## Tear down the whole stack (containers + network) whether it was started by
+## `make up` or `make dev` — same project, so the dev file set is a safe superset.
+## Named volumes (pgdata) are kept; use `make db-down` semantics or add -v to wipe.
 down:
-	$(COMPOSE) down
+	$(COMPOSE_DEV) down
 
 ## Start ONLY the dockerized Postgres (exposed on localhost:5432) for migrate/tests.
 db:

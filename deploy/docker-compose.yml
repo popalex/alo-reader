@@ -11,6 +11,21 @@ services:
     depends_on:
       - api
 
+  # One-shot: applies Alembic migrations to head, then exits. api/worker wait for
+  # it to finish (service_completed_successfully), so schema is always current
+  # before they boot — and with N replicas this runs exactly once, not per-replica.
+  migrate:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    command: ["migrate"]
+    restart: "no"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://alo:alo@postgres:5432/alo}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
     build:
       context: ..
@@ -18,9 +33,20 @@ services:
     command: ["api"]
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://alo:alo@postgres:5432/alo}
+      # No default on purpose: the API refuses to boot without an explicit
+      # AUTH_MODE (set it in .env; see .env.example). Dev overlay sets "none".
+      AUTH_MODE: ${AUTH_MODE:-}
+      CLERK_ISSUER: ${CLERK_ISSUER:-}
+      CLERK_AUDIENCE: ${CLERK_AUDIENCE:-}
+      CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY:-}
+      CLERK_WEBHOOK_SECRET: ${CLERK_WEBHOOK_SECRET:-}
+      RATE_LIMIT_RPS: ${RATE_LIMIT_RPS:-10}
+      RATE_LIMIT_BURST: ${RATE_LIMIT_BURST:-30}
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   worker:
     build:
@@ -32,6 +58,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   postgres:
     image: postgres:18
@@ -40,7 +68,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-alo}
       POSTGRES_DB: ${POSTGRES_DB:-alo}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # postgres:18+ images require the mount at /var/lib/postgresql (data lives
+      # in a version-specific subdir); mounting .../data is refused at boot.
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-alo} -d ${POSTGRES_DB:-alo}"]
       interval: 5s

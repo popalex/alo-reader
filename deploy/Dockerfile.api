@@ -10,6 +10,11 @@ COPY api/pyproject.toml ./pyproject.toml
 COPY api/app ./app
 RUN pip install --no-cache-dir .
 
+# Alembic config + migration scripts: needed by the `migrate` command so the
+# image can bring a database up to head on its own.
+COPY api/alembic.ini ./alembic.ini
+COPY api/migrations ./migrations
+
 COPY deploy/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
