@@ -52,6 +52,29 @@ class Settings(BaseSettings):
         """Honest, contactable crawler UA (DESIGN.md §1.3)."""
         return f"alo-reader/1.0 (+{self.fetch_contact_url})"
 
+    # Worker / poller (DESIGN.md §1.3). The claim loop wakes every
+    # WORKER_POLL_INTERVAL_S, claims WORKER_CLAIM_BATCH due feeds under a
+    # WORKER_LEASE_S lease, and fetches at most WORKER_MAX_CONCURRENCY at once.
+    worker_poll_interval_s: float = 5.0
+    worker_claim_batch: int = 50
+    worker_lease_s: int = 120
+    worker_max_concurrency: int = 20
+
+    # Politeness per origin host: at most this many concurrent fetches to one
+    # host, and at least this long between successive fetches to it.
+    worker_per_host_concurrency: int = 1
+    worker_per_host_delay_s: float = 1.0
+
+    # Adaptive poll interval bounds (seconds): active feeds trend toward the
+    # floor, dormant ones toward the ceiling.
+    worker_interval_floor_s: int = 900
+    worker_interval_ceil_s: int = 86_400
+
+    # Exponential backoff on fetch/parse errors: base doubled per consecutive
+    # error, clamped to the cap.
+    worker_backoff_base_s: int = 900
+    worker_backoff_cap_s: int = 86_400
+
 
 @lru_cache
 def get_settings() -> Settings:
