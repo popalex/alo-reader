@@ -16,6 +16,12 @@ services:
       - api
       - web
 
+  # Mount source so a newly-added migration is applied on the next `make dev`
+  # without rebuilding the image.
+  migrate:
+    volumes:
+      - ../api:/app
+
   api:
     # Bypass the image entrypoint (api/worker dispatch) to run uvicorn with reload.
     entrypoint: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
