@@ -55,6 +55,8 @@ services:
     command: ["worker"]
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://alo:alo@postgres:5432/alo}
+      # Hostnames exempt from the SSRF private-range block (trusted internal feeds).
+      FETCH_ALLOW_HOSTS: ${FETCH_ALLOW_HOSTS:-}
     depends_on:
       postgres:
         condition: service_healthy

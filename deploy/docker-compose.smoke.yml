@@ -1,0 +1,11 @@
+# Overlay for scripts/smoke.sh: adds a static feed server on the compose network.
+# The worker is allowed to poll it via FETCH_ALLOW_HOSTS=feedfixture (set by the
+# script), which exempts this trusted internal host from the SSRF private-range block.
+#
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.smoke.yml up
+
+services:
+  feedfixture:
+    image: nginx:alpine
+    volumes:
+      - ../scripts/smoke_feed.xml:/usr/share/nginx/html/rss.xml:ro

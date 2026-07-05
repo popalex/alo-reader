@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Smoke Test Feed</title>
+    <link>http://feedfixture/</link>
+    <description>A tiny feed served inside compose for scripts/smoke.sh.</description>
+    <item>
+      <title>First smoke article</title>
+      <link>http://feedfixture/1</link>
+      <guid>smoke-1</guid>
+      <pubDate>Tue, 01 Jul 2025 10:00:00 GMT</pubDate>
+      <description>&lt;p&gt;Hello from the &lt;b&gt;first&lt;/b&gt; article.&lt;/p&gt;</description>
+    </item>
+    <item>
+      <title>Second smoke article</title>
+      <link>http://feedfixture/2</link>
+      <guid>smoke-2</guid>
+      <pubDate>Wed, 02 Jul 2025 10:00:00 GMT</pubDate>
+      <description>&lt;p&gt;Hello from the second article.&lt;/p&gt;</description>
+    </item>
+    <item>
+      <title>Third smoke article</title>
+      <link>http://feedfixture/3</link>
+      <guid>smoke-3</guid>
+      <pubDate>Thu, 03 Jul 2025 10:00:00 GMT</pubDate>
+      <description>&lt;p&gt;Hello from the third article.&lt;/p&gt;</description>
+    </item>
+  </channel>
+</rss>
