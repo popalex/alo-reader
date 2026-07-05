@@ -6,10 +6,16 @@ functions are not user-scoped.
 
 from datetime import timedelta
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select, text, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Feed
+
+# A released lease: 1970, always in the past, so the row is immediately claimable.
+_RELEASED = text("'epoch'::timestamptz")
+# Cap stored error text so a hostile server message can't bloat the row.
+_MAX_ERROR_LEN = 2000
 
 
 async def create(
@@ -74,3 +80,76 @@ async def claim_due_feeds(
     )
     result = await session.scalars(stmt)
     return list(result.all())
+
+
+async def record_success(
+    session: AsyncSession,
+    feed_id: int,
+    *,
+    interval_s: int,
+    etag: str | None,
+    last_modified: str | None,
+    title: str,
+    site_url: str | None,
+) -> None:
+    """Persist a successful poll: refresh metadata/validators, schedule the next
+    check ``interval_s`` out, clear the error state, and release the lease."""
+    await session.execute(
+        update(Feed)
+        .where(Feed.id == feed_id)
+        .values(
+            etag=etag,
+            last_modified=last_modified,
+            title=title,
+            site_url=site_url,
+            check_interval_s=interval_s,
+            next_check_at=func.now() + timedelta(seconds=interval_s),
+            error_count=0,
+            last_error=None,
+            last_fetched_at=func.now(),
+            claimed_until=_RELEASED,
+        )
+    )
+
+
+async def record_not_modified(session: AsyncSession, feed_id: int, *, interval_s: int) -> None:
+    """Persist a ``304``: reschedule and clear errors, leaving content untouched."""
+    await session.execute(
+        update(Feed)
+        .where(Feed.id == feed_id)
+        .values(
+            check_interval_s=interval_s,
+            next_check_at=func.now() + timedelta(seconds=interval_s),
+            error_count=0,
+            last_error=None,
+            last_fetched_at=func.now(),
+            claimed_until=_RELEASED,
+        )
+    )
+
+
+async def record_error(session: AsyncSession, feed_id: int, *, delay_s: int, message: str) -> None:
+    """Persist a failed poll: bump ``error_count``, store ``last_error``, back off
+    ``delay_s``, and release the lease. Feeds are never auto-deleted."""
+    await session.execute(
+        update(Feed)
+        .where(Feed.id == feed_id)
+        .values(
+            error_count=Feed.error_count + 1,
+            last_error=message[:_MAX_ERROR_LEN],
+            next_check_at=func.now() + timedelta(seconds=delay_s),
+            claimed_until=_RELEASED,
+        )
+    )
+
+
+async def update_feed_url(session: AsyncSession, feed_id: int, new_url: str) -> bool:
+    """Repoint a permanently-redirected feed. Returns ``False`` on a unique
+    collision (another feed already lives at ``new_url``) — the caller must mark an
+    error rather than silently merge two feeds."""
+    try:
+        async with session.begin_nested():
+            await session.execute(update(Feed).where(Feed.id == feed_id).values(feed_url=new_url))
+    except IntegrityError:
+        return False
+    return True
