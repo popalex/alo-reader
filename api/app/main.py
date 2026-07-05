@@ -13,6 +13,8 @@ from app.auth import AuthMiddleware
 from app.auth import router as auth_router
 from app.config import validate_boot_config
 from app.errors import register_exception_handlers
+from app.routes.folders import router as folders_router
+from app.routes.subscriptions import router as subscriptions_router
 
 
 @asynccontextmanager
@@ -34,4 +36,6 @@ async def healthz() -> dict[str, str]:
 
 
 api_v1.include_router(auth_router)
+api_v1.include_router(folders_router)
+api_v1.include_router(subscriptions_router)
 app.include_router(api_v1)

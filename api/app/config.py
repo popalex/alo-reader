@@ -40,17 +40,24 @@ class Settings(BaseSettings):
     rate_limit_rps: float = 10.0
     rate_limit_burst: int = 30
 
-    # Fetcher / poller (DESIGN.md §1.3). The contact URL goes into an honest
-    # crawler User-Agent so hosts can reach us; the caps bound cost and abuse.
-    fetch_contact_url: str = "https://github.com/popalex/alo-reader"
+    # Minimum spacing between manual /subscriptions/{id}/refresh calls per feed
+    # (per API replica), so a user can't hammer the poller.
+    subscription_refresh_window_s: float = 300.0
+
+    # Fetcher / poller (DESIGN.md §1.3). An operator may set a contact URL so hosts
+    # can reach them; it's optional and empty by default (no personal URL baked in).
+    # The caps bound per-fetch cost/abuse.
+    fetch_contact_url: str = ""
     fetch_timeout_s: float = 30.0
     fetch_max_bytes: int = 5 * 1024 * 1024
     fetch_max_redirects: int = 5
 
     @property
     def user_agent(self) -> str:
-        """Honest, contactable crawler UA (DESIGN.md §1.3)."""
-        return f"alo-reader/1.0 (+{self.fetch_contact_url})"
+        """Crawler UA (DESIGN.md §1.3); appends a ``(+contact)`` only if configured."""
+        if self.fetch_contact_url:
+            return f"alo-reader/1.0 (+{self.fetch_contact_url})"
+        return "alo-reader/1.0"
 
     # Worker / poller (DESIGN.md §1.3). The claim loop wakes every
     # WORKER_POLL_INTERVAL_S, claims WORKER_CLAIM_BATCH due feeds under a

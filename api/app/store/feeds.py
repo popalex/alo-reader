@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Feed
+from app.store import rowcount
 
 # A released lease: 1970, always in the past, so the row is immediately claimable.
 _RELEASED = text("'epoch'::timestamptz")
@@ -56,6 +57,15 @@ async def upsert_by_url(
     session.add(feed)
     await session.flush()
     return feed
+
+
+async def request_immediate_check(session: AsyncSession, feed_id: int) -> bool:
+    """Queue a feed for the next poll cycle (``next_check_at = now()``). Used by the
+    manual /subscriptions/{id}/refresh path. Returns False if the feed is gone."""
+    result = await session.execute(
+        update(Feed).where(Feed.id == feed_id).values(next_check_at=func.now())
+    )
+    return rowcount(result) > 0
 
 
 async def claim_due_feeds(

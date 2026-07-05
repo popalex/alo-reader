@@ -9,7 +9,7 @@ per-user ``entry_states`` read flag.
 from datetime import datetime
 from typing import Any, TypedDict
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
@@ -46,6 +46,13 @@ async def insert_batch(session: AsyncSession, feed_id: int, entries: list[NewEnt
 
 async def get(session: AsyncSession, entry_id: int) -> Entry | None:
     return await session.get(Entry, entry_id)
+
+
+async def max_id_for_feed(session: AsyncSession, feed_id: int) -> int:
+    """Highest entry id currently stored for a feed (0 if none). Used to set a new
+    subscription's ``since_entry_id`` so its archive isn't dumped as unread."""
+    result = await session.scalar(select(func.max(Entry.id)).where(Entry.feed_id == feed_id))
+    return result or 0
 
 
 async def list_by_stream(
