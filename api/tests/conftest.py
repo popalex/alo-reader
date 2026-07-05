@@ -164,6 +164,16 @@ async def pat_user(api_db: str) -> PatUser:
     return await make_pat_user()
 
 
+@pytest.fixture(autouse=True)
+def _reset_refresh_cooldown() -> Iterator[None]:
+    """The per-feed refresh cooldown is process-global; feed ids repeat across the
+    fresh per-test databases, so clear it between tests to avoid cross-test bleed."""
+    from app.routes import subscriptions
+
+    subscriptions._refresh_cooldown.reset()
+    yield
+
+
 @pytest.fixture
 def public_dns(monkeypatch: pytest.MonkeyPatch) -> None:
     """Make the SSRF resolver treat every host as a public IP (worker/fetch tests)."""

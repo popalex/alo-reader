@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     rate_limit_rps: float = 10.0
     rate_limit_burst: int = 30
 
+    # Minimum spacing between manual /subscriptions/{id}/refresh calls per feed
+    # (per API replica), so a user can't hammer the poller.
+    subscription_refresh_window_s: float = 300.0
+
     # Fetcher / poller (DESIGN.md §1.3). An operator may set a contact URL so hosts
     # can reach them; it's optional and empty by default (no personal URL baked in).
     # The caps bound per-fetch cost/abuse.
