@@ -16,6 +16,12 @@ from .runtime import get_runtime
 # Paths that never need an identity: skipped entirely (healthz must not touch
 # the DB, /config is the SPA's pre-auth boot call, the webhook is svix-signed).
 PUBLIC_PATHS = frozenset({"/api/v1/healthz", "/api/v1/config", "/api/v1/webhooks/clerk"})
+# Served favicons are global, immutable bytes referenced from <img> tags — public.
+PUBLIC_PREFIXES = ("/api/v1/icons/",)
+
+
+def _is_public(path: str) -> bool:
+    return path in PUBLIC_PATHS or path.startswith(PUBLIC_PREFIXES)
 
 
 class AuthMiddleware:
@@ -23,7 +29,7 @@ class AuthMiddleware:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or scope["path"] in PUBLIC_PATHS:
+        if scope["type"] != "http" or _is_public(scope["path"]):
             await self.app(scope, receive, send)
             return
         request = Request(scope, receive)

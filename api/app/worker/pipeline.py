@@ -8,6 +8,7 @@ can drive the whole pipeline with an ``httpx.MockTransport`` and no real network
 """
 
 import asyncio
+import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Protocol
@@ -20,9 +21,13 @@ from app.ingest import compress_text, parse_feed, sanitize_html
 from app.ingest.parse import ParsedFeed
 from app.store import entries as entries_store
 from app.store import feeds as feeds_store
+from app.store import icons as icons_store
 from app.store.entries import NewEntry
 from app.worker.fetch import FetchResult, FetchTarget, fetch_feed
+from app.worker.icons import fetch_favicon
 from app.worker.schedule import adaptive_interval, error_delay
+
+log = logging.getLogger("worker")
 
 FetchFn = Callable[..., Awaitable[FetchResult]]
 
@@ -35,6 +40,7 @@ class FeedRow(FetchTarget, Protocol):
     site_url: str | None
     check_interval_s: int
     error_count: int
+    icon_id: int | None
 
 
 # Outcome status: new_body | not_modified | http_error | network_error | blocked
@@ -67,7 +73,11 @@ def _build_entries(body: bytes) -> tuple[ParsedFeed, list[NewEntry]]:
 
 
 async def _apply_new_body(
-    session: AsyncSession, feed: FeedRow, result: FetchResult, settings: Settings
+    session: AsyncSession,
+    feed: FeedRow,
+    result: FetchResult,
+    settings: Settings,
+    transport: httpx.AsyncBaseTransport | None,
 ) -> FeedOutcome:
     if result.body is None:  # defensive: new_body always carries a body
         return await _apply_error(session, feed, result, settings, "empty body")
@@ -80,6 +90,7 @@ async def _apply_new_body(
         floor_s=settings.worker_interval_floor_s,
         ceil_s=settings.worker_interval_ceil_s,
     )
+    site_url = parsed.site_url or feed.site_url
     await feeds_store.record_success(
         session,
         feed.id,
@@ -87,9 +98,30 @@ async def _apply_new_body(
         etag=result.etag,
         last_modified=result.last_modified,
         title=parsed.title or feed.title,
-        site_url=parsed.site_url or feed.site_url,
+        site_url=site_url,
     )
+    if settings.worker_fetch_favicons and feed.icon_id is None:
+        await _maybe_fetch_favicon(session, feed.id, site_url, settings, transport)
     return FeedOutcome(feed.id, "new_body", new_entries=count)
+
+
+async def _maybe_fetch_favicon(
+    session: AsyncSession,
+    feed_id: int,
+    site_url: str | None,
+    settings: Settings,
+    transport: httpx.AsyncBaseTransport | None,
+) -> None:
+    """Best-effort: a missing/broken favicon must never fail the poll."""
+    try:
+        favicon = await fetch_favicon(site_url, settings=settings, transport=transport)
+        if favicon is not None:
+            icon = await icons_store.get_or_create(
+                session, url=favicon.url, mime=favicon.mime, data=favicon.data
+            )
+            await icons_store.set_feed_icon(session, feed_id, icon.id)
+    except Exception as exc:  # noqa: BLE001 — best-effort, log and move on
+        log.warning("favicon_fetch_failed feed_id=%s error=%r", feed_id, exc)
 
 
 async def _apply_not_modified(
@@ -150,7 +182,7 @@ async def process_feed(
                 )
 
         if result.status == "new_body":
-            return await _apply_new_body(session, feed, result, settings)
+            return await _apply_new_body(session, feed, result, settings, transport)
         if result.status == "not_modified":
             return await _apply_not_modified(session, feed, settings)
         # http_error / network_error / blocked

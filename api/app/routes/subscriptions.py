@@ -96,7 +96,7 @@ def _shape(sub: Subscription, feed: Feed) -> SubscriptionResponse:
         title=sub.title_override or feed.title,
         site_url=feed.site_url,
         folder_id=sub.folder_id,
-        icon_url=None,
+        icon_url=f"/api/v1/icons/{feed.icon_id}" if feed.icon_id is not None else None,
         last_error=feed.last_error,
         last_fetched_at=feed.last_fetched_at,
     )
