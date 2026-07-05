@@ -87,4 +87,9 @@ AFTER=$(curl -fsS "$BASE/counts" "${AUTH[@]}" | jget "['total_unread']")
 echo "Unread after mark-read: $AFTER."
 [[ "$AFTER" == "0" ]] || fail "expected 0 unread after mark-read, got $AFTER"
 
-printf '\n\033[32mPASS: subscribe -> poll -> list -> read -> mark-read -> count all worked.\033[0m\n'
+log "Exporting OPML"
+OPML=$(curl -fsS "$BASE/opml" "${AUTH[@]}")
+echo "$OPML" | grep -q "$FEED_URL" || fail "OPML export did not contain the subscribed feed"
+echo "OPML export contains the subscribed feed."
+
+printf '\n\033[32mPASS: subscribe -> poll -> list -> read -> mark-read -> count -> opml all worked.\033[0m\n'
