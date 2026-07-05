@@ -61,6 +61,11 @@ class Settings(BaseSettings):
     def fetch_allow_hosts_set(self) -> frozenset[str]:
         return frozenset(h.strip() for h in self.fetch_allow_hosts.split(",") if h.strip())
 
+    # OPML / discovery / icons (WP-08) size caps.
+    opml_max_bytes: int = 1 * 1024 * 1024  # reject larger OPML uploads
+    discover_max_bytes: int = 2 * 1024 * 1024  # HTML page cap for feed discovery
+    favicon_max_bytes: int = 100 * 1024  # stored favicon cap
+
     @property
     def user_agent(self) -> str:
         """Crawler UA (DESIGN.md §1.3); appends a ``(+contact)`` only if configured."""
@@ -80,6 +85,9 @@ class Settings(BaseSettings):
     # host, and at least this long between successive fetches to it.
     worker_per_host_concurrency: int = 1
     worker_per_host_delay_s: float = 1.0
+
+    # Fetch a feed's favicon on its first successful poll (WP-08). Best-effort.
+    worker_fetch_favicons: bool = True
 
     # Adaptive poll interval bounds (seconds): active feeds trend toward the
     # floor, dormant ones toward the ceiling.
