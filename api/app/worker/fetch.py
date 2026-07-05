@@ -98,8 +98,9 @@ async def fetch_feed(
     fresh :class:`SSRFGuardedTransport` is created and closed per call.
     """
     settings = settings or get_settings()
+    allow_hosts = settings.fetch_allow_hosts_set
     owns_transport = transport is None
-    transport = transport or SSRFGuardedTransport()
+    transport = transport or SSRFGuardedTransport(allow_hosts=allow_hosts)
 
     base_headers = {
         "User-Agent": settings.user_agent,
@@ -119,7 +120,7 @@ async def fetch_feed(
             ) as client:
                 for hop in range(settings.fetch_max_redirects + 1):
                     try:
-                        await guard_url(url)
+                        await guard_url(url, allow_hosts=allow_hosts)
                     except SSRFError as exc:
                         return FetchResult("blocked", final_url=url, error=str(exc))
 

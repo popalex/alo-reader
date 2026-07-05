@@ -52,6 +52,15 @@ class Settings(BaseSettings):
     fetch_max_bytes: int = 5 * 1024 * 1024
     fetch_max_redirects: int = 5
 
+    # Comma-separated hostnames exempt from the SSRF private-range block (they still
+    # must be http/https and resolvable). Default empty. Intended for trusted
+    # internal/test feed servers — e.g. a fixture host in the compose network.
+    fetch_allow_hosts: str = ""
+
+    @property
+    def fetch_allow_hosts_set(self) -> frozenset[str]:
+        return frozenset(h.strip() for h in self.fetch_allow_hosts.split(",") if h.strip())
+
     @property
     def user_agent(self) -> str:
         """Crawler UA (DESIGN.md §1.3); appends a ``(+contact)`` only if configured."""

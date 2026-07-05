@@ -78,6 +78,19 @@ async def test_reject_if_any_resolved_address_is_blocked(monkeypatch: pytest.Mon
         await ssrf.guard_url("https://mixed.example/feed")
 
 
+async def test_allowlisted_host_bypasses_private_block(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake(host: str, port: int) -> list[str]:
+        return ["10.0.0.9"]  # private, normally blocked
+
+    monkeypatch.setattr(ssrf, "resolve", fake)
+    # Without the allowlist it's blocked...
+    with pytest.raises(ssrf.SSRFError):
+        await ssrf.guard_url("http://feedfixture/rss")
+    # ...but an allowlisted host resolves through to the private IP.
+    ip = await ssrf.guard_url("http://feedfixture/rss", allow_hosts=frozenset({"feedfixture"}))
+    assert ip == "10.0.0.9"
+
+
 async def test_ip_literal_host_is_validated_without_dns(monkeypatch: pytest.MonkeyPatch) -> None:
     called = False
 

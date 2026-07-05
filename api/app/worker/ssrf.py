@@ -71,11 +71,14 @@ async def resolve(host: str, port: int) -> list[str]:
     return list(seen)
 
 
-async def resolve_and_validate(host: str, port: int) -> list[str]:
+async def resolve_and_validate(
+    host: str, port: int, *, allow_hosts: frozenset[str] = frozenset()
+) -> list[str]:
     """Resolve ``host`` and validate every address; return the allowed IPs.
 
     A host with *any* blocked address is refused outright (defeats round-robin /
-    rebind tricks that mix a public and a private record).
+    rebind tricks that mix a public and a private record). A host in ``allow_hosts``
+    skips the private-range block (still resolved) — for trusted internal feeds.
     """
     # Accept IP literals without a DNS round-trip, but still validate them.
     try:
@@ -85,13 +88,15 @@ async def resolve_and_validate(host: str, port: int) -> list[str]:
         candidates = await resolve(host, port)
     if not candidates:
         raise SSRFError("dns", f"{host!r} did not resolve")
+    if host in allow_hosts:
+        return candidates
     for ip in candidates:
         if ip_is_blocked(ip):
             raise SSRFError("blocked_ip", f"{host!r} resolves to disallowed address {ip}")
     return candidates
 
 
-async def guard_url(url: str) -> str:
+async def guard_url(url: str, *, allow_hosts: frozenset[str] = frozenset()) -> str:
     """Validate a URL's scheme + resolved host; return the IP to connect to.
 
     Raises :class:`SSRFError` on a bad scheme, missing host, or disallowed address.
@@ -103,7 +108,7 @@ async def guard_url(url: str) -> str:
     if not host:
         raise SSRFError("no_host", f"no host in {url!r}")
     port = parts.port or (443 if parts.scheme == "https" else 80)
-    ips = await resolve_and_validate(host, port)
+    ips = await resolve_and_validate(host, port, allow_hosts=allow_hosts)
     return ips[0]
 
 
@@ -114,8 +119,11 @@ class _GuardedBackend(httpcore.AsyncNetworkBackend):
     lookup for an attacker to rebind between (DESIGN.md §1.3).
     """
 
-    def __init__(self, inner: httpcore.AsyncNetworkBackend) -> None:
+    def __init__(
+        self, inner: httpcore.AsyncNetworkBackend, allow_hosts: frozenset[str] = frozenset()
+    ) -> None:
         self._inner = inner
+        self._allow_hosts = allow_hosts
 
     async def connect_tcp(
         self,
@@ -125,7 +133,7 @@ class _GuardedBackend(httpcore.AsyncNetworkBackend):
         local_address: str | None = None,
         socket_options: object = None,
     ) -> httpcore.AsyncNetworkStream:
-        ips = await resolve_and_validate(host, port)
+        ips = await resolve_and_validate(host, port, allow_hosts=self._allow_hosts)
         return await self._inner.connect_tcp(
             ips[0],
             port,
@@ -146,7 +154,7 @@ class _GuardedBackend(httpcore.AsyncNetworkBackend):
 class SSRFGuardedTransport(httpx.AsyncHTTPTransport):
     """``AsyncHTTPTransport`` whose TCP connections are pinned to a validated IP."""
 
-    def __init__(self, **kwargs: object) -> None:
+    def __init__(self, *, allow_hosts: frozenset[str] = frozenset(), **kwargs: object) -> None:
         super().__init__(**kwargs)  # type: ignore[arg-type]
         # Wrap the pool's backend so every new connection is validated + pinned.
-        self._pool._network_backend = _GuardedBackend(self._pool._network_backend)
+        self._pool._network_backend = _GuardedBackend(self._pool._network_backend, allow_hosts)
