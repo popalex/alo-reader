@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head>
+    <title>Miniflux</title>
+  </head>
+  <body>
+    <outline text="Programming">
+      <outline title="Julia Evans" text="Julia Evans" xmlUrl="https://jvns.ca/atom.xml" htmlUrl="https://jvns.ca" type="rss"/>
+      <outline title="Dan Luu" text="Dan Luu" xmlUrl="https://danluu.com/atom.xml" htmlUrl="https://danluu.com" type="rss"/>
+    </outline>
+    <outline text="Uncategorized">
+      <outline title="Simon Willison" text="Simon Willison" xmlUrl="https://simonwillison.net/atom/everything/" htmlUrl="https://simonwillison.net/" type="rss"/>
+    </outline>
+  </body>
+</opml>

@@ -14,8 +14,11 @@ from app.auth import router as auth_router
 from app.config import validate_boot_config
 from app.errors import register_exception_handlers
 from app.routes.counts import router as counts_router
+from app.routes.discover import router as discover_router
 from app.routes.entries import router as entries_router
 from app.routes.folders import router as folders_router
+from app.routes.icons import router as icons_router
+from app.routes.opml import router as opml_router
 from app.routes.streams import router as streams_router
 from app.routes.subscriptions import router as subscriptions_router
 
@@ -44,4 +47,7 @@ api_v1.include_router(subscriptions_router)
 api_v1.include_router(streams_router)
 api_v1.include_router(entries_router)
 api_v1.include_router(counts_router)
+api_v1.include_router(discover_router)
+api_v1.include_router(opml_router)
+api_v1.include_router(icons_router)
 app.include_router(api_v1)

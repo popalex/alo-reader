@@ -16,6 +16,9 @@ def worker_settings(**over: object) -> Settings:
         "database_url": "postgresql+asyncpg://x/y",
         "auth_mode": "none",
         "worker_per_host_delay_s": 0.0,
+        # Keep favicon fetching out of the generic worker tests (they inject a
+        # feed-only transport); WP-08's own tests turn it on explicitly.
+        "worker_fetch_favicons": False,
     }
     base.update(over)
     return Settings(**base)  # type: ignore[arg-type]
