@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 
-from sqlalchemy import Row, select
+from sqlalchemy import Row, func, select
 from sqlalchemy import delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -43,6 +43,14 @@ async def get_by_feed(session: AsyncSession, user_id: int, feed_id: int) -> Subs
         select(Subscription).where(Subscription.user_id == user_id, Subscription.feed_id == feed_id)
     )
     return result.first()
+
+
+async def count_for_user(session: AsyncSession, user_id: int) -> int:
+    """Number of subscriptions a user has (for quota enforcement)."""
+    result = await session.scalar(
+        select(func.count()).select_from(Subscription).where(Subscription.user_id == user_id)
+    )
+    return result or 0
 
 
 async def list_all(session: AsyncSession, user_id: int) -> list[Subscription]:
