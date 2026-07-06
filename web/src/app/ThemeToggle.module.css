@@ -1,0 +1,26 @@
+.toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg);
+  border: 1px solid var(--border-2);
+  border-radius: 9px;
+}
+
+.option {
+  display: inline-flex;
+  padding: 6px;
+  border-radius: 7px;
+  line-height: 0;
+  color: var(--text-faint);
+}
+
+.option:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.option[data-active="true"] {
+  color: var(--accent);
+  background: var(--accent-weak);
+}

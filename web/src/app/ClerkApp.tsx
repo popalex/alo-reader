@@ -11,7 +11,7 @@ import {
 } from "@clerk/clerk-react";
 import { useCallback, useRef, type ReactNode } from "react";
 
-import { Home } from "../features/Home";
+import { AppProviders } from "./AppProviders";
 import { TokenProvider, type TokenGetter } from "./auth";
 
 /** Bridges Clerk's session (auto-refreshing) into the app's token seam. */
@@ -37,7 +37,7 @@ export default function ClerkApp({ publishableKey }: { publishableKey: string })
           <UserButton />
         </header>
         <ClerkTokenBridge>
-          <Home />
+          <AppProviders />
         </ClerkTokenBridge>
       </SignedIn>
     </ClerkProvider>

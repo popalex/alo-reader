@@ -1,0 +1,46 @@
+.viewport {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(92vw, 380px);
+  z-index: 100;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 12px 11px 14px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border-2);
+  border-left: 3px solid var(--danger);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+}
+
+.toast[data-tone="info"] {
+  border-left-color: var(--accent);
+}
+
+.message {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.close {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 5px;
+  color: var(--text-faint);
+}
+
+.close:hover {
+  color: var(--text);
+  background: var(--hover);
+}
