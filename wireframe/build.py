@@ -584,6 +584,8 @@ for slug, title, css, ltitle in STYLES:
 
 # ---- index / chooser -----------------------------------------------------
 CARDS = [
+    ('aligned',  'Aligned — the chosen system',  'Studio (light) + Nocturne (dark), unified',
+     'The direction we are building for WP-09: Studio in light mode, Nocturne in dark, unified on Inter and one calm teal-green accent. Toggle light/dark bottom-right (or add ?theme=dark to the URL).'),
     ('console',  'Console',  'Light monospace developer tool',
      'JetBrains Mono throughout, teal accent, TUI-style inverse selection and keycap-tight rows. Reads as an instrument, not a magazine.'),
     ('studio',   'Studio',   'Modern muted product UI',
@@ -611,6 +613,7 @@ transition:border-color .15s,transform .15s}a.card:hover{border-color:#4f7a70;tr
 def sw(colors):
     return ''.join(f'<span class="sw" style="background:{c}"></span>' for c in colors)
 SWATCHES = {
+ 'aligned':['#f6f7f9','#0e7c6d','#14161b'],
  'console':['#f8f8f6','#0f766e','#242a2e'],'studio':['#f6f7f9','#4f46e5','#1b1f24'],
  'reader':['#faf7f1','#1f5f5b','#242019'],'classic':['#ffffff','#1155cc','#fdf6d8'],
  'nocturne':['#14161b','#7fb2a6','#d8dde4'],
@@ -637,3 +640,124 @@ down the type, palette, and density for WP-09.</p>
 with open(os.path.join(HERE, 'index.html'), 'w') as f:
     f.write(index)
 print('wrote index.html')
+
+# ==========================================================================
+#  ALIGNED : the chosen system — Studio (light) + Nocturne (dark) unified on
+#  Inter + one teal-green accent, driven entirely by CSS custom properties.
+#  This is the source of truth translated into web/src tokens for WP-09.
+# ==========================================================================
+LIGHTVARS = '''--c1:262px;--c2:404px;
+--sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+--mono:ui-monospace,"SF Mono",Menlo,monospace;
+--bg:#f6f7f9;--panel:#ffffff;--panel2:#fafbfc;--hover:#f2f3f5;
+--ink:#1b1f24;--ink2:#2b3138;--dim:#6b7280;--faint:#9aa1ab;
+--line:#eceef1;--line2:#e7e9ec;
+--acc:#0e7c6d;--acc-ink:#ffffff;--acc-weak:#e7f2ef;--acc-border:#bcdcd5;
+--star:#d99a12;--err:#ef4444;
+--code-bg:#1b1f27;--code-ink:#e7ebf1;--icode:#eef1f0;
+--shadow:0 1px 2px rgba(14,124,109,.22);'''
+
+DARKVARS = '''--bg:#14161b;--panel:#181b21;--panel2:#1c2027;--hover:#1c2027;
+--ink:#eef1f5;--ink2:#c4ccd6;--dim:#8b93a1;--faint:#6b7280;
+--line:#262a32;--line2:#262a32;
+--acc:#7fb2a6;--acc-ink:#0f1512;--acc-weak:#20302c;--acc-border:#37564e;
+--star:#e0b877;--err:#d98a6a;
+--code-bg:#0f1216;--code-ink:#cbd3dd;--icode:#22272f;
+--shadow:none;'''
+
+UNIFIED_COMPONENTS = '''
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13.5px;line-height:1.5}
+.side{background:var(--bg);padding:16px 12px;gap:14px;border-right:1px solid var(--line)}
+.side-head{padding:2px 6px 4px}
+.logo{font-weight:700;font-size:17px;letter-spacing:-.02em;color:var(--ink)}.logo-dot{color:var(--acc)}
+.compose{font-size:12.5px;font-weight:600;color:var(--acc-ink);background:var(--acc);border-radius:8px;padding:7px 12px;box-shadow:var(--shadow)}
+.compose .ic{width:15px;height:15px}
+.search{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:8px 10px;color:var(--faint)}
+.search input{border:none;background:none;color:var(--ink);width:100%;outline:none;font-size:13px}
+.views{display:flex;flex-direction:column;gap:2px}
+.view{padding:7px 10px;border-radius:8px;color:var(--ink2);font-weight:500;font-size:13.5px}
+.view .ic{color:var(--faint)}.view .count{margin-left:auto;color:var(--faint);font-size:12px;font-weight:500}
+.view.active{background:var(--acc-weak);color:var(--acc)}.view.active .ic,.view.active .count{color:var(--acc)}
+.folders{display:flex;flex-direction:column;gap:14px;margin-top:2px}
+.folder-head{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);padding:2px 10px}
+.folder-head .ic{width:14px;height:14px}.folder-head .count{margin-left:auto}
+.feed{padding:6px 10px;border-radius:8px;color:var(--ink2);font-size:13px}
+.feed .fname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.feed .count{margin-left:auto;color:var(--faint);font-size:12px}
+.feed.unread{color:var(--ink);font-weight:600}.feed.unread .count{color:var(--acc)}
+.feed:hover{background:var(--hover)}
+.edot{width:6px;height:6px;border-radius:50%;background:var(--err);margin-left:auto}.err .count{margin-left:7px}
+.list{background:var(--panel);border-right:1px solid var(--line)}
+.list-head{position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--line);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;z-index:2}
+.list-head h2{margin:0;font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--ink)}
+.list-tools button{color:var(--dim);padding:7px;border-radius:7px}.list-tools button:hover{background:var(--hover);color:var(--ink)}
+.density{font-size:12px!important;font-weight:600;color:var(--dim)!important;padding:5px 10px!important;border:1px solid var(--line2)!important;border-radius:7px!important}
+.dsep{width:1px;height:18px;background:var(--line2);margin:0 4px}
+.row{grid-template-columns:8px 18px 1fr auto auto;gap:10px;padding:12px 20px 12px 16px;border-bottom:1px solid var(--line);position:relative}
+.row .dot{grid-row:1;grid-column:1;width:7px;height:7px;border-radius:50%;background:transparent;align-self:start;margin-top:6px}
+.row .fav{grid-row:1;grid-column:2;align-self:start;margin-top:1px}
+.row .src{grid-column:3;font-size:12px;color:var(--dim);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .title{grid-column:3;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px}
+.row .snippet{grid-column:3;font-size:12.5px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row time{grid-row:1;grid-column:4;font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums;align-self:start;padding-top:1px}
+.row .rowstar{grid-row:1;grid-column:5;align-self:start;color:var(--star)}.row .star{fill:var(--star);width:15px;height:15px}
+.row.unread .dot{background:var(--acc)}
+.row.unread .title{font-weight:700;color:var(--ink)}
+.row.unread .src{color:var(--acc)}
+.row:hover{background:var(--panel2)}
+.row.selected{background:var(--acc-weak)}
+.row.selected::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--acc)}
+.reader{background:var(--panel)}
+.reader-actions{position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--line);padding:12px 24px;z-index:2}
+.ract{font-size:12.5px;font-weight:500;color:var(--dim);border:1px solid var(--line2);border-radius:8px;padding:7px 12px}
+.ract:hover{background:var(--panel2);color:var(--ink)}.ract.on{color:var(--acc);border-color:var(--acc-border);background:var(--acc-weak)}.ract.on .star{fill:var(--acc)}
+.reader-head{padding:32px 48px 18px;max-width:720px}
+.art-src{font-size:12.5px;color:var(--dim);font-weight:600;margin-bottom:16px}
+.art-title{font-size:28px;line-height:1.22;font-weight:700;letter-spacing:-.02em;margin:0 0 12px;color:var(--ink)}
+.art-meta{font-size:12.5px;color:var(--faint)}
+.art-body{padding:10px 48px 90px;max-width:720px;font-size:15px;line-height:1.72;color:var(--ink2)}
+.art-body p{margin:0 0 18px}.art-body a{color:var(--acc);font-weight:500;border-bottom:1px solid var(--acc-border)}
+.art-body h3{font-size:18px;font-weight:700;letter-spacing:-.01em;margin:30px 0 12px;color:var(--ink)}
+.art-body blockquote{margin:22px 0;padding:4px 0 4px 18px;border-left:3px solid var(--acc);color:var(--ink2);font-size:16px}
+.art-body code{background:var(--icode);padding:2px 6px;border-radius:5px;font-size:13.5px;font-family:var(--mono)}
+.art-body pre{background:var(--code-bg);color:var(--code-ink);padding:16px 18px;border-radius:10px;overflow:auto;font-size:13px;line-height:1.6;font-family:var(--mono)}
+.art-body pre code{background:none;padding:0}
+.themebar{position:fixed;bottom:16px;right:16px;display:flex;gap:2px;background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:3px;box-shadow:0 6px 20px rgba(0,0,0,.16);z-index:50}
+.themebar button{display:inline-flex;padding:7px;border-radius:7px;color:var(--faint)}
+.themebar button:hover{color:var(--ink);background:var(--hover)}
+.themebar button.on{color:var(--acc);background:var(--acc-weak)}
+.themebar .ic{width:16px;height:16px}
+'''
+
+UNIFIED = (RESET
+    + "@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');\n"
+    + ':root{' + LIGHTVARS + '}\n'
+    + ':root[data-theme="dark"]{' + DARKVARS + '}\n'
+    + '@media (prefers-color-scheme:dark){:root:not([data-theme]){' + DARKVARS + '}}\n'
+    + UNIFIED_COMPONENTS)
+
+SUN = ic('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4'
+         'M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>')
+MOON = ic('<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/>')
+MON = ic('<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>')
+TOGGLE = ('<div class="themebar" role="group" aria-label="Theme">'
+          '<button data-set="light" title="Light" aria-label="Light theme">' + SUN + '</button>'
+          '<button data-set="dark" title="Dark" aria-label="Dark theme">' + MOON + '</button>'
+          '<button data-set="system" title="Match system" aria-label="Match system theme">' + MON + '</button>'
+          '</div>')
+SCRIPT = ("<script>(function(){var r=document.documentElement;"
+          "function mark(m){document.querySelectorAll('.themebar button').forEach("
+          "function(b){b.classList.toggle('on',b.dataset.set===m);});}"
+          "function apply(m){if(m==='system'){r.removeAttribute('data-theme');}"
+          "else{r.setAttribute('data-theme',m);}try{localStorage.setItem('alo-theme',m);}"
+          "catch(e){}mark(m);}var q=null;try{q=new URLSearchParams(location.search).get('theme');}"
+          "catch(e){}var s=q;if(!s){try{s=localStorage.getItem('alo-theme');}catch(e){}}"
+          "if(!s){s='system';}apply(s);document.querySelectorAll('.themebar button').forEach("
+          "function(b){b.addEventListener('click',function(){apply(b.dataset.set);});});})();</script>")
+
+aligned_html = (PAGE.replace('%%TITLE%%', 'Aligned — alo')
+                    .replace('%%CSS%%', UNIFIED)
+                    .replace('%%BODY%%', app('All items') + '\n' + TOGGLE + '\n' + SCRIPT))
+with open(os.path.join(HERE, 'aligned.html'), 'w') as f:
+    f.write(aligned_html)
+print('wrote aligned.html')

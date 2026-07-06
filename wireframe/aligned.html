@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aligned — alo</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;height:100%}
+body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+a{text-decoration:none;color:inherit}button{font:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input{font:inherit}ol,ul,nav{list-style:none;margin:0;padding:0}
+.ic{width:16px;height:16px;flex:none}
+.app{display:grid;grid-template-columns:var(--c1) var(--c2) 1fr;height:100vh;overflow:hidden}
+.side,.list,.reader{min-height:0;overflow-y:auto}
+.side{display:flex;flex-direction:column}
+.list{display:flex;flex-direction:column}
+.reader{padding:0}
+.rows{flex:1}
+.fav{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;
+  border-radius:3px;background:var(--fc,#888);color:#fff;font-size:9px;font-weight:700;flex:none;letter-spacing:-.02em}
+.row{display:grid;align-items:center;cursor:pointer}
+.list-tools{display:flex;align-items:center;gap:2px}
+.side-head{display:flex;align-items:center;justify-content:space-between}
+.compose{display:inline-flex;align-items:center;gap:6px}
+.view,.feed{display:flex;align-items:center;gap:8px}
+.folder-head{display:flex;align-items:center;gap:6px}
+.reader-actions{display:flex;gap:4px}.ract{display:inline-flex;align-items:center;gap:6px}
+.art-src{display:flex;align-items:center;gap:8px}
+:focus-visible{outline:2px solid var(--focus,#4c8bf5);outline-offset:-2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media (max-width:900px){.app{grid-template-columns:1fr}.side,.reader{display:none}}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+:root{--c1:262px;--c2:404px;
+--sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+--mono:ui-monospace,"SF Mono",Menlo,monospace;
+--bg:#f6f7f9;--panel:#ffffff;--panel2:#fafbfc;--hover:#f2f3f5;
+--ink:#1b1f24;--ink2:#2b3138;--dim:#6b7280;--faint:#9aa1ab;
+--line:#eceef1;--line2:#e7e9ec;
+--acc:#0e7c6d;--acc-ink:#ffffff;--acc-weak:#e7f2ef;--acc-border:#bcdcd5;
+--star:#d99a12;--err:#ef4444;
+--code-bg:#1b1f27;--code-ink:#e7ebf1;--icode:#eef1f0;
+--shadow:0 1px 2px rgba(14,124,109,.22);}
+:root[data-theme="dark"]{--bg:#14161b;--panel:#181b21;--panel2:#1c2027;--hover:#1c2027;
+--ink:#eef1f5;--ink2:#c4ccd6;--dim:#8b93a1;--faint:#6b7280;
+--line:#262a32;--line2:#262a32;
+--acc:#7fb2a6;--acc-ink:#0f1512;--acc-weak:#20302c;--acc-border:#37564e;
+--star:#e0b877;--err:#d98a6a;
+--code-bg:#0f1216;--code-ink:#cbd3dd;--icode:#22272f;
+--shadow:none;}
+@media (prefers-color-scheme:dark){:root:not([data-theme]){--bg:#14161b;--panel:#181b21;--panel2:#1c2027;--hover:#1c2027;
+--ink:#eef1f5;--ink2:#c4ccd6;--dim:#8b93a1;--faint:#6b7280;
+--line:#262a32;--line2:#262a32;
+--acc:#7fb2a6;--acc-ink:#0f1512;--acc-weak:#20302c;--acc-border:#37564e;
+--star:#e0b877;--err:#d98a6a;
+--code-bg:#0f1216;--code-ink:#cbd3dd;--icode:#22272f;
+--shadow:none;}}
+
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13.5px;line-height:1.5}
+.side{background:var(--bg);padding:16px 12px;gap:14px;border-right:1px solid var(--line)}
+.side-head{padding:2px 6px 4px}
+.logo{font-weight:700;font-size:17px;letter-spacing:-.02em;color:var(--ink)}.logo-dot{color:var(--acc)}
+.compose{font-size:12.5px;font-weight:600;color:var(--acc-ink);background:var(--acc);border-radius:8px;padding:7px 12px;box-shadow:var(--shadow)}
+.compose .ic{width:15px;height:15px}
+.search{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:8px 10px;color:var(--faint)}
+.search input{border:none;background:none;color:var(--ink);width:100%;outline:none;font-size:13px}
+.views{display:flex;flex-direction:column;gap:2px}
+.view{padding:7px 10px;border-radius:8px;color:var(--ink2);font-weight:500;font-size:13.5px}
+.view .ic{color:var(--faint)}.view .count{margin-left:auto;color:var(--faint);font-size:12px;font-weight:500}
+.view.active{background:var(--acc-weak);color:var(--acc)}.view.active .ic,.view.active .count{color:var(--acc)}
+.folders{display:flex;flex-direction:column;gap:14px;margin-top:2px}
+.folder-head{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);padding:2px 10px}
+.folder-head .ic{width:14px;height:14px}.folder-head .count{margin-left:auto}
+.feed{padding:6px 10px;border-radius:8px;color:var(--ink2);font-size:13px}
+.feed .fname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.feed .count{margin-left:auto;color:var(--faint);font-size:12px}
+.feed.unread{color:var(--ink);font-weight:600}.feed.unread .count{color:var(--acc)}
+.feed:hover{background:var(--hover)}
+.edot{width:6px;height:6px;border-radius:50%;background:var(--err);margin-left:auto}.err .count{margin-left:7px}
+.list{background:var(--panel);border-right:1px solid var(--line)}
+.list-head{position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--line);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;z-index:2}
+.list-head h2{margin:0;font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--ink)}
+.list-tools button{color:var(--dim);padding:7px;border-radius:7px}.list-tools button:hover{background:var(--hover);color:var(--ink)}
+.density{font-size:12px!important;font-weight:600;color:var(--dim)!important;padding:5px 10px!important;border:1px solid var(--line2)!important;border-radius:7px!important}
+.dsep{width:1px;height:18px;background:var(--line2);margin:0 4px}
+.row{grid-template-columns:8px 18px 1fr auto auto;gap:10px;padding:12px 20px 12px 16px;border-bottom:1px solid var(--line);position:relative}
+.row .dot{grid-row:1;grid-column:1;width:7px;height:7px;border-radius:50%;background:transparent;align-self:start;margin-top:6px}
+.row .fav{grid-row:1;grid-column:2;align-self:start;margin-top:1px}
+.row .src{grid-column:3;font-size:12px;color:var(--dim);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .title{grid-column:3;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px}
+.row .snippet{grid-column:3;font-size:12.5px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row time{grid-row:1;grid-column:4;font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums;align-self:start;padding-top:1px}
+.row .rowstar{grid-row:1;grid-column:5;align-self:start;color:var(--star)}.row .star{fill:var(--star);width:15px;height:15px}
+.row.unread .dot{background:var(--acc)}
+.row.unread .title{font-weight:700;color:var(--ink)}
+.row.unread .src{color:var(--acc)}
+.row:hover{background:var(--panel2)}
+.row.selected{background:var(--acc-weak)}
+.row.selected::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--acc)}
+.reader{background:var(--panel)}
+.reader-actions{position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--line);padding:12px 24px;z-index:2}
+.ract{font-size:12.5px;font-weight:500;color:var(--dim);border:1px solid var(--line2);border-radius:8px;padding:7px 12px}
+.ract:hover{background:var(--panel2);color:var(--ink)}.ract.on{color:var(--acc);border-color:var(--acc-border);background:var(--acc-weak)}.ract.on .star{fill:var(--acc)}
+.reader-head{padding:32px 48px 18px;max-width:720px}
+.art-src{font-size:12.5px;color:var(--dim);font-weight:600;margin-bottom:16px}
+.art-title{font-size:28px;line-height:1.22;font-weight:700;letter-spacing:-.02em;margin:0 0 12px;color:var(--ink)}
+.art-meta{font-size:12.5px;color:var(--faint)}
+.art-body{padding:10px 48px 90px;max-width:720px;font-size:15px;line-height:1.72;color:var(--ink2)}
+.art-body p{margin:0 0 18px}.art-body a{color:var(--acc);font-weight:500;border-bottom:1px solid var(--acc-border)}
+.art-body h3{font-size:18px;font-weight:700;letter-spacing:-.01em;margin:30px 0 12px;color:var(--ink)}
+.art-body blockquote{margin:22px 0;padding:4px 0 4px 18px;border-left:3px solid var(--acc);color:var(--ink2);font-size:16px}
+.art-body code{background:var(--icode);padding:2px 6px;border-radius:5px;font-size:13.5px;font-family:var(--mono)}
+.art-body pre{background:var(--code-bg);color:var(--code-ink);padding:16px 18px;border-radius:10px;overflow:auto;font-size:13px;line-height:1.6;font-family:var(--mono)}
+.art-body pre code{background:none;padding:0}
+.themebar{position:fixed;bottom:16px;right:16px;display:flex;gap:2px;background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:3px;box-shadow:0 6px 20px rgba(0,0,0,.16);z-index:50}
+.themebar button{display:inline-flex;padding:7px;border-radius:7px;color:var(--faint)}
+.themebar button:hover{color:var(--ink);background:var(--hover)}
+.themebar button.on{color:var(--acc);background:var(--acc-weak)}
+.themebar .ic{width:16px;height:16px}
+
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="side-head">
+      <span class="logo">alo<span class="logo-dot">.</span></span>
+      <button class="compose"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 5v14M5 12h14"/></svg><span>Subscribe</span></button>
+    </div>
+    <div class="search"><span class="si"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><circle cx="11" cy="11" r="7"/><path d="m21 21-4.1-4.1"/></svg></span><input placeholder="Search all items" aria-label="Search"></div>
+    <nav class="views">
+      <a class="view active" href="#"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><path d="M3 12h5l2 3h4l2-3h5"/><path d="M4 6h16v12H4z"/></svg><span>All items</span><span class="count">24</span></a>
+      <a class="view" href="#"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg><span>Unread</span><span class="count">24</span></a>
+      <a class="view" href="#"><svg class="ic star" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8-5.3-2.8-5.3 2.8 1-5.8-4.2-4.1 5.9-.9z"/></svg><span>Starred</span><span class="count">3</span></a>
+    </nav>
+    <div class="folders">
+      <div class="folder">
+        <div class="folder-head"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><path d="m6 9 6 6 6-6"/></svg><span>Tech</span><span class="count">11</span></div>
+        <a class="feed unread" href="#"><span class="fav" style="--fc:#FF6600">HN</span><span class="fname">Hacker News</span><span class="count">5</span></a>
+        <a class="feed unread" href="#"><span class="fav" style="--fc:#5B21B6">V</span><span class="fname">The Verge</span><span class="count">3</span></a>
+        <a class="feed unread" href="#"><span class="fav" style="--fc:#E8622C">SW</span><span class="fname">Simon Willison</span><span class="count">2</span></a>
+        <a class="feed unread" href="#"><span class="fav" style="--fc:#F97316">CT</span><span class="fname">CSS-Tricks</span><span class="count">1</span></a>
+      </div>
+      <div class="folder">
+        <div class="folder-head"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><path d="m6 9 6 6 6-6"/></svg><span>News</span><span class="count">11</span></div>
+        <a class="feed unread" href="#"><span class="fav" style="--fc:#BB1919">B</span><span class="fname">BBC News</span><span class="count">7</span></a>
+        <a class="feed err" href="#"><span class="fav" style="--fc:#EA6A16">R</span><span class="fname">Reuters</span><span class="edot" title="Last fetch failed"></span><span class="count">4</span></a>
+      </div>
+      <div class="folder">
+        <div class="folder-head"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><path d="m6 9 6 6 6-6"/></svg><span>People</span><span class="count">2</span></div>
+        <a class="feed unread" href="#"><span class="fav" style="--fc:#DB2777">JE</span><span class="fname">Julia Evans</span><span class="count">2</span></a>
+      </div>
+    </div>
+  </aside>
+  <section class="list">
+    <header class="list-head">
+      <h2>All items</h2>
+      <div class="list-tools">
+        <button title="Refresh"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg></button>
+        <button title="Mark all read"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><path d="m3 12 5 5L20 5"/><path d="m14 14 3 3L23 8"/></svg></button>
+        <span class="dsep"></span>
+        <button class="density" title="Density">List</button>
+      </div>
+    </header>
+    <ol class="rows">
+    <li class="row unread selected" tabindex="0">
+      <span class="dot" aria-hidden="true"></span>
+      <span class="fav" style="--fc:#E8622C">SW</span>
+      <span class="src">Simon Willison</span>
+      <span class="title">Running a local LLM with a single command</span>
+      <span class="snippet">The llm CLI now installs and runs Llama models with one line, no GPU config, no Docker.</span>
+      <span class="rowstar"></span>
+      <time>12m</time>
+    </li>
+    <li class="row unread" tabindex="0">
+      <span class="dot" aria-hidden="true"></span>
+      <span class="fav" style="--fc:#FF6600">HN</span>
+      <span class="src">Hacker News</span>
+      <span class="title">Show HN: A calm, keyboard-first RSS reader</span>
+      <span class="snippet">I got tired of algorithmic feeds, so I built an inbox for the web — chronological, no ranking.</span>
+      <span class="rowstar"></span>
+      <time>34m</time>
+    </li>
+    <li class="row unread" tabindex="0">
+      <span class="dot" aria-hidden="true"></span>
+      <span class="fav" style="--fc:#5B21B6">V</span>
+      <span class="src">The Verge</span>
+      <span class="title">The browser wars are back, quietly</span>
+      <span class="snippet">Three rendering engines shipped major releases this year and almost nobody noticed.</span>
+      <span class="rowstar"></span>
+      <time>1h</time>
+    </li>
+    <li class="row unread starred" tabindex="0">
+      <span class="dot" aria-hidden="true"></span>
+      <span class="fav" style="--fc:#DB2777">JE</span>
+      <span class="src">Julia Evans</span>
+      <span class="title">A few things I finally understand about DNS</span>
+      <span class="snippet">Resolvers, TTLs, and why your change still "isn’t live yet" an hour later.</span>
+      <span class="rowstar"><svg class="ic star" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8-5.3-2.8-5.3 2.8 1-5.8-4.2-4.1 5.9-.9z"/></svg></span>
+      <time>2h</time>
+    </li>
+    <li class="row" tabindex="0">
+      <span class="dot" aria-hidden="true"></span>
+      <span class="fav" style="--fc:#BB1919">B</span>
+      <span class="src">BBC News</span>
+      <span class="title">Markets steady as inflation cools</span>
+      <span class="snippet">Investors welcomed softer price data as central banks signalled a pause on rate rises.</span>
+      <span class="rowstar"></span>
+      <time>3h</time>
+    </li>
+    <li class="row unread" tabindex="0">
+      <span class="dot" aria-hidden="true"></span>
+      <span class="fav" style="--fc:#FF6600">HN</span>
+      <span class="src">Hacker News</span>
+      <span class="title">Ask HN: What’s your note-taking setup in 2026?</span>
+      <span class="snippet">Plain text, a personal wiki, or an app you slightly regret paying for? Let’s compare.</span>
+      <span class="rowstar"></span>
+      <time>5h</time>
+    </li>
+    <li class="row" tabindex="0">
+      <span class="dot" aria-hidden="true"></span>
+      <span class="fav" style="--fc:#F97316">CT</span>
+      <span class="src">CSS-Tricks</span>
+      <span class="title">Container queries are everywhere now</span>
+      <span class="snippet">The last holdout browser shipped support, so here’s how to actually restructure a layout.</span>
+      <span class="rowstar"></span>
+      <time>6h</time>
+    </li>
+    <li class="row starred" tabindex="0">
+      <span class="dot" aria-hidden="true"></span>
+      <span class="fav" style="--fc:#EA6A16">R</span>
+      <span class="src">Reuters</span>
+      <span class="title">Shipping routes shift after canal delays</span>
+      <span class="snippet">Carriers reroute around congestion, adding days to transit and pressure to freight rates.</span>
+      <span class="rowstar"><svg class="ic star" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8-5.3-2.8-5.3 2.8 1-5.8-4.2-4.1 5.9-.9z"/></svg></span>
+      <time>9h</time>
+    </li>
+    <li class="row" tabindex="0">
+      <span class="dot" aria-hidden="true"></span>
+      <span class="fav" style="--fc:#E8622C">SW</span>
+      <span class="src">Simon Willison</span>
+      <span class="title">Notes on prompt caching</span>
+      <span class="snippet">Caching the shared prefix of a long prompt can cut both latency and cost dramatically.</span>
+      <span class="rowstar"></span>
+      <time>12h</time>
+    </li>
+    <li class="row unread" tabindex="0">
+      <span class="dot" aria-hidden="true"></span>
+      <span class="fav" style="--fc:#5B21B6">V</span>
+      <span class="src">The Verge</span>
+      <span class="title">A good keyboard is a quiet keyboard</span>
+      <span class="snippet">The loud mechanical trend is cooling in favour of softer, low-profile switches.</span>
+      <span class="rowstar"></span>
+      <time>1d</time>
+    </li>
+    <li class="row" tabindex="0">
+      <span class="dot" aria-hidden="true"></span>
+      <span class="fav" style="--fc:#BB1919">B</span>
+      <span class="src">BBC News</span>
+      <span class="title">The town that switched off its streetlights</span>
+      <span class="snippet">One community’s experiment with darkness — and what its residents learned.</span>
+      <span class="rowstar"></span>
+      <time>1d</time>
+    </li>
+    <li class="row" tabindex="0">
+      <span class="dot" aria-hidden="true"></span>
+      <span class="fav" style="--fc:#EA6A16">R</span>
+      <span class="src">Reuters</span>
+      <span class="title">Central banks weigh their next move</span>
+      <span class="snippet">Policymakers signal caution as growth and employment data stay stubbornly mixed.</span>
+      <span class="rowstar"></span>
+      <time>2d</time>
+    </li>
+    </ol>
+  </section>
+  <article class="reader">
+    <div class="reader-actions">
+      <button class="ract on"><svg class="ic star" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8-5.3-2.8-5.3 2.8 1-5.8-4.2-4.1 5.9-.9z"/></svg><span>Starred</span></button>
+      <button class="ract"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg><span>Mark unread</span></button>
+      <button class="ract"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg><span>Open original</span></button>
+    </div>
+    <header class="reader-head">
+      <div class="art-src"><span class="fav" style="--fc:#E8622C">SW</span><span>Simon Willison’s Weblog</span></div>
+      <h1 class="art-title">Running a local LLM with a single command</h1>
+      <div class="art-meta">Simon Willison · 6 Jul 2026 · 4 min read</div>
+    </header>
+    <div class="art-body">
+      <p>For a long time, running a language model on your own laptop meant a weekend of
+      wrangling CUDA versions, quantisation formats, and a Python environment that broke
+      the moment you looked at it. That era is quietly ending.</p>
+      <p>The latest release of the <code>llm</code> command-line tool ships a plugin that
+      downloads, quantises, and serves a small Llama model with a single command. There is
+      no separate server to start and nothing to configure — <a href="#">read the release
+      notes</a> for the full list of supported models.</p>
+      <blockquote>The goal was never to compete with the hosted frontier models. It was to
+      make the <em>smallest useful</em> model something you can run without thinking about it.</blockquote>
+      <p>Installation is two lines, and the first run pulls the weights into a local cache:</p>
+      <pre><code>llm install llm-llama
+llm -m llama-local "Explain RSS to a five-year-old"</code></pre>
+      <p>On an ordinary machine the first token comes back in about a second, and everything
+      stays on the device. For a calm, offline-friendly reading workflow — summaries,
+      tagging, the occasional translation — that turns out to be more than enough.</p>
+      <h3>Where this is going</h3>
+      <p>The interesting frontier is no longer raw capability; it is how invisibly these
+      tools fold into software you already use. A feed reader that can quietly summarise a
+      backlog while you sleep, without sending a single article to anyone’s server, is
+      the kind of thing that only becomes possible once the model fits on the same box.</p>
+    </div>
+  </article>
+</div>
+<div class="themebar" role="group" aria-label="Theme"><button data-set="light" title="Light" aria-label="Light theme"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button><button data-set="dark" title="Dark" aria-label="Dark theme"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg></button><button data-set="system" title="Match system" aria-label="Match system theme"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></button></div>
+<script>(function(){var r=document.documentElement;function mark(m){document.querySelectorAll('.themebar button').forEach(function(b){b.classList.toggle('on',b.dataset.set===m);});}function apply(m){if(m==='system'){r.removeAttribute('data-theme');}else{r.setAttribute('data-theme',m);}try{localStorage.setItem('alo-theme',m);}catch(e){}mark(m);}var q=null;try{q=new URLSearchParams(location.search).get('theme');}catch(e){}var s=q;if(!s){try{s=localStorage.getItem('alo-theme');}catch(e){}}if(!s){s='system';}apply(s);document.querySelectorAll('.themebar button').forEach(function(b){b.addEventListener('click',function(){apply(b.dataset.set);});});})();</script>
+</body>
+</html>
