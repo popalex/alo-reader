@@ -11,7 +11,7 @@ COMPOSE_DEV := docker compose -f deploy/docker-compose.yml -f deploy/docker-comp
 # (see `make db`). Postgres itself is never installed on the host.
 TEST_DATABASE_URL ?= postgresql+asyncpg://alo:alo@localhost:5432/alo
 
-.PHONY: venv lint typecheck test-api test-web e2e up dev down db db-down migrate
+.PHONY: venv lint typecheck test-api test-web e2e up dev down db db-down migrate generate-client
 
 ## Create the virtualenv and install the api project (editable, with dev tools).
 venv:
@@ -63,3 +63,11 @@ db-down:
 ## Apply Alembic migrations against the dockerized Postgres.
 migrate:
 	cd api && DATABASE_URL=$(TEST_DATABASE_URL) ../$(VENV)/bin/alembic upgrade head
+
+## Regenerate the typed API client from the FastAPI OpenAPI schema. The schema
+## is exported in-process (no server needed); sorted keys keep it deterministic
+## so CI can diff-check for drift. web/src/api/schema.d.ts is committed; the
+## intermediate openapi.json is gitignored.
+generate-client:
+	cd api && AUTH_MODE=none ../$(VENV)/bin/python -c "import json,sys; from app.main import app; json.dump(app.openapi(), sys.stdout, sort_keys=True)" > $(CURDIR)/web/openapi.json
+	cd web && pnpm exec openapi-typescript openapi.json -o src/api/schema.d.ts
