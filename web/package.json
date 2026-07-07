@@ -8,8 +8,20 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "tsc": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "size": "size-limit"
   },
+  "size-limit": [
+    {
+      "name": "main app (initial JS + CSS, gzip)",
+      "path": [
+        "dist/assets/index-*.js",
+        "dist/assets/index-*.css"
+      ],
+      "gzip": true,
+      "limit": "180 kB"
+    }
+  ],
   "dependencies": {
     "@clerk/clerk-react": "^5.61.3",
     "@tanstack/react-query": "^5.101.2",
@@ -19,12 +31,15 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@size-limit/file": "^12.1.0",
     "@testing-library/react": "^16.0.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "jsdom": "^24.1.0",
     "openapi-typescript": "^7.13.0",
+    "size-limit": "^12.1.0",
     "typescript": "^5.5.3",
     "vite": "^5.3.3",
     "vitest": "^2.0.2"

@@ -21,3 +21,8 @@ web/openapi.json
 
 # OS / editor
 .DS_Store
+
+# Playwright
+web/test-results/
+web/playwright-report/
+web/playwright/.cache/
