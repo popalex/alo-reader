@@ -65,6 +65,45 @@ jobs:
       - run: pnpm -C web install
       - run: pnpm -C web test
 
+  bundle-size:
+    # The SPA's initial JS+CSS must stay within the gz budget (DESIGN.md §1.2).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: "11"
+      - run: pnpm -C web install
+      - run: pnpm -C web build
+      - run: pnpm -C web size
+
+  client-drift:
+    # The typed client is generated from the API's OpenAPI schema; regenerate it
+    # and fail if the committed output is stale (SPA <-> API contract drift).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e "./api[dev]"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: "11"
+      - run: pnpm -C web install
+      - name: Regenerate typed client
+        run: |
+          cd api && AUTH_MODE=none python -c "import json,sys; from app.main import app; json.dump(app.openapi(), sys.stdout, sort_keys=True)" > ../web/openapi.json
+          cd ../web && pnpm exec openapi-typescript openapi.json -o src/api/schema.d.ts
+      - name: Fail on drift
+        run: git diff --exit-code -- web/src/api/schema.d.ts
+
   build-images:
     runs-on: ubuntu-latest
     steps:

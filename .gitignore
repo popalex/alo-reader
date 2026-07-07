@@ -12,6 +12,8 @@ node_modules/
 web/dist/
 dist/
 .pnpm-store/
+# Intermediate OpenAPI dump for the generated client (schema.d.ts IS committed).
+web/openapi.json
 
 # Env / secrets
 .env
@@ -19,3 +21,8 @@ dist/
 
 # OS / editor
 .DS_Store
+
+# Playwright
+web/test-results/
+web/playwright-report/
+web/playwright/.cache/

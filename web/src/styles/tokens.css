@@ -1,0 +1,117 @@
+/* Design tokens — the aligned design system.
+ *
+ * Source of truth: wireframe/aligned.html. Studio in light mode, Nocturne in
+ * dark, unified on Inter and a single calm teal-green accent. Every colour is a
+ * custom property so components never hardcode one and light/dark is a token
+ * swap, not a component fork.
+ *
+ * Resolution order: light is the default (:root); an explicit choice sets
+ * [data-theme="light"|"dark"] and wins; with no explicit choice the OS
+ * preference decides via prefers-color-scheme.
+ */
+
+:root {
+  color-scheme: light;
+
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --sidebar-w: 260px;
+  --list-w: 400px;
+  --radius: 8px;
+  --radius-sm: 7px;
+
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #fafbfc;
+  --hover: #f2f3f5;
+
+  --text: #1b1f24;
+  --text-2: #2b3138;
+  --text-dim: #6b7280;
+  --text-faint: #9aa1ab;
+
+  --border: #eceef1;
+  --border-2: #e7e9ec;
+
+  --accent: #0e7c6d;
+  --accent-contrast: #ffffff;
+  --accent-weak: #e7f2ef;
+  --accent-border: #bcdcd5;
+
+  --star: #d99a12;
+  --danger: #ef4444;
+
+  --code-bg: #1b1f27;
+  --code-text: #e7ebf1;
+  --code-inline: #eef1f0;
+
+  --shadow-sm: 0 1px 2px rgba(14, 124, 109, 0.22);
+}
+
+/* Dark values, applied on explicit choice and (below) on OS preference. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #14161b;
+  --surface: #181b21;
+  --surface-2: #1c2027;
+  --hover: #1c2027;
+
+  --text: #eef1f5;
+  --text-2: #c4ccd6;
+  --text-dim: #8b93a1;
+  --text-faint: #6b7280;
+
+  --border: #262a32;
+  --border-2: #262a32;
+
+  --accent: #7fb2a6;
+  --accent-contrast: #0f1512;
+  --accent-weak: #20302c;
+  --accent-border: #37564e;
+
+  --star: #e0b877;
+  --danger: #d98a6a;
+
+  --code-bg: #0f1216;
+  --code-text: #cbd3dd;
+  --code-inline: #22272f;
+
+  --shadow-sm: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  /* No explicit choice → follow the OS. An explicit light/dark choice sets the
+     attribute and takes precedence over this block. */
+  :root:not([data-theme]) {
+    color-scheme: dark;
+
+    --bg: #14161b;
+    --surface: #181b21;
+    --surface-2: #1c2027;
+    --hover: #1c2027;
+
+    --text: #eef1f5;
+    --text-2: #c4ccd6;
+    --text-dim: #8b93a1;
+    --text-faint: #6b7280;
+
+    --border: #262a32;
+    --border-2: #262a32;
+
+    --accent: #7fb2a6;
+    --accent-contrast: #0f1512;
+    --accent-weak: #20302c;
+    --accent-border: #37564e;
+
+    --star: #e0b877;
+    --danger: #d98a6a;
+
+    --code-bg: #0f1216;
+    --code-text: #cbd3dd;
+    --code-inline: #22272f;
+
+    --shadow-sm: none;
+  }
+}

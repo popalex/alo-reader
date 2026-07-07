@@ -11,7 +11,7 @@ COMPOSE_DEV := docker compose -f deploy/docker-compose.yml -f deploy/docker-comp
 # (see `make db`). Postgres itself is never installed on the host.
 TEST_DATABASE_URL ?= postgresql+asyncpg://alo:alo@localhost:5432/alo
 
-.PHONY: venv lint typecheck test-api test-web e2e up dev down db db-down migrate
+.PHONY: venv lint typecheck test-api test-web e2e lighthouse size up dev down db db-down migrate generate-client
 
 ## Create the virtualenv and install the api project (editable, with dev tools).
 venv:
@@ -35,9 +35,19 @@ test-api:
 test-web:
 	pnpm -C web test
 
-## Placeholder until WP-09 wires Playwright.
+## End-to-end (Playwright): bring up the stack (AUTH_MODE=none) with a fixture
+## feed, seed a folder + subscription, and drive the real SPA through Caddy.
+## KEEP_UP=1 leaves the stack running afterwards.
 e2e:
-	@echo "e2e: not implemented until WP-09"
+	./scripts/e2e.sh
+
+## Lighthouse performance budget (>=90) against the built SPA served by Caddy.
+lighthouse:
+	./scripts/lighthouse.sh
+
+## Build the SPA and check the initial bundle stays within the size budget.
+size:
+	cd web && pnpm build && pnpm size
 
 ## Build and start the full stack; SPA + API served through Caddy on :80.
 up:
@@ -63,3 +73,11 @@ db-down:
 ## Apply Alembic migrations against the dockerized Postgres.
 migrate:
 	cd api && DATABASE_URL=$(TEST_DATABASE_URL) ../$(VENV)/bin/alembic upgrade head
+
+## Regenerate the typed API client from the FastAPI OpenAPI schema. The schema
+## is exported in-process (no server needed); sorted keys keep it deterministic
+## so CI can diff-check for drift. web/src/api/schema.d.ts is committed; the
+## intermediate openapi.json is gitignored.
+generate-client:
+	cd api && AUTH_MODE=none ../$(VENV)/bin/python -c "import json,sys; from app.main import app; json.dump(app.openapi(), sys.stdout, sort_keys=True)" > $(CURDIR)/web/openapi.json
+	cd web && pnpm exec openapi-typescript openapi.json -o src/api/schema.d.ts

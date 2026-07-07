@@ -8,7 +8,7 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 
 import { ApiError, getConfig, type ApiConfig } from "./api/client";
-import { Home } from "./features/Home";
+import { AppProviders } from "./app/AppProviders";
 
 const ClerkApp = lazy(() => import("./app/ClerkApp"));
 
@@ -64,5 +64,5 @@ export function App() {
 
   // none (and any non-clerk) mode: no token seam needed — the default
   // TokenGetter resolves to null, so requests go out bare.
-  return <Home />;
+  return <AppProviders />;
 }

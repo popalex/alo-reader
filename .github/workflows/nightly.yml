@@ -1,0 +1,52 @@
+name: Nightly
+
+# The heavy full-stack gates (a compose stack + a real browser), too slow for
+# every PR. They run on a nightly schedule and on demand from the Actions tab.
+on:
+  schedule:
+    - cron: "0 3 * * *" # 03:00 UTC daily
+  workflow_dispatch: {} # on-demand ("Run workflow" button)
+
+# A manual run supersedes an in-flight one; never cancel the scheduled run.
+concurrency:
+  group: nightly-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'workflow_dispatch' }}
+
+jobs:
+  e2e:
+    # make e2e: build+run the compose stack (AUTH_MODE=none) with the fixture
+    # feed, seed data, and drive the Caddy-served SPA with Playwright.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: "11"
+      - run: pnpm -C web install
+      - name: Install Playwright Chromium
+        run: pnpm -C web exec playwright install --with-deps chromium
+      - name: make e2e
+        run: make e2e
+
+  lighthouse:
+    # make lighthouse: serve the build via Caddy and gate performance >= 90.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: "11"
+      - run: pnpm -C web install
+      - name: Install Chromium for Lighthouse
+        # Populates ~/.cache/ms-playwright so lighthouse.sh finds a Chrome.
+        run: pnpm -C web exec playwright install --with-deps chromium
+      - name: make lighthouse
+        run: make lighthouse

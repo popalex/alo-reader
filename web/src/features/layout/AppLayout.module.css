@@ -1,0 +1,27 @@
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.content {
+  min-width: 0;
+  display: flex;
+}
+
+/* Below the tablet breakpoint the three panes can't sit side by side. For now
+ * the sidebar stacks above the content; proper single-pane list<->reader
+ * navigation with a back affordance lands with the entry list in WP-10. */
+@media (max-width: 768px) {
+  .shell {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+  }
+  .content {
+    flex: 1;
+    min-height: 0;
+  }
+}
