@@ -19,8 +19,14 @@ OUT="$(mktemp -d)/lighthouse.json"
 
 # The API refuses to boot without an explicit AUTH_MODE; none = single user.
 export AUTH_MODE=none
-# Reuse the Playwright-managed Chromium instead of downloading another browser.
-export CHROME_PATH="${CHROME_PATH:-$HOME/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome}"
+
+# Reuse a Playwright-installed Chromium rather than downloading another browser.
+# Honour an explicit CHROME_PATH; else glob the Playwright cache (the build
+# number varies by version); else let chrome-launcher auto-detect a system Chrome.
+if [[ -z "${CHROME_PATH:-}" ]]; then
+  CHROME_PATH=$(ls -1 "$HOME"/.cache/ms-playwright/chromium-*/chrome-linux*/chrome 2>/dev/null | sort -V | tail -n1 || true)
+fi
+[[ -n "${CHROME_PATH:-}" ]] && export CHROME_PATH
 
 log() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 fail() { printf '\033[31mFAIL: %s\033[0m\n' "$*" >&2; exit 1; }
