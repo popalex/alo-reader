@@ -1,10 +1,17 @@
 // TanStack Query hooks over the typed endpoints. Query functions resolve the
 // bearer token through the auth seam, so components never touch it.
 
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
 import { useTokenGetter } from "../app/auth";
-import { getCounts, getFolders, getSubscriptions } from "./endpoints";
+import { streamToPath, type StreamDescriptor } from "../lib/streams";
+import {
+  getCounts,
+  getEntry,
+  getFolders,
+  getStreamEntries,
+  getSubscriptions,
+} from "./endpoints";
 
 export const queryKeys = {
   folders: ["folders"] as const,
@@ -33,5 +40,28 @@ export function useCounts() {
   return useQuery({
     queryKey: queryKeys.counts,
     queryFn: async () => getCounts(await getToken()),
+  });
+}
+
+export type StreamStatus = "unread" | "all";
+
+export function useStreamEntries(stream: StreamDescriptor, status: StreamStatus = "all") {
+  const getToken = useTokenGetter();
+  const path = streamToPath(stream);
+  return useInfiniteQuery({
+    queryKey: ["entries", path, status],
+    queryFn: async ({ pageParam }) =>
+      getStreamEntries(await getToken(), path, { status, cursor: pageParam }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.next_cursor,
+  });
+}
+
+export function useEntry(id: number | null) {
+  const getToken = useTokenGetter();
+  return useQuery({
+    queryKey: ["entry", id],
+    queryFn: async () => getEntry(await getToken(), id as number),
+    enabled: id != null,
   });
 }
