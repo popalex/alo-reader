@@ -26,6 +26,7 @@ lint:
 typecheck:
 	$(VENV)/bin/mypy api
 	pnpm -C web tsc
+	pnpm -C web lint
 
 ## Tests provision their own throwaway Postgres via Testcontainers — no `make db`
 ## needed, and the real/dev DB is never touched.
