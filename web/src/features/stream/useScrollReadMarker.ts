@@ -24,6 +24,11 @@ export function useScrollReadMarker(
   entries: EntryListItem[],
 ): void {
   const setState = useSetEntryState();
+  // Everything the listener needs goes through refs so the effect depends only
+  // on scrollEl — otherwise the mutation's fresh identity each render would
+  // re-run the effect and clear the pending settle timer mid-scroll.
+  const setStateRef = useRef(setState);
+  setStateRef.current = setState;
   const entriesRef = useRef(entries);
   entriesRef.current = entries;
   const virtualizerRef = useRef(virtualizer);
@@ -63,7 +68,7 @@ export function useScrollReadMarker(
         markedUpTo.current = firstVisible;
 
         for (let i = 0; i < ids.length; i += CHUNK) {
-          setState.mutate({ ids: ids.slice(i, i + CHUNK), read: true });
+          setStateRef.current.mutate({ ids: ids.slice(i, i + CHUNK), read: true });
         }
       }, SETTLE_MS);
     };
@@ -73,5 +78,5 @@ export function useScrollReadMarker(
       el.removeEventListener("scroll", onScroll);
       if (timer) clearTimeout(timer);
     };
-  }, [scrollEl, setState]);
+  }, [scrollEl]);
 }
