@@ -20,6 +20,12 @@
     flex-direction: column;
     height: 100dvh;
   }
+  /* Cap the stacked sidebar (it scrolls) so the content pane always has room —
+   * otherwise a tall feed list starves it of height. */
+  .shell > :first-child {
+    min-height: 0;
+    max-height: 42vh;
+  }
   .content {
     flex: 1;
     min-height: 0;

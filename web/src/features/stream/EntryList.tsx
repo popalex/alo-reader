@@ -121,7 +121,7 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
     );
   } else {
     body = (
-      <div ref={scrollRef} className={styles.scroll}>
+      <div ref={scrollRef} className={styles.scroll} data-testid="entry-scroll">
         <div className={styles.viewport} style={{ height: virtualizer.getTotalSize() }}>
           {items.map((vi) => {
             const e = entries[vi.index];
