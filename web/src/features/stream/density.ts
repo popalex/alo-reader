@@ -15,7 +15,7 @@ function read(): Density {
   } catch {
     /* localStorage unavailable */
   }
-  return "list";
+  return "expanded";
 }
 
 let density: Density = read();
