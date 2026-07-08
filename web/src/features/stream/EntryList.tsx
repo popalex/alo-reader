@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { CircleAlert, List as ListIcon, Rows3, Star } from "lucide-react";
 
+import { useSetEntryState } from "../../api/mutations";
 import { useStreamEntries, useSubscriptions } from "../../api/queries";
 import { ThemeToggle } from "../../app/ThemeToggle";
 import { Favicon } from "../../components/Favicon";
@@ -62,6 +63,13 @@ function EmptyList({ starred }: { starred: boolean }) {
 export function EntryList({ stream, title }: { stream: StreamDescriptor; title: string }) {
   const [density, setDensity] = useDensity();
   const { selectedId, select } = useSelection();
+  const setState = useSetEntryState();
+
+  // Open an entry and mark it read (mark-read-on-open, WP-11).
+  const open = (entry: { id: number; is_read: boolean }) => {
+    select(entry.id);
+    if (!entry.is_read) setState.mutate({ ids: [entry.id], read: true });
+  };
 
   const subs = useSubscriptions();
   const iconByFeed = useMemo(() => {
@@ -139,7 +147,7 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
                 data-read={e.is_read || undefined}
                 data-selected={selectedId === e.id || undefined}
                 aria-current={selectedId === e.id}
-                onClick={() => select(e.id)}
+                onClick={() => open(e)}
                 style={{ transform: `translateY(${vi.start}px)` }}
               >
                 <span className={styles.dot} aria-hidden="true" />

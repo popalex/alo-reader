@@ -18,6 +18,7 @@ import {
   postEntryState,
   postMarkRead,
   type Counts,
+  type EntryDetail,
   type EntryListItem,
   type StreamPage,
   type Subscription,
@@ -93,6 +94,18 @@ export function useSetEntryState() {
       if (vars.starred !== undefined) patch.is_starred = vars.starred;
       patchEntries(qc, new Set(vars.ids), patch);
 
+      // Also patch any open entry-detail caches so the reader flips instantly.
+      const detailPatch: Partial<EntryDetail> = {};
+      if (vars.read !== undefined) detailPatch.is_read = vars.read;
+      if (vars.starred !== undefined) detailPatch.is_starred = vars.starred;
+      const prevDetails: Array<[number, EntryDetail | undefined]> = vars.ids.map((id) => [
+        id,
+        qc.getQueryData<EntryDetail>(["entry", id]),
+      ]);
+      for (const id of vars.ids) {
+        qc.setQueryData<EntryDetail>(["entry", id], (d) => (d ? { ...d, ...detailPatch } : d));
+      }
+
       if (vars.read !== undefined) {
         const perSub = new Map<number, number>();
         let total = 0;
@@ -107,11 +120,12 @@ export function useSetEntryState() {
         }
         adjustCounts(qc, perSub, total);
       }
-      return { prevEntries, prevCounts };
+      return { prevEntries, prevCounts, prevDetails };
     },
     onError: (_err, _vars, ctx) => {
       restoreEntries(qc, ctx?.prevEntries);
       qc.setQueryData(queryKeys.counts, ctx?.prevCounts);
+      for (const [id, d] of ctx?.prevDetails ?? []) qc.setQueryData(["entry", id], d);
       pushToast("Couldn't save your change — it was rolled back.", "error");
     },
     onSettled: (_data, _err, vars) => {

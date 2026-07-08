@@ -35,21 +35,41 @@
   color: var(--text);
 }
 
-.orig {
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-inline-start: auto;
+}
+
+.action {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  margin-inline-start: auto;
   padding: 6px 10px;
-  border: 1px solid var(--accent-border);
   border-radius: 8px;
   font-size: 12.5px;
   font-weight: 500;
-  color: var(--accent);
+  color: var(--text-dim);
 }
 
-.orig:hover {
-  background: var(--accent-weak);
+.action:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.action[data-active="true"] {
+  color: var(--star);
+}
+
+.action[data-active="true"] .starIcon {
+  fill: var(--star);
+}
+
+@media (max-width: 768px) {
+  .action span {
+    display: none;
+  }
 }
 
 .header {
