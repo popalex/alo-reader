@@ -5,69 +5,23 @@
   grid-template-columns: var(--list-w) minmax(0, 1fr);
 }
 
-.list {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--surface);
-  border-right: 1px solid var(--border);
-  overflow-y: auto;
-}
-
-.reader {
-  min-width: 0;
-  display: flex;
-  background: var(--surface);
-  overflow-y: auto;
-}
-
-.listHead {
-  position: sticky;
-  top: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 16px 12px 20px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  z-index: 2;
-}
-
-.listTitle {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: var(--text);
-}
-
-.empty {
-  margin: auto;
-  padding: 40px 32px;
-  max-width: 340px;
-  text-align: center;
-}
-
-.emptyTitle {
-  margin: 0 0 6px;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-2);
-}
-
-.emptyBody {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--text-faint);
-}
-
+/* Below the tablet breakpoint the two panes become one view: the list by
+ * default, swapping to the reader once an entry is selected (ReaderPane shows a
+ * Back button that clears the selection). */
 @media (max-width: 768px) {
   .panes {
     grid-template-columns: 1fr;
   }
-  .reader {
+  .panes > * {
     display: none;
+  }
+  .panes > :first-child {
+    display: flex;
+  }
+  .panes[data-reading] > :first-child {
+    display: none;
+  }
+  .panes[data-reading] > :last-child {
+    display: flex;
   }
 }

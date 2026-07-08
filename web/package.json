@@ -26,6 +26,7 @@
     "@clerk/clerk-react": "^5.61.3",
     "@tanstack/react-query": "^5.101.2",
     "@tanstack/react-router": "^1.170.17",
+    "@tanstack/react-virtual": "^3.14.5",
     "lucide-react": "^1.23.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

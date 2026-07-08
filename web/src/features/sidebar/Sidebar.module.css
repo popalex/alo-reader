@@ -166,27 +166,6 @@
   color: var(--accent);
 }
 
-.fav {
-  flex: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 3px;
-  object-fit: cover;
-}
-
-.favLetter {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 3px;
-  color: #fff;
-  font-size: 9px;
-  font-weight: 700;
-}
-
 .errorDot {
   flex: none;
   width: 6px;

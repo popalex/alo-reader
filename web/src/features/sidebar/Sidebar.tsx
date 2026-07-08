@@ -12,30 +12,8 @@ import { ChevronDown, Inbox, Plus, Star } from "lucide-react";
 import type { Subscription } from "../../api/endpoints";
 import { useCounts, useFolders, useSubscriptions } from "../../api/queries";
 import { pushToast } from "../../app/toast";
+import { Favicon } from "../../components/Favicon";
 import styles from "./Sidebar.module.css";
-
-/** Stable pseudo-colour for a favicon fallback, derived from the feed title. */
-function faviconHue(text: string): number {
-  let h = 0;
-  for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) >>> 0;
-  return h % 360;
-}
-
-function Favicon({ sub }: { sub: Subscription }) {
-  const label = sub.title || sub.site_url || "?";
-  if (sub.icon_url) {
-    return <img className={styles.fav} src={sub.icon_url} alt="" width={16} height={16} loading="lazy" />;
-  }
-  return (
-    <span
-      className={styles.favLetter}
-      style={{ background: `hsl(${faviconHue(label)} 42% 42%)` }}
-      aria-hidden="true"
-    >
-      {label.charAt(0).toUpperCase()}
-    </span>
-  );
-}
 
 function FeedLink({ sub, unread }: { sub: Subscription; unread: number }) {
   const base = unread > 0 ? `${styles.feed} ${styles.feedUnread}` : styles.feed;
@@ -46,7 +24,7 @@ function FeedLink({ sub, unread }: { sub: Subscription; unread: number }) {
       className={base}
       activeProps={{ className: `${base} ${styles.active}` }}
     >
-      <Favicon sub={sub} />
+      <Favicon title={sub.title || sub.site_url || "?"} iconUrl={sub.icon_url} />
       <span className={styles.name}>{sub.title || "Untitled feed"}</span>
       {sub.last_error ? <span className={styles.errorDot} title="This feed failed to update" /> : null}
       {unread > 0 ? <span className={styles.count}>{unread}</span> : null}
