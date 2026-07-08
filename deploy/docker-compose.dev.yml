@@ -24,7 +24,9 @@ services:
 
   api:
     # Bypass the image entrypoint (api/worker dispatch) to run uvicorn with reload.
-    entrypoint: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    # --timeout-keep-alive matches entrypoint.sh: outlast Caddy's upstream pool so
+    # uvicorn doesn't emit a closing 400 on idle connections (see that comment).
+    entrypoint: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--timeout-keep-alive", "150"]
     command: !reset null
     environment:
       # Dev is explicitly local: default to single-user no-auth mode.

@@ -6,7 +6,11 @@ set -e
 
 case "${1:-api}" in
   api)
-    exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+    # --timeout-keep-alive outlasts Caddy's ~2m upstream keep-alive pool so Caddy
+    # recycles idle connections first (clean FIN). Otherwise uvicorn times out the
+    # idle connection at its 5s default and emits a closing 400 that Caddy logs as
+    # an "unsolicited response on idle HTTP channel" (harmless, but noisy).
+    exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --timeout-keep-alive 150
     ;;
   worker)
     exec python -m app.worker.main
