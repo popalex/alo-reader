@@ -11,7 +11,7 @@ COMPOSE_DEV := docker compose -f deploy/docker-compose.yml -f deploy/docker-comp
 # (see `make db`). Postgres itself is never installed on the host.
 TEST_DATABASE_URL ?= postgresql+asyncpg://alo:alo@localhost:5432/alo
 
-.PHONY: venv lint typecheck test-api test-web e2e lighthouse size up dev down db db-down migrate generate-client
+.PHONY: venv lint typecheck test-api test-web e2e lighthouse size up seed dev down db db-down migrate generate-client
 
 ## Create the virtualenv and install the api project (editable, with dev tools).
 venv:
@@ -51,8 +51,19 @@ size:
 	cd web && pnpm build && pnpm size
 
 ## Build and start the full stack; SPA + API served through Caddy on :80.
+## Needs AUTH_MODE set (prod compose has no default, by design): put it in a
+## repo-root .env (see .env.example) or prefix, e.g. `AUTH_MODE=none make up`.
+## For local hacking, `make dev` defaults AUTH_MODE=none and adds hot-reload.
 up:
 	$(COMPOSE) up --build -d
+
+## Seed a large, realistic dataset (20 feeds in folders, ~5k mixed read/starred
+## entries) into the running stack — no host Python needed. Idempotent: it resets
+## this user's seeded feeds/folders/state first. Needs `make up` (or `make dev`)
+## running. Scale knob: SEED_ENTRIES_PER_FEED (default 250), e.g.
+##   make seed SEED_ENTRIES_PER_FEED=50
+seed:
+	$(COMPOSE) exec -T $(if $(SEED_ENTRIES_PER_FEED),-e SEED_ENTRIES_PER_FEED=$(SEED_ENTRIES_PER_FEED)) api python - < scripts/seed_dev.py
 
 ## Hot-reload dev stack (uvicorn --reload + Vite HMR) on http://localhost.
 dev:
