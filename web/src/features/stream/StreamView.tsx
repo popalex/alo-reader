@@ -8,7 +8,8 @@ import { useFolders, useSubscriptions } from "../../api/queries";
 import { streamToPath, type StreamDescriptor } from "../../lib/streams";
 import { EntryList } from "./EntryList";
 import { ReaderPane } from "./ReaderPane";
-import { SelectionProvider, useSelection } from "./selection";
+import { SelectionProvider } from "./SelectionProvider";
+import { useSelection } from "./selection";
 import styles from "./StreamView.module.css";
 
 export type { StreamDescriptor };
@@ -31,9 +32,9 @@ function useStreamTitle(stream: StreamDescriptor): string {
 }
 
 function Panes({ stream, title }: { stream: StreamDescriptor; title: string }) {
-  const { selectedId } = useSelection();
+  const { openId } = useSelection();
   return (
-    <div className={styles.panes} data-reading={selectedId != null || undefined}>
+    <div className={styles.panes} data-reading={openId != null || undefined}>
       <EntryList stream={stream} title={title} />
       <ReaderPane />
     </div>

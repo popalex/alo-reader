@@ -6,10 +6,10 @@ import { expect, test } from "@playwright/test";
 test.describe("entry list + reading pane", () => {
   test("lists entries and opens an article into the reader", async ({ page }) => {
     await page.goto("/");
-    await page.waitForSelector("button[data-index]");
+    await page.waitForSelector("[data-index]");
 
     // Open a normal article (row 0 is the XSS probe; open row 1).
-    await page.locator("button[data-index='1']").click();
+    await page.locator("[data-index='1']").click();
     const article = page.locator("article");
     await expect(article.getByRole("heading", { level: 1 })).toBeVisible();
     await expect(article.getByText(/seeded article body/i)).toBeVisible();
@@ -17,8 +17,8 @@ test.describe("entry list + reading pane", () => {
 
   test("virtualizes 5k entries and pages in on scroll", async ({ page }) => {
     await page.goto("/");
-    await page.waitForSelector("button[data-index]");
-    const rows = page.locator("button[data-index]");
+    await page.waitForSelector("[data-index]");
+    const rows = page.locator("[data-index]");
     const scroller = page.getByTestId("entry-scroll");
 
     // Scroll gently (as a user would); the tail pages in as we go.
@@ -44,8 +44,8 @@ test.describe("entry list + reading pane", () => {
     });
 
     await page.goto("/");
-    await page.waitForSelector("button[data-index]");
-    await page.getByRole("button", { name: /XSS probe/ }).click();
+    await page.waitForSelector("[data-index]");
+    await page.locator("[data-index='0']").click(); // row 0 is the XSS probe
 
     const article = page.locator("article");
     await expect(article.getByRole("heading", { name: /XSS probe/ })).toBeVisible();
@@ -63,15 +63,15 @@ test.describe("mobile", () => {
 
   test("list -> entry -> back", async ({ page }) => {
     await page.goto("/");
-    await page.waitForSelector("button[data-index]");
+    await page.waitForSelector("[data-index]");
 
-    await page.locator("button[data-index='1']").click();
+    await page.locator("[data-index='1']").click();
     const back = page.getByRole("button", { name: "Back" });
     await expect(back).toBeVisible();
     await expect(page.locator("article h1")).toBeVisible();
 
     await back.click();
-    await expect(page.locator("button[data-index]").first()).toBeVisible();
+    await expect(page.locator("[data-index]").first()).toBeVisible();
     await expect(back).toBeHidden();
   });
 });

@@ -10,7 +10,7 @@ import { RouterProvider } from "@tanstack/react-router";
 
 import { createQueryClient } from "./queryClient";
 import { router } from "./router";
-import { Toaster } from "./toast";
+import { Toaster } from "./Toaster";
 
 export function AppProviders() {
   const [queryClient] = useState(createQueryClient);

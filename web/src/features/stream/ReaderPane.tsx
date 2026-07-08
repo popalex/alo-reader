@@ -14,8 +14,8 @@ import { useSelection } from "./selection";
 import styles from "./ReaderPane.module.css";
 
 export function ReaderPane() {
-  const { selectedId, clear } = useSelection();
-  const query = useEntry(selectedId);
+  const { openId, close } = useSelection();
+  const query = useEntry(openId);
   const setState = useSetEntryState();
   const contentRef = useRef<HTMLDivElement>(null);
   const html = query.data?.content_html;
@@ -28,10 +28,13 @@ export function ReaderPane() {
     el.querySelectorAll("img").forEach((img) => {
       img.loading = "lazy";
       img.decoding = "async";
+      // Feed images often ship without alt text; mark those decorative so they
+      // don't read as unlabelled images to assistive tech (WP-12 a11y).
+      if (!img.hasAttribute("alt")) img.alt = "";
     });
   }, [html]);
 
-  if (selectedId == null) {
+  if (openId == null) {
     return (
       <article className={styles.reader}>
         <div className={styles.empty}>
@@ -68,7 +71,7 @@ export function ReaderPane() {
   return (
     <article className={styles.reader}>
       <div className={styles.bar}>
-        <button type="button" className={styles.back} onClick={clear}>
+        <button type="button" className={styles.back} onClick={close}>
           <ChevronLeft size={16} /> Back
         </button>
         <div className={styles.actions}>

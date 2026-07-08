@@ -3,6 +3,7 @@
 
 import { Outlet } from "@tanstack/react-router";
 
+import { UnreadAnnouncer } from "../../app/UnreadAnnouncer";
 import { Sidebar } from "../sidebar/Sidebar";
 import styles from "./AppLayout.module.css";
 
@@ -13,6 +14,7 @@ export function AppLayout() {
       <div className={styles.content}>
         <Outlet />
       </div>
+      <UnreadAnnouncer />
     </div>
   );
 }

@@ -14,11 +14,11 @@ async function totalUnread(page: Page): Promise<number> {
 test.describe("read-state", () => {
   test("opening an entry marks it read and drops the unread count", async ({ page }) => {
     await page.goto("/");
-    await page.waitForSelector("button[data-index]");
+    await page.waitForSelector("[data-index]");
     const before = await totalUnread(page);
     expect(before).toBeGreaterThan(0);
 
-    await page.locator("button[data-index]:not([data-read])").first().click();
+    await page.locator("[data-index]:not([data-read])").first().click();
     await expect.poll(() => totalUnread(page)).toBeLessThan(before);
   });
 
@@ -31,7 +31,7 @@ test.describe("read-state", () => {
     });
 
     await page.goto("/");
-    await page.waitForSelector("button[data-index]");
+    await page.waitForSelector("[data-index]");
     // A feed with plenty of unread entries, untouched by the other tests.
     await page.getByRole("link", { name: /Nature/ }).click();
     await expect(page.getByRole("heading", { name: "Nature", level: 1 })).toBeVisible();
@@ -49,7 +49,7 @@ test.describe("read-state", () => {
 
   test("rolls back and toasts when the API fails mid-mark", async ({ page }) => {
     await page.goto("/");
-    await page.waitForSelector("button[data-index]");
+    await page.waitForSelector("[data-index]");
     const before = await totalUnread(page);
 
     await page.route("**/api/v1/entries/state", (route) =>
@@ -60,7 +60,7 @@ test.describe("read-state", () => {
       }),
     );
 
-    await page.locator("button[data-index]:not([data-read])").first().click();
+    await page.locator("[data-index]:not([data-read])").first().click();
     await expect(page.getByRole("alert")).toContainText(/rolled back/i);
     // Optimistic drop is reverted.
     await expect.poll(() => totalUnread(page)).toBe(before);
@@ -68,8 +68,8 @@ test.describe("read-state", () => {
 
   test("star toggles and persists across reload", async ({ page }) => {
     await page.goto("/");
-    await page.waitForSelector("button[data-index]");
-    await page.locator("button[data-index]").first().click();
+    await page.waitForSelector("[data-index]");
+    await page.locator("[data-index]").first().click();
     await page.waitForSelector("article h1");
 
     const star = page.getByRole("button", { name: /^Star/ });
@@ -78,8 +78,8 @@ test.describe("read-state", () => {
     await expect(star).toHaveAttribute("aria-pressed", String(!wasPressed));
 
     await page.reload();
-    await page.waitForSelector("button[data-index]");
-    await page.locator("button[data-index]").first().click();
+    await page.waitForSelector("[data-index]");
+    await page.locator("[data-index]").first().click();
     await page.waitForSelector("article h1");
     await expect(page.getByRole("button", { name: /^Star/ })).toHaveAttribute(
       "aria-pressed",
@@ -89,13 +89,16 @@ test.describe("read-state", () => {
 
   test("mark-all-read clears a feed's unread count", async ({ page }) => {
     await page.goto("/");
-    await page.waitForSelector("button[data-index]");
+    await page.waitForSelector("[data-index]");
 
     const feed = page.getByRole("link", { name: /The Verge/ });
     await feed.click();
     await expect(page.getByRole("heading", { name: "The Verge", level: 1 })).toBeVisible();
 
     await page.getByRole("button", { name: "Mark all read" }).click();
+    // Destructive, so it's now confirm-guarded (WP-12); accept in the dialog.
+    const confirm = page.getByRole("dialog", { name: "Mark all as read?" });
+    await confirm.getByRole("button", { name: "Mark all read" }).click();
     // The feed's sidebar badge disappears (unread → 0).
     await expect.poll(async () => (await feed.textContent()) ?? "").not.toMatch(/\d/);
   });

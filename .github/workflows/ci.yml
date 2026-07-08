@@ -33,6 +33,7 @@ jobs:
           version: "11"
       - run: pnpm -C web install
       - run: pnpm -C web tsc
+      - run: pnpm -C web lint
 
   test-api:
     # Tests provision their own throwaway Postgres via Testcontainers (Docker is
