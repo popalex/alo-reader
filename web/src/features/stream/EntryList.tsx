@@ -1,18 +1,25 @@
 // The inbox: a virtualized, newest-first list of entries with infinite cursor
 // pagination. Rows show feed favicon, feed name, title, summary and relative
-// time; unread rows are bold, read rows dim (DESIGN.md §1.7). Selecting a row
-// drives the reading pane. Marking read/refresh is WP-11; keyboard is WP-12.
+// time; unread rows are bold, read rows dim (DESIGN.md §1.7). The list is the
+// keyboard model's home (WP-12): it owns the global handler, since it has the
+// entries, the virtualizer (scroll-into-view), selection and the mutations.
+// A cursor row (j/k) carries a visible ring; opening (o/Enter/click) drives the
+// reading pane and marks read.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
+import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { CheckCheck, CircleAlert, List as ListIcon, RefreshCw, Rows3, Star } from "lucide-react";
+import { CheckCheck, CircleAlert, List as ListIcon, RefreshCw, Rows3, Search, Star } from "lucide-react";
 
 import { useMarkStreamRead, useSetEntryState } from "../../api/mutations";
 import { useStreamEntries, useSubscriptions } from "../../api/queries";
 import { ThemeToggle } from "../../app/ThemeToggle";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Favicon } from "../../components/Favicon";
+import { KeyboardHelp } from "../../keyboard/KeyboardHelp";
+import { useKeyboard, type KeyboardActions } from "../../keyboard/useKeyboard";
 import type { StreamDescriptor } from "../../lib/streams";
 import { formatDateTime, relativeTime } from "../../lib/time";
 import { useDensity, type Density } from "./density";
@@ -64,21 +71,15 @@ function EmptyList({ starred }: { starred: boolean }) {
 
 export function EntryList({ stream, title }: { stream: StreamDescriptor; title: string }) {
   const [density, setDensity] = useDensity();
-  const { selectedId, select } = useSelection();
+  const { cursorId, openId, setCursor, open, close } = useSelection();
   const setState = useSetEntryState();
   const markStreamRead = useMarkStreamRead(stream);
   const qc = useQueryClient();
+  const navigate = useNavigate();
 
-  // Open an entry and mark it read (mark-read-on-open, WP-11).
-  const open = (entry: { id: number; is_read: boolean }) => {
-    select(entry.id);
-    if (!entry.is_read) setState.mutate({ ids: [entry.id], read: true });
-  };
-
-  const refresh = () => {
-    void qc.invalidateQueries({ queryKey: ["entries"] });
-    void qc.invalidateQueries({ queryKey: ["counts"] });
-  };
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const subs = useSubscriptions();
   const iconByFeed = useMemo(() => {
@@ -120,10 +121,78 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
 
   useScrollReadMarker(scrollEl, virtualizer, entries);
 
-  const markAllRead = () => {
+  // Open an entry and mark it read (mark-read-on-open, WP-11).
+  const openEntry = (entry: { id: number; is_read: boolean }) => {
+    open(entry.id);
+    if (!entry.is_read) setState.mutate({ ids: [entry.id], read: true });
+  };
+
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ["entries"] });
+    void qc.invalidateQueries({ queryKey: ["counts"] });
+  };
+
+  const doMarkAllRead = () => {
     const maxId = entries[0]?.id; // newest observed entry bounds the action
     if (maxId != null) markStreamRead.mutate(maxId);
   };
+
+  // Keyboard model (WP-12). Actions operate on the cursor row; they read the
+  // latest `entries`/`cursorId` because the map is rebuilt each render.
+  const cursorIndex = cursorId == null ? -1 : entries.findIndex((e) => e.id === cursorId);
+
+  // Move the keyboard cursor, scroll it into view and take DOM focus (so the
+  // ring is real focus and screen readers announce the row).
+  const focusRowSoon = (index: number) => {
+    requestAnimationFrame(() => {
+      scrollEl?.querySelector<HTMLElement>(`[data-index="${index}"]`)?.focus();
+    });
+  };
+  const moveCursor = (index: number) => {
+    const e = entries[index];
+    if (!e) return;
+    setCursor(e.id);
+    virtualizer.scrollToIndex(index, { align: "auto" });
+    focusRowSoon(index);
+  };
+
+  const actions: KeyboardActions = {
+    next: () => moveCursor(cursorIndex < 0 ? 0 : Math.min(cursorIndex + 1, entries.length - 1)),
+    prev: () => moveCursor(cursorIndex < 0 ? 0 : Math.max(cursorIndex - 1, 0)),
+    open: () => {
+      const e = cursorIndex < 0 ? entries[0] : entries[cursorIndex];
+      if (!e) return;
+      if (openId === e.id) {
+        close();
+        focusRowSoon(entries.findIndex((x) => x.id === e.id));
+      } else {
+        openEntry(e);
+      }
+    },
+    openOriginal: () => {
+      const e = entries[cursorIndex];
+      if (e?.url) window.open(e.url, "_blank", "noopener,noreferrer");
+    },
+    toggleRead: () => {
+      const e = entries[cursorIndex];
+      if (e) setState.mutate({ ids: [e.id], read: !e.is_read });
+    },
+    star: () => {
+      const e = entries[cursorIndex];
+      if (e) setState.mutate({ ids: [e.id], starred: !e.is_starred });
+    },
+    markAllRead: () => {
+      if (entries.length > 0) setConfirmOpen(true);
+    },
+    refresh,
+    goAll: () => void navigate({ to: "/" }),
+    goStarred: () => void navigate({ to: "/starred" }),
+    focusSearch: () => searchRef.current?.focus(),
+    help: () => setHelpOpen(true),
+  };
+  // The global handler stands down while a modal owns the keyboard.
+  useKeyboard(actions, !helpOpen && !confirmOpen);
+
   const feedError =
     stream.kind === "feed" ? (subs.data?.find((s) => s.id === stream.id)?.last_error ?? null) : null;
 
@@ -150,22 +219,32 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
     );
   } else {
     body = (
-      <div ref={setScrollEl} className={styles.scroll} data-testid="entry-scroll">
-        <div className={styles.viewport} style={{ height: virtualizer.getTotalSize() }}>
+      <div ref={setScrollEl} className={styles.scroll} data-testid="entry-scroll" tabIndex={0}>
+        <div
+          className={styles.viewport}
+          role="list"
+          aria-label={`${title} articles`}
+          style={{ height: virtualizer.getTotalSize() }}
+        >
           {items.map((vi) => {
             const e = entries[vi.index];
             return (
-              <button
+              <div
                 key={vi.key}
-                type="button"
+                role="listitem"
+                tabIndex={-1}
                 data-index={vi.index}
                 ref={virtualizer.measureElement}
                 className={styles.row}
                 data-density={density}
                 data-read={e.is_read || undefined}
-                data-selected={selectedId === e.id || undefined}
-                aria-current={selectedId === e.id}
-                onClick={() => open(e)}
+                data-selected={openId === e.id || undefined}
+                data-cursor={cursorId === e.id || undefined}
+                aria-current={openId === e.id}
+                onClick={() => {
+                  setCursor(e.id);
+                  openEntry(e);
+                }}
                 style={{ transform: `translateY(${vi.start}px)` }}
               >
                 <span className={styles.dot} aria-hidden="true" />
@@ -183,7 +262,7 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
                   {e.is_starred ? <Star className={styles.star} size={12} /> : null}
                   {relativeTime(e.created_at)}
                 </time>
-              </button>
+              </div>
             );
           })}
         </div>
@@ -211,7 +290,7 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
             className={styles.toolBtn}
             title="Mark all read"
             aria-label="Mark all read"
-            onClick={markAllRead}
+            onClick={() => setConfirmOpen(true)}
             disabled={entries.length === 0}
           >
             <CheckCheck size={15} />
@@ -221,6 +300,22 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
           <ThemeToggle />
         </div>
       </header>
+      <div className={styles.searchBar}>
+        <Search size={14} className={styles.searchIcon} aria-hidden="true" />
+        {/* Search executes in WP-13; the input exists now so `/` has a target. */}
+        <input
+          ref={searchRef}
+          type="search"
+          className={styles.searchInput}
+          placeholder="Search articles"
+          aria-label="Search articles"
+          readOnly
+          title="Search is coming soon"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") e.currentTarget.blur();
+          }}
+        />
+      </div>
       {feedError ? (
         <div className={styles.errorBanner} role="alert">
           <CircleAlert size={15} />
@@ -228,6 +323,16 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
         </div>
       ) : null}
       {body}
+
+      <KeyboardHelp open={helpOpen} onOpenChange={setHelpOpen} />
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Mark all as read?"
+        body={`Every article in ${title} will be marked as read. This can’t be undone.`}
+        confirmLabel="Mark all read"
+        onConfirm={doMarkAllRead}
+      />
     </section>
   );
 }

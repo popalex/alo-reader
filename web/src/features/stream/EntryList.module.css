@@ -65,6 +65,43 @@
   background: var(--border-2);
 }
 
+/* Slim search bar (WP-12 focus target for `/`; wired to results in WP-13). */
+.searchBar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.searchIcon {
+  flex: none;
+  color: var(--text-faint);
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.searchInput::placeholder {
+  color: var(--text-faint);
+}
+
+.searchInput:focus {
+  outline: none;
+}
+
+.searchBar:focus-within {
+  box-shadow: inset 0 -2px 0 0 var(--accent);
+}
+
 .errorBanner {
   display: flex;
   align-items: center;
@@ -174,6 +211,7 @@
   border-bottom: 1px solid var(--border);
   text-align: left;
   color: var(--text-2);
+  cursor: pointer;
 }
 
 .row:hover {
@@ -192,6 +230,18 @@
   bottom: 0;
   width: 3px;
   background: var(--accent);
+}
+
+/* Keyboard cursor (j/k): a visible ring that reads as the current selection.
+   The row takes real DOM focus, so suppress the generic focus outline in favour
+   of this ring. */
+.row[data-cursor] {
+  box-shadow: inset 0 0 0 2px var(--accent);
+  border-radius: 4px;
+}
+
+.row:focus {
+  outline: none;
 }
 
 .dot {
