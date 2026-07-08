@@ -13,12 +13,22 @@ test.describe("keyboard-only session", () => {
 
     // j puts the keyboard cursor on the first row: a visible ring + real focus.
     await page.keyboard.press("j");
-    await expect(page.locator("[data-cursor]")).toHaveCount(1);
+    await expect(page.locator("[data-cursor]")).toHaveAttribute("data-index", "0");
     await expect
       .poll(() => page.evaluate(() => document.activeElement?.getAttribute("role")))
       .toBe("listitem");
 
-    // j again advances the cursor (row 0 is the XSS probe; land on a real one).
+    // j/k move the cursor ONLY — they must not open the reader or mark anything
+    // (opening/marking is o/Enter's job). The reader stays on its empty state.
+    await page.keyboard.press("j"); // -> row 1
+    await expect(page.locator("[data-cursor]")).toHaveAttribute("data-index", "1");
+    await expect(page.getByText("Select an article")).toBeVisible();
+    await expect(page.locator("article h1")).toHaveCount(0);
+    await page.keyboard.press("k"); // -> back to row 0, still not opened
+    await expect(page.locator("[data-cursor]")).toHaveAttribute("data-index", "0");
+    await expect(page.getByText("Select an article")).toBeVisible();
+
+    // Land the cursor on a real article (row 0 is the XSS probe) before acting.
     await page.keyboard.press("j");
 
     // s stars the cursor row without opening it.
@@ -44,6 +54,14 @@ test.describe("keyboard-only session", () => {
     await expect(help.getByText("Go to All items")).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(help).toBeHidden();
+
+    // o again closes the reader and returns focus to the cursor row (predictable
+    // focus after the pane closes — no focus lost to <body>).
+    await page.keyboard.press("o");
+    await expect(page.getByText("Select an article")).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => document.activeElement?.getAttribute("role")))
+      .toBe("listitem");
 
     // g s switches to the Starred stream.
     await page.keyboard.press("g");
