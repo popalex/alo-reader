@@ -17,8 +17,9 @@ export function createQueryClient(): QueryClient {
       queries: {
         staleTime: 30_000,
         retry: 1,
-        // WP-11 owns refetch-on-focus explicitly; keep it off until then.
-        refetchOnWindowFocus: false,
+        // Refresh on focus, but respect staleTime — TanStack won't refetch data
+        // newer than 30s (WP-11). The manual refresh button force-invalidates.
+        refetchOnWindowFocus: true,
       },
     },
   });

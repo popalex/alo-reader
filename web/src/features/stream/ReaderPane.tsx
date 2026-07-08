@@ -4,8 +4,9 @@
 
 import { useEffect, useRef } from "react";
 
-import { ChevronLeft, ExternalLink } from "lucide-react";
+import { Check, ChevronLeft, Circle, ExternalLink, Star } from "lucide-react";
 
+import { useSetEntryState } from "../../api/mutations";
 import { useEntry } from "../../api/queries";
 import { Favicon } from "../../components/Favicon";
 import { formatDateTime } from "../../lib/time";
@@ -15,6 +16,7 @@ import styles from "./ReaderPane.module.css";
 export function ReaderPane() {
   const { selectedId, clear } = useSelection();
   const query = useEntry(selectedId);
+  const setState = useSetEntryState();
   const contentRef = useRef<HTMLDivElement>(null);
   const html = query.data?.content_html;
 
@@ -69,11 +71,34 @@ export function ReaderPane() {
         <button type="button" className={styles.back} onClick={clear}>
           <ChevronLeft size={16} /> Back
         </button>
-        {entry.url ? (
-          <a className={styles.orig} href={entry.url} target="_blank" rel="noopener noreferrer">
-            Open original <ExternalLink size={13} />
-          </a>
-        ) : null}
+        <div className={styles.actions}>
+          <button
+            type="button"
+            className={styles.action}
+            data-active={entry.is_starred}
+            aria-pressed={entry.is_starred}
+            title={entry.is_starred ? "Unstar" : "Star"}
+            onClick={() => setState.mutate({ ids: [entry.id], starred: !entry.is_starred })}
+          >
+            <Star size={15} className={styles.starIcon} />
+            <span>{entry.is_starred ? "Starred" : "Star"}</span>
+          </button>
+          <button
+            type="button"
+            className={styles.action}
+            title={entry.is_read ? "Mark unread" : "Mark read"}
+            onClick={() => setState.mutate({ ids: [entry.id], read: !entry.is_read })}
+          >
+            {entry.is_read ? <Circle size={15} /> : <Check size={15} />}
+            <span>{entry.is_read ? "Mark unread" : "Mark read"}</span>
+          </button>
+          {entry.url ? (
+            <a className={styles.action} href={entry.url} target="_blank" rel="noopener noreferrer">
+              <ExternalLink size={14} />
+              <span>Open original</span>
+            </a>
+          ) : null}
+        </div>
       </div>
       <header className={styles.header}>
         <div className={styles.source}>

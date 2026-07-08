@@ -1,8 +1,12 @@
 .panes {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: grid;
   grid-template-columns: var(--list-w) minmax(0, 1fr);
+  /* Bound the row so the list/reader panes (and their scroll containers) get a
+   * definite height for virtualization. */
+  grid-template-rows: minmax(0, 1fr);
 }
 
 /* Below the tablet breakpoint the two panes become one view: the list by

@@ -47,3 +47,31 @@ export function getStreamEntries(
 export function getEntry(token: string | null, id: number): Promise<EntryDetail> {
   return apiFetch<EntryDetail>(`/entries/${id}`, { token });
 }
+
+export type UpdatedResponse = components["schemas"]["UpdatedResponse"];
+
+export interface EntryStateInput {
+  ids: number[];
+  read?: boolean;
+  starred?: boolean;
+  changed_at?: string;
+}
+
+export function postEntryState(
+  token: string | null,
+  input: EntryStateInput,
+): Promise<UpdatedResponse> {
+  return apiFetch<UpdatedResponse>("/entries/state", { token, method: "POST", body: input });
+}
+
+export function postMarkRead(
+  token: string | null,
+  streamPath: string,
+  maxEntryId: number,
+): Promise<UpdatedResponse> {
+  return apiFetch<UpdatedResponse>(`/streams/${streamPath}/mark-read`, {
+    token,
+    method: "POST",
+    body: { max_entry_id: maxEntryId },
+  });
+}
