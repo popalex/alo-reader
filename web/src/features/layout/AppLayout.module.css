@@ -1,6 +1,10 @@
 .shell {
   display: grid;
   grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  /* Bound the single row to the viewport; without this the auto row grows to
+   * content height and the scroll container below never gets a bounded height
+   * (breaking virtualization). */
+  grid-template-rows: minmax(0, 1fr);
   height: 100vh;
   overflow: hidden;
   background: var(--bg);
@@ -8,6 +12,7 @@
 
 .content {
   min-width: 0;
+  min-height: 0;
   display: flex;
 }
 
