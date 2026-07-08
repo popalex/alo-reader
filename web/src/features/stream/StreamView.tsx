@@ -1,19 +1,17 @@
-// The two right-hand panes: the article list and the reading pane. Both are
-// placeholders in WP-09 — the virtualised list lands in WP-10 and reading in
-// WP-10/11. This owns the list header (stream title + theme toggle) and the
-// empty states, so the three-pane shell reads as finished.
+// The two right-hand panes: the entry list and the reading pane, sharing a
+// per-stream selection store. On mobile the panes become a single view that
+// swaps to the reader (with a Back button) once an entry is selected.
 
 import { useMemo } from "react";
 
-import { ThemeToggle } from "../../app/ThemeToggle";
 import { useFolders, useSubscriptions } from "../../api/queries";
+import { streamToPath, type StreamDescriptor } from "../../lib/streams";
+import { EntryList } from "./EntryList";
+import { ReaderPane } from "./ReaderPane";
+import { SelectionProvider, useSelection } from "./selection";
 import styles from "./StreamView.module.css";
 
-export type StreamDescriptor =
-  | { kind: "all" }
-  | { kind: "starred" }
-  | { kind: "feed"; id: number }
-  | { kind: "folder"; id: number };
+export type { StreamDescriptor };
 
 function useStreamTitle(stream: StreamDescriptor): string {
   const subs = useSubscriptions();
@@ -32,33 +30,22 @@ function useStreamTitle(stream: StreamDescriptor): string {
   }, [stream, subs.data, folders.data]);
 }
 
+function Panes({ stream, title }: { stream: StreamDescriptor; title: string }) {
+  const { selectedId } = useSelection();
+  return (
+    <div className={styles.panes} data-reading={selectedId != null || undefined}>
+      <EntryList stream={stream} title={title} />
+      <ReaderPane />
+    </div>
+  );
+}
+
 export function StreamView({ stream }: { stream: StreamDescriptor }) {
   const title = useStreamTitle(stream);
-  const isStarred = stream.kind === "starred";
-
+  // Key by stream so selection resets when the stream changes.
   return (
-    <div className={styles.panes}>
-      <section className={styles.list} aria-label={title}>
-        <header className={styles.listHead}>
-          <h1 className={styles.listTitle}>{title}</h1>
-          <ThemeToggle />
-        </header>
-        <div className={styles.empty}>
-          <p className={styles.emptyTitle}>{isStarred ? "No starred articles" : "Nothing here yet"}</p>
-          <p className={styles.emptyBody}>
-            {isStarred
-              ? "Star an article and it will be kept here."
-              : "Articles from your feeds will appear here, newest first. The list arrives in the next update."}
-          </p>
-        </div>
-      </section>
-
-      <article className={styles.reader}>
-        <div className={styles.empty}>
-          <p className={styles.emptyTitle}>Select an article</p>
-          <p className={styles.emptyBody}>Choose something from the list to read it here.</p>
-        </div>
-      </article>
-    </div>
+    <SelectionProvider key={streamToPath(stream)}>
+      <Panes stream={stream} title={title} />
+    </SelectionProvider>
   );
 }
