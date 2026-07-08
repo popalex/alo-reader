@@ -7,7 +7,10 @@ const baseURL = process.env.E2E_BASE_URL ?? "http://localhost";
 
 export default defineConfig({
   testDir: "./e2e",
-  fullyParallel: true,
+  // The tests share one backend and WP-11 mutates read/star state, so run them
+  // serially (one worker) for deterministic, non-interfering state.
+  fullyParallel: false,
+  workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: [["list"]],

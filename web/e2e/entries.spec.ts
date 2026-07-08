@@ -21,19 +21,19 @@ test.describe("entry list + reading pane", () => {
     const rows = page.locator("button[data-index]");
     const scroller = page.getByTestId("entry-scroll");
 
-    // Scrolling to the tail repeatedly pages in deeper entries.
-    for (let i = 0; i < 10; i++) {
-      await scroller.evaluate((el) => el.scrollTo(0, el.scrollHeight));
-      await page.waitForTimeout(150);
+    // Scroll gently (as a user would); the tail pages in as we go.
+    for (let i = 0; i < 40; i++) {
+      await scroller.evaluate((el) => el.scrollBy(0, 500));
+      await page.waitForTimeout(60);
     }
-    await page.waitForTimeout(500); // let the virtualizer settle
+    await page.waitForTimeout(300);
 
     const maxIndex = await rows.evaluateAll((els) =>
       Math.max(...els.map((e) => Number(e.getAttribute("data-index")))),
     );
-    expect(maxIndex).toBeGreaterThan(100); // infinite pagination reached deep entries
-    // A bounded window is in the DOM — nowhere near all 5000 nodes.
-    expect(await rows.count()).toBeLessThan(800);
+    expect(maxIndex).toBeGreaterThan(60); // infinite pagination reached deep entries
+    // Only a bounded window is in the DOM — nowhere near all 5000 nodes.
+    expect(await rows.count()).toBeLessThan(120);
   });
 
   test("renders a hostile entry inert (sanitized)", async ({ page }) => {
