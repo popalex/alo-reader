@@ -67,7 +67,9 @@ async def resolve(host: str, port: int) -> list[str]:
     # Preserve order, drop duplicates.
     seen: dict[str, None] = {}
     for info in infos:
-        seen.setdefault(info[4][0], None)
+        # sockaddr[0] is the address string; newer typeshed widens the sockaddr
+        # union so its first element is str | int — coerce to keep it a str key.
+        seen.setdefault(str(info[4][0]), None)
     return list(seen)
 
 
