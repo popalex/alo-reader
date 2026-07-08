@@ -15,6 +15,7 @@ import { Favicon } from "../../components/Favicon";
 import type { StreamDescriptor } from "../../lib/streams";
 import { formatDateTime, relativeTime } from "../../lib/time";
 import { useDensity, type Density } from "./density";
+import { useScrollReadMarker } from "./useScrollReadMarker";
 import { useSelection } from "./selection";
 import styles from "./EntryList.module.css";
 
@@ -108,6 +109,8 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
       void query.fetchNextPage();
     }
   }, [lastIndex, entries.length, query]);
+
+  useScrollReadMarker(scrollEl, virtualizer, entries);
 
   let body: React.ReactNode;
   if (query.isPending) {
