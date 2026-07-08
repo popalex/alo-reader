@@ -3,7 +3,7 @@
 // time; unread rows are bold, read rows dim (DESIGN.md §1.7). Selecting a row
 // drives the reading pane. Marking read/refresh is WP-11; keyboard is WP-12.
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { CircleAlert, List as ListIcon, Rows3, Star } from "lucide-react";
@@ -76,10 +76,13 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
     [query.data],
   );
 
-  const scrollRef = useRef<HTMLDivElement>(null);
+  // State-backed ref so the virtualizer re-initializes once the scroll element
+  // mounts (a plain useRef doesn't trigger a render, which can leave the list
+  // rendering zero rows until the first resize/scroll).
+  const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
   const virtualizer = useVirtualizer({
     count: entries.length,
-    getScrollElement: () => scrollRef.current,
+    getScrollElement: () => scrollEl,
     estimateSize: () => (density === "expanded" ? 92 : 46),
     overscan: 10,
     getItemKey: (i) => entries[i]?.id ?? i,
@@ -121,7 +124,7 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
     );
   } else {
     body = (
-      <div ref={scrollRef} className={styles.scroll} data-testid="entry-scroll">
+      <div ref={setScrollEl} className={styles.scroll} data-testid="entry-scroll">
         <div className={styles.viewport} style={{ height: virtualizer.getTotalSize() }}>
           {items.map((vi) => {
             const e = entries[vi.index];
