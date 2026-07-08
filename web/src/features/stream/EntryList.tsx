@@ -5,10 +5,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { CircleAlert, List as ListIcon, Rows3, Star } from "lucide-react";
+import { CheckCheck, CircleAlert, List as ListIcon, RefreshCw, Rows3, Star } from "lucide-react";
 
-import { useSetEntryState } from "../../api/mutations";
+import { useMarkStreamRead, useSetEntryState } from "../../api/mutations";
 import { useStreamEntries, useSubscriptions } from "../../api/queries";
 import { ThemeToggle } from "../../app/ThemeToggle";
 import { Favicon } from "../../components/Favicon";
@@ -65,11 +66,18 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
   const [density, setDensity] = useDensity();
   const { selectedId, select } = useSelection();
   const setState = useSetEntryState();
+  const markStreamRead = useMarkStreamRead(stream);
+  const qc = useQueryClient();
 
   // Open an entry and mark it read (mark-read-on-open, WP-11).
   const open = (entry: { id: number; is_read: boolean }) => {
     select(entry.id);
     if (!entry.is_read) setState.mutate({ ids: [entry.id], read: true });
+  };
+
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ["entries"] });
+    void qc.invalidateQueries({ queryKey: ["counts"] });
   };
 
   const subs = useSubscriptions();
@@ -111,6 +119,13 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
   }, [lastIndex, entries.length, query]);
 
   useScrollReadMarker(scrollEl, virtualizer, entries);
+
+  const markAllRead = () => {
+    const maxId = entries[0]?.id; // newest observed entry bounds the action
+    if (maxId != null) markStreamRead.mutate(maxId);
+  };
+  const feedError =
+    stream.kind === "feed" ? (subs.data?.find((s) => s.id === stream.id)?.last_error ?? null) : null;
 
   let body: React.ReactNode;
   if (query.isPending) {
@@ -182,10 +197,36 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
       <header className={styles.head}>
         <h1 className={styles.title}>{title}</h1>
         <div className={styles.controls}>
+          <button
+            type="button"
+            className={styles.toolBtn}
+            title="Refresh"
+            aria-label="Refresh"
+            onClick={refresh}
+          >
+            <RefreshCw size={15} />
+          </button>
+          <button
+            type="button"
+            className={styles.toolBtn}
+            title="Mark all read"
+            aria-label="Mark all read"
+            onClick={markAllRead}
+            disabled={entries.length === 0}
+          >
+            <CheckCheck size={15} />
+          </button>
+          <span className={styles.sep} />
           <DensityToggle value={density} onChange={setDensity} />
           <ThemeToggle />
         </div>
       </header>
+      {feedError ? (
+        <div className={styles.errorBanner} role="alert">
+          <CircleAlert size={15} />
+          <span>This feed failed to update: {feedError}</span>
+        </div>
+      ) : null}
       {body}
     </section>
   );
