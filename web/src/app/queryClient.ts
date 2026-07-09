@@ -20,6 +20,15 @@ export function createQueryClient(): QueryClient {
         // Refresh on focus, but respect staleTime — TanStack won't refetch data
         // newer than 30s (WP-11). The manual refresh button force-invalidates.
         refetchOnWindowFocus: true,
+        // The service worker owns offline caching (WP-14), so don't let TanStack
+        // pause queries when offline — run the queryFn and let the SW serve cache.
+        networkMode: "always",
+      },
+      mutations: {
+        // Critical for the offline queue: with the default "online" mode TanStack
+        // pauses mutations offline and never calls mutationFn, so our enqueue never
+        // runs. "always" lets mutationFn run and decide (post or enqueue).
+        networkMode: "always",
       },
     },
   });
