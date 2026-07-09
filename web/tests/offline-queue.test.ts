@@ -22,7 +22,9 @@ describe("offline queue", () => {
     expect(q.getQueuedCount()).toBe(0);
 
     // A second replay sends nothing — each item left exactly once.
-    await q.replayQueue(async (item) => sent.push(item.ids));
+    await q.replayQueue(async (item) => {
+      sent.push(item.ids);
+    });
     expect(sent).toEqual([[1], [2]]);
   });
 
