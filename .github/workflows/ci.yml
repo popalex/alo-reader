@@ -1,8 +1,17 @@
 name: CI
 
+# Feature branches run once, via pull_request (which tests the simulated merge
+# with main); push only fires for main itself (post-merge). This avoids the
+# double run you'd get from push + pull_request both matching a PR branch.
 on:
   push:
+    branches: [main]
   pull_request:
+
+# A newer push to the same ref cancels an in-flight run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint:
