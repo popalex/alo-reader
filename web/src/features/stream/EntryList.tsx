@@ -4,14 +4,25 @@
 // keyboard model's home (WP-12): it owns the global handler, since it has the
 // entries, the virtualizer (scroll-into-view), selection and the mutations.
 // A cursor row (j/k) carries a visible ring; opening (o/Enter/click) drives the
-// reading pane and marks read.
+// reading pane and marks read. Search (WP-13, DESIGN.md §4.1) reuses this list:
+// the `/` search box filters the stream (or all streams) via `q=`, replacing the
+// summary with a highlighted ts_headline snippet, still newest-first.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { CheckCheck, CircleAlert, List as ListIcon, RefreshCw, Rows3, Search, Star } from "lucide-react";
+import {
+  CheckCheck,
+  CircleAlert,
+  List as ListIcon,
+  RefreshCw,
+  Rows3,
+  Search,
+  Star,
+  X,
+} from "lucide-react";
 
 import { useMarkStreamRead, useSetEntryState } from "../../api/mutations";
 import { useStreamEntries, useSubscriptions } from "../../api/queries";
@@ -20,6 +31,7 @@ import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Favicon } from "../../components/Favicon";
 import { KeyboardHelp } from "../../keyboard/KeyboardHelp";
 import { useKeyboard, type KeyboardActions } from "../../keyboard/useKeyboard";
+import { highlightSnippet } from "../../lib/highlight";
 import type { StreamDescriptor } from "../../lib/streams";
 import { formatDateTime, relativeTime } from "../../lib/time";
 import { useDensity, type Density } from "./density";
@@ -69,6 +81,21 @@ function EmptyList({ starred }: { starred: boolean }) {
   );
 }
 
+const ALL_STREAM: StreamDescriptor = { kind: "all" };
+
+function scopeLabel(stream: StreamDescriptor): string {
+  switch (stream.kind) {
+    case "feed":
+      return "This feed";
+    case "folder":
+      return "This folder";
+    case "starred":
+      return "Starred";
+    case "all":
+      return "All";
+  }
+}
+
 export function EntryList({ stream, title }: { stream: StreamDescriptor; title: string }) {
   const [density, setDensity] = useDensity();
   const { cursorId, openId, setCursor, open, close } = useSelection();
@@ -81,6 +108,22 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
+  // Search (WP-13). The raw box value is debounced into the term that drives the
+  // query; scope switches between this stream and every subscription.
+  const [searchInput, setSearchInput] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [scopeAll, setScopeAll] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setSearchTerm(searchInput.trim()), 200);
+    return () => window.clearTimeout(t);
+  }, [searchInput]);
+  const searching = searchTerm.length > 0;
+  const clearSearch = () => {
+    setSearchInput("");
+    setSearchTerm("");
+  };
+  const activeStream = searching && scopeAll ? ALL_STREAM : stream;
+
   const subs = useSubscriptions();
   const iconByFeed = useMemo(() => {
     const m = new Map<number, string | null>();
@@ -88,11 +131,8 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
     return m;
   }, [subs.data]);
 
-  const query = useStreamEntries(stream, "all");
-  const entries = useMemo(
-    () => query.data?.pages.flatMap((p) => p.entries) ?? [],
-    [query.data],
-  );
+  const query = useStreamEntries(activeStream, "all", searching ? searchTerm : undefined);
+  const entries = useMemo(() => query.data?.pages.flatMap((p) => p.entries) ?? [], [query.data]);
 
   // State-backed ref so the virtualizer re-initializes once the scroll element
   // mounts (a plain useRef doesn't trigger a render, which can leave the list
@@ -110,16 +150,14 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
   const items = virtualizer.getVirtualItems();
   const lastIndex = items.length ? items[items.length - 1].index : 0;
   useEffect(() => {
-    if (
-      lastIndex >= entries.length - 8 &&
-      query.hasNextPage &&
-      !query.isFetchingNextPage
-    ) {
+    if (lastIndex >= entries.length - 8 && query.hasNextPage && !query.isFetchingNextPage) {
       void query.fetchNextPage();
     }
   }, [lastIndex, entries.length, query]);
 
-  useScrollReadMarker(scrollEl, virtualizer, entries);
+  // Scroll-past marks read (WP-11) — but not while searching: paging through search
+  // hits shouldn't silently mark them read.
+  useScrollReadMarker(scrollEl, virtualizer, searching ? [] : entries);
 
   // Open an entry and mark it read (mark-read-on-open, WP-11).
   const openEntry = (entry: { id: number; is_read: boolean }) => {
@@ -200,7 +238,7 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
   if (query.isPending) {
     body = (
       <div className={styles.fill}>
-        <div className={styles.state}>Loading articles…</div>
+        <div className={styles.state}>{searching ? "Searching…" : "Loading articles…"}</div>
       </div>
     );
   } else if (query.isError) {
@@ -214,7 +252,17 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
   } else if (entries.length === 0) {
     body = (
       <div className={styles.fill}>
-        <EmptyList starred={stream.kind === "starred"} />
+        {searching ? (
+          <div className={styles.empty}>
+            <p className={styles.emptyTitle}>No results</p>
+            <p className={styles.emptyBody}>
+              Nothing matches &ldquo;{searchTerm}&rdquo;
+              {scopeAll ? "" : ` in ${title}`}.
+            </p>
+          </div>
+        ) : (
+          <EmptyList starred={stream.kind === "starred"} />
+        )}
       </div>
     );
   } else {
@@ -253,7 +301,15 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
                 </span>
                 <span className={styles.feed}>{e.feed_title}</span>
                 <span className={styles.rowtitle}>{e.title}</span>
-                <span className={styles.summary}>{e.summary}</span>
+                {searching && e.snippet ? (
+                  <span
+                    className={styles.summary}
+                    // Safe: highlightSnippet escapes all content, re-allows only <b>.
+                    dangerouslySetInnerHTML={{ __html: highlightSnippet(e.snippet) }}
+                  />
+                ) : (
+                  <span className={styles.summary}>{e.summary}</span>
+                )}
                 <time
                   className={styles.time}
                   dateTime={e.created_at}
@@ -291,7 +347,7 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
             title="Mark all read"
             aria-label="Mark all read"
             onClick={() => setConfirmOpen(true)}
-            disabled={entries.length === 0}
+            disabled={entries.length === 0 && !searching}
           >
             <CheckCheck size={15} />
           </button>
@@ -302,19 +358,56 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
       </header>
       <div className={styles.searchBar}>
         <Search size={14} className={styles.searchIcon} aria-hidden="true" />
-        {/* Search executes in WP-13; the input exists now so `/` has a target. */}
         <input
           ref={searchRef}
           type="search"
           className={styles.searchInput}
-          placeholder="Search articles"
+          placeholder={`Search ${scopeAll ? "all articles" : title}`}
           aria-label="Search articles"
-          readOnly
-          title="Search is coming soon"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Escape") e.currentTarget.blur();
+            if (e.key === "Escape") {
+              clearSearch();
+              e.currentTarget.blur();
+            }
           }}
         />
+        {searchInput ? (
+          <>
+            {stream.kind !== "all" ? (
+              <div className={styles.scope} role="group" aria-label="Search scope">
+                <button
+                  type="button"
+                  className={styles.scopeOpt}
+                  data-active={!scopeAll}
+                  aria-pressed={!scopeAll}
+                  onClick={() => setScopeAll(false)}
+                >
+                  {scopeLabel(stream)}
+                </button>
+                <button
+                  type="button"
+                  className={styles.scopeOpt}
+                  data-active={scopeAll}
+                  aria-pressed={scopeAll}
+                  onClick={() => setScopeAll(true)}
+                >
+                  All
+                </button>
+              </div>
+            ) : null}
+            <button
+              type="button"
+              className={styles.clear}
+              aria-label="Clear search"
+              title="Clear search (Esc)"
+              onClick={clearSearch}
+            >
+              <X size={14} />
+            </button>
+          </>
+        ) : null}
       </div>
       {feedError ? (
         <div className={styles.errorBanner} role="alert">

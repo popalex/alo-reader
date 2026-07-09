@@ -45,13 +45,19 @@ export function useCounts() {
 
 export type StreamStatus = "unread" | "all";
 
-export function useStreamEntries(stream: StreamDescriptor, status: StreamStatus = "all") {
+export function useStreamEntries(
+  stream: StreamDescriptor,
+  status: StreamStatus = "all",
+  q?: string,
+) {
   const getToken = useTokenGetter();
   const path = streamToPath(stream);
   return useInfiniteQuery({
-    queryKey: ["entries", path, status],
+    // q is part of the key so a query switches result sets (and mutations still
+    // match the ["entries", …] prefix, so optimistic patches reach search rows too).
+    queryKey: ["entries", path, status, q ?? null],
     queryFn: async ({ pageParam }) =>
-      getStreamEntries(await getToken(), path, { status, cursor: pageParam }),
+      getStreamEntries(await getToken(), path, { status, cursor: pageParam, q }),
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.next_cursor,
   });

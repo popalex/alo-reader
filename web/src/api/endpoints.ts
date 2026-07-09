@@ -29,6 +29,7 @@ export interface StreamQuery {
   status?: "unread" | "all";
   cursor?: string | null;
   limit?: number;
+  q?: string;
 }
 
 export function getStreamEntries(
@@ -41,6 +42,7 @@ export function getStreamEntries(
     limit: String(opts.limit ?? 50),
   });
   if (opts.cursor) params.set("cursor", opts.cursor);
+  if (opts.q) params.set("q", opts.q);
   return apiFetch<StreamPage>(`/streams/${streamPath}/entries?${params}`, { token });
 }
 

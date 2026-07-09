@@ -102,6 +102,57 @@
   box-shadow: inset 0 -2px 0 0 var(--accent);
 }
 
+/* Search scope toggle (this stream / all) — segmented, matches the density control. */
+.scope {
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg);
+  border: 1px solid var(--border-2);
+  border-radius: 9px;
+}
+
+.scopeOpt {
+  padding: 2px 8px;
+  font-size: 11.5px;
+  font-weight: 550;
+  color: var(--text-faint);
+  border-radius: 7px;
+  white-space: nowrap;
+}
+
+.scopeOpt:hover {
+  color: var(--text);
+}
+
+.scopeOpt[data-active="true"] {
+  color: var(--accent);
+  background: var(--accent-weak);
+}
+
+.clear {
+  display: inline-flex;
+  flex: none;
+  padding: 4px;
+  border-radius: 6px;
+  color: var(--text-faint);
+}
+
+.clear:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+/* ts_headline match highlight inside a result snippet. */
+.summary b {
+  font-weight: 600;
+  color: var(--text);
+  background: var(--accent-weak);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
 .errorBanner {
   display: flex;
   align-items: center;
