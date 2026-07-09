@@ -1,8 +1,10 @@
 """Full-text search on the streams endpoint (WP-13, DESIGN.md §4.1).
 
 Covers stemming, websearch operator semantics, robustness to garbage input,
-stream scope + tenant isolation, strict id-desc chronology, limit capping, the
-highlighted snippet, and the widened coverage (author + feed name).
+stream scope (incl. searching within starred) + tenant isolation, strict id-desc
+chronology, limit capping, the highlighted snippet, and the widened coverage
+(author + feed name — including that the global feed-name arm can't leak an
+unsubscribed or other-tenant feed's entries).
 """
 
 import os
@@ -228,3 +230,58 @@ async def test_search_excludes_other_tenant_via_second_user(
     await seed(other.user_id, [{"title": "secret", "content_html": "<p>plutonium recipe</p>"}])
     hits = (await search(api_client, pat_user, "all", "plutonium")).json()["entries"]
     assert hits == []
+
+
+async def test_search_within_starred_stream(
+    api_client: httpx.AsyncClient, pat_user: PatUser
+) -> None:
+    # A, B, D mention "photon"; C mentions "gluon".
+    _, ids = await seed(
+        pat_user.user_id,
+        [
+            {"title": "a", "content_html": "<p>photon drive</p>"},
+            {"title": "b", "content_html": "<p>photon sail</p>"},
+            {"title": "c", "content_html": "<p>gluon field</p>"},
+            {"title": "d", "content_html": "<p>photon torpedo</p>"},
+        ],
+    )
+    a, b, c, d = ids
+    # Star A, C and D (not B).
+    await api_client.post(
+        "/api/v1/entries/state",
+        json={"ids": [a, c, d], "starred": True},
+        headers=pat_user.headers,
+    )
+    # Searching the starred stream returns only entries that are BOTH starred and a
+    # match: A and D (B is unstarred; C is starred but has no "photon").
+    hits = {
+        e["id"] for e in (await search(api_client, pat_user, "starred", "photon")).json()["entries"]
+    }
+    assert hits == {a, d}
+
+
+async def test_feed_name_match_respects_subscription_and_tenant(
+    api_client: httpx.AsyncClient, pat_user: PatUser
+) -> None:
+    # The feed-name arm queries the GLOBAL feeds table, so prove it can't leak
+    # entries from a name-matching feed the user can't see. All three feeds match
+    # "alpha" by name; only the user's own subscribed one may return.
+    _, mine = await seed(
+        pat_user.user_id,
+        [{"title": "x", "content_html": "<p>morning coffee</p>"}],  # content does NOT match
+        feed_title="Alpha Report",
+    )
+    # Name-matching feed this user is not subscribed to.
+    await seed(
+        None, [{"title": "y", "content_html": "<p>evening tea</p>"}], feed_title="Alpha Digest"
+    )
+    # Another tenant's subscribed, name-matching feed.
+    other = await make_pat_user(email="alpha-other@example.com")
+    await seed(
+        other.user_id,
+        [{"title": "z", "content_html": "<p>noon soup</p>"}],
+        feed_title="Alpha Vault",
+    )
+
+    hits = {e["id"] for e in (await search(api_client, pat_user, "all", "alpha")).json()["entries"]}
+    assert hits == set(mine)
