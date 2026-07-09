@@ -57,4 +57,24 @@ test.describe("offline / PWA", () => {
     await expect(page.getByRole("heading", { name: "All items", level: 1 })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Views" })).toBeVisible();
   });
+
+  test("is installable: manifest + active service worker", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => navigator.serviceWorker?.controller != null, null, {
+      timeout: 20_000,
+    });
+
+    const href = await page.getAttribute('link[rel="manifest"]', "href");
+    expect(href).toBeTruthy();
+    const manifest = await (
+      await page.request.get(new URL(href!, page.url()).toString())
+    ).json();
+
+    expect(manifest.name).toBeTruthy();
+    expect(manifest.display).toBe("standalone");
+    const sizes: string[] = manifest.icons.map((i: { sizes: string }) => i.sizes);
+    expect(sizes).toContain("192x192");
+    expect(sizes).toContain("512x512");
+    expect(manifest.icons.some((i: { purpose?: string }) => i.purpose === "maskable")).toBe(true);
+  });
 });
