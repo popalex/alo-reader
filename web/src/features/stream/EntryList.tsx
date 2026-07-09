@@ -26,6 +26,7 @@ import {
 
 import { useMarkStreamRead, useSetEntryState } from "../../api/mutations";
 import { useStreamEntries, useSubscriptions } from "../../api/queries";
+import { useOnline } from "../../app/offline/useOffline";
 import { ThemeToggle } from "../../app/ThemeToggle";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Favicon } from "../../components/Favicon";
@@ -103,6 +104,7 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
   const markStreamRead = useMarkStreamRead(stream);
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const online = useOnline();
 
   const [helpOpen, setHelpOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -220,7 +222,8 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
       if (e) setState.mutate({ ids: [e.id], starred: !e.is_starred });
     },
     markAllRead: () => {
-      if (entries.length > 0) setConfirmOpen(true);
+      // Mark-all is stream-bounded by a live max id — it can't be queued offline.
+      if (online && entries.length > 0) setConfirmOpen(true);
     },
     refresh,
     goAll: () => void navigate({ to: "/" }),
@@ -344,10 +347,10 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
           <button
             type="button"
             className={styles.toolBtn}
-            title="Mark all read"
+            title={online ? "Mark all read" : "Mark all read (unavailable offline)"}
             aria-label="Mark all read"
             onClick={() => setConfirmOpen(true)}
-            disabled={entries.length === 0 && !searching}
+            disabled={!online || (entries.length === 0 && !searching)}
           >
             <CheckCheck size={15} />
           </button>
