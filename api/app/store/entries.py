@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, TypedDict
 
-from sqlalchemy import Select, and_, func, literal, or_, select
+from sqlalchemy import Select, and_, func, literal, literal_column, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
@@ -28,6 +28,13 @@ class StreamRow:
     feed_title: str
     is_read: bool
     is_starred: bool
+
+
+@dataclass(frozen=True)
+class SearchRow(StreamRow):
+    """A :class:`StreamRow` plus a highlighted ``ts_headline`` snippet (``<b>`` marks)."""
+
+    snippet: str
 
 
 class NewEntry(TypedDict, total=False):
@@ -148,6 +155,84 @@ async def list_stream_page(
     rows = await session.execute(stmt)
     return [
         StreamRow(entry=r[0], feed_title=r.feed_title, is_read=r.is_read, is_starred=r.is_starred)
+        for r in rows
+    ]
+
+
+# Cap for search pages: ts_headline re-parses each returned document, so it must
+# only ever run on a bounded page, never across the whole match set (DESIGN §4.1.5).
+SEARCH_LIMIT = 50
+
+# ts_headline options — highlight matches with <b>…</b> (the markers the frontend
+# renders), bounded to a short excerpt. The frontend HTML-escapes everything except
+# those markers, so the tag choice here is the safe-list.
+_HEADLINE_OPTS = (
+    "StartSel=<b>, StopSel=</b>, MaxWords=32, MinWords=12, MaxFragments=2, FragmentDelimiter= … "
+)
+
+# 'english'::regconfig as a SQL literal (not a bound param): the text/regconfig
+# overload of websearch_to_tsquery/ts_headline needs the config typed as regconfig,
+# and it's a constant, never user input.
+_ENGLISH: Any = literal_column("'english'::regconfig")
+
+
+async def search_stream_page(
+    session: AsyncSession,
+    user_id: int,
+    stream: str | Stream,
+    *,
+    q: str,
+    status: str = "all",
+    cursor: int | None = None,
+    limit: int = SEARCH_LIMIT,
+) -> list[SearchRow]:
+    """Full-text search within a stream (DESIGN.md §4.1).
+
+    Uses ``websearch_to_tsquery('english', q)`` against the ``search_tsv`` generated
+    column (Google-like syntax; never raises on malformed input). Results stay strictly
+    ``id DESC`` — chronological, never ``ts_rank`` (§4.1.4) — and stream-scoped/tenant-
+    isolated exactly like the normal listing. ``ts_headline`` runs only on the returned
+    page because ``limit`` is capped (§4.1.5); the caller must not exceed ``SEARCH_LIMIT``.
+    """
+    parsed = stream if isinstance(stream, Stream) else parse_stream(stream)
+    es = aliased(EntryState)
+    tsquery = func.websearch_to_tsquery(_ENGLISH, q)
+    snippet = func.ts_headline(
+        _ENGLISH,
+        func.left(func.strip_html(Entry.content_html), 20000),
+        tsquery,
+        _HEADLINE_OPTS,
+    ).label("snippet")
+    stmt = _apply_stream(
+        select(
+            Entry,
+            Feed.title.label("feed_title"),
+            func.coalesce(es.is_read, False).label("is_read"),
+            func.coalesce(es.is_starred, False).label("is_starred"),
+            snippet,
+        ),
+        user_id,
+        parsed,
+        status,
+        es,
+    ).join(Feed, Feed.id == Entry.feed_id)
+    # Match title/author/content (GIN on entries.search_tsv) OR the feed's name. The
+    # feed-name arm is kept on entries (feed_id IN subquery) so Postgres can BitmapOr
+    # the two entries indexes instead of seq-scanning (DESIGN.md §4.1 perf budget).
+    feed_name_match = select(Feed.id).where(Feed.search_tsv.op("@@")(tsquery)).scalar_subquery()
+    stmt = stmt.where(or_(Entry.search_tsv.op("@@")(tsquery), Entry.feed_id.in_(feed_name_match)))
+    if cursor is not None:
+        stmt = stmt.where(Entry.id < cursor)
+    stmt = stmt.order_by(Entry.id.desc()).limit(min(limit, SEARCH_LIMIT))
+    rows = await session.execute(stmt)
+    return [
+        SearchRow(
+            entry=r[0],
+            feed_title=r.feed_title,
+            is_read=r.is_read,
+            is_starred=r.is_starred,
+            snippet=r.snippet,
+        )
         for r in rows
     ]
 

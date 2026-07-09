@@ -19,7 +19,7 @@ from app.db import get_session
 from app.errors import ApiError
 from app.ingest import summarize
 from app.store import entries as entries_store
-from app.store.entries import StreamRow
+from app.store.entries import SEARCH_LIMIT, SearchRow, StreamRow
 from app.store.stream import parse_stream
 
 router = APIRouter(prefix="/streams", tags=["streams"])
@@ -42,6 +42,8 @@ class EntryListItem(BaseModel):
     created_at: datetime
     is_read: bool
     is_starred: bool
+    # Highlighted ts_headline excerpt (``<b>`` marks); present only for search (q=).
+    snippet: str | None = None
 
 
 class StreamPage(BaseModel):
@@ -79,6 +81,7 @@ def _list_item(row: StreamRow) -> EntryListItem:
         created_at=e.created_at,
         is_read=row.is_read,
         is_starred=row.is_starred,
+        snippet=row.snippet if isinstance(row, SearchRow) else None,
     )
 
 
@@ -92,13 +95,31 @@ async def list_entries(
     limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = 50,
     q: str | None = None,
 ) -> StreamPage:
-    if q is not None:
-        raise ApiError(422, "validation_error", "search (q=) is not yet available")
-    rows = await entries_store.list_stream_page(
-        session, user.id, _parse(stream), status=status, cursor=cursor, limit=limit
-    )
+    parsed = _parse(stream)
+    query = q.strip() if q else ""
+    if query:
+        # Search: chronological (id-desc), stream-scoped, page-capped so ts_headline
+        # only runs on the returned rows (DESIGN.md §4.1). websearch_to_tsquery never
+        # raises on malformed input, so garbage queries just return few/no results.
+        effective_limit = min(limit, SEARCH_LIMIT)
+        rows: list[StreamRow] = list(
+            await entries_store.search_stream_page(
+                session,
+                user.id,
+                parsed,
+                q=query,
+                status=status,
+                cursor=cursor,
+                limit=effective_limit,
+            )
+        )
+    else:
+        effective_limit = limit
+        rows = await entries_store.list_stream_page(
+            session, user.id, parsed, status=status, cursor=cursor, limit=limit
+        )
     items = [_list_item(r) for r in rows]
-    next_cursor = str(items[-1].id) if len(items) == limit else None
+    next_cursor = str(items[-1].id) if len(items) == effective_limit else None
     return StreamPage(entries=items, next_cursor=next_cursor)
 
 
