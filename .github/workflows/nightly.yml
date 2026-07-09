@@ -50,3 +50,33 @@ jobs:
         run: pnpm -C web exec playwright install --with-deps chromium
       - name: make lighthouse
         run: make lighthouse
+
+  bench-search:
+    # Search p95 budget (< 100 ms) at full 5M-entry scale (DESIGN §4.1.6). Too slow
+    # to seed per-PR; the 100k profile gates PRs in ci.yml.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: alo
+          POSTGRES_PASSWORD: alo
+          POSTGRES_DB: alo
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd "pg_isready -U alo -d alo"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgresql+asyncpg://alo:alo@localhost:5432/alo
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e "./api[dev]"
+      - name: Migrate
+        run: cd api && alembic upgrade head
+      - name: Benchmark (5M profile)
+        run: BENCH_PROFILE=nightly python scripts/bench_search.py
