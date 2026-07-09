@@ -452,6 +452,8 @@ export interface components {
             is_starred: boolean;
             /** Published At */
             published_at: string | null;
+            /** Snippet */
+            snippet?: string | null;
             /** Summary */
             summary: string;
             /** Title */

@@ -11,7 +11,7 @@ COMPOSE_DEV := docker compose -f deploy/docker-compose.yml -f deploy/docker-comp
 # (see `make db`). Postgres itself is never installed on the host.
 TEST_DATABASE_URL ?= postgresql+asyncpg://alo:alo@localhost:5432/alo
 
-.PHONY: venv lint typecheck test-api test-web e2e lighthouse size up seed dev down db db-down migrate generate-client
+.PHONY: venv lint typecheck test-api test-web e2e lighthouse size up seed dev down db db-down migrate generate-client bench-search
 
 ## Create the virtualenv and install the api project (editable, with dev tools).
 venv:
@@ -45,6 +45,11 @@ e2e:
 ## Lighthouse performance budget (>=90) against the built SPA served by Caddy.
 lighthouse:
 	./scripts/lighthouse.sh
+
+## Search latency benchmark (WP-13, p95 < 100ms). Needs `make db` + `make migrate`.
+## BENCH_PROFILE=pr (100k, default) | nightly (5M); BENCH_KEEP=1 keeps the corpus.
+bench-search:
+	DATABASE_URL=$(TEST_DATABASE_URL) $(PY) scripts/bench_search.py
 
 ## Build the SPA and check the initial bundle stays within the size budget.
 size:
