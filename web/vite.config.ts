@@ -53,6 +53,18 @@ export default defineConfig({
               cacheableResponse: { statuses: [200] },
             },
           },
+          {
+            // Small app-shell data (config/sidebar/counts) so the app actually
+            // boots offline with last-known state instead of the /config error.
+            urlPattern: /\/api\/v1\/(config|me|folders|subscriptions|counts)\b/,
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "alo-app",
+              networkTimeoutSeconds: 3,
+              expiration: { maxEntries: 40, maxAgeSeconds: 60 * 60 * 24 * 7 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
         ],
       },
     }),
