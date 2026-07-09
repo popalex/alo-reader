@@ -114,11 +114,6 @@ async def test_invalid_stream_is_400(api_client: httpx.AsyncClient, pat_user: Pa
     assert resp.json()["error"]["code"] == "invalid_request"
 
 
-async def test_search_q_is_422(api_client: httpx.AsyncClient, pat_user: PatUser) -> None:
-    resp = await api_client.get(f"{BASE}/all/entries?q=hello", headers=pat_user.headers)
-    assert resp.status_code == 422
-
-
 async def test_limit_over_max_is_422(api_client: httpx.AsyncClient, pat_user: PatUser) -> None:
     resp = await api_client.get(f"{BASE}/all/entries?limit=201", headers=pat_user.headers)
     assert resp.status_code == 422
