@@ -64,7 +64,11 @@ services:
         condition: service_completed_successfully
 
   postgres:
-    image: postgres:18
+    # Postgres 18 + RUM extension (search's index-ordered FTS; see Dockerfile).
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.postgres
+    image: alo-reader-postgres:local
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-alo}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-alo}

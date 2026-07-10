@@ -1,0 +1,9 @@
+# Postgres 18 + the RUM extension. Search needs an index that returns full-text
+# matches already ordered by id (chronological), which core Postgres can't do:
+# GIN finds matches unordered, so the top-N id-desc sort blows the p95 budget at
+# scale (benchmarked ~166ms p95 at 5M vs ~35ms with RUM). RUM stores the id
+# alongside the tsvector and yields matches in id order (DESIGN.md §4.1).
+FROM postgres:18
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends postgresql-18-rum \
+ && rm -rf /var/lib/apt/lists/*
