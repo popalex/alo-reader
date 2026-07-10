@@ -12,7 +12,7 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   // Generated / build output — never linted.
-  { ignores: ["dist", "coverage", "src/api/schema.d.ts"] },
+  { ignores: ["dist", "dev-dist", "coverage", "src/api/schema.d.ts"] },
 
   // App source (browser).
   {
