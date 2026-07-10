@@ -5,6 +5,22 @@ import { expect, test } from "@playwright/test";
 // SW state into the other specs.
 
 test.describe("offline / PWA", () => {
+  test("opening an uncached article offline shows a calm notice, not an error toast", async ({
+    page,
+    context,
+  }) => {
+    await page.goto("/");
+    await page.waitForSelector("[data-index]");
+    await context.setOffline(true);
+    await expect(page.getByTestId("offline-bar")).toBeVisible();
+
+    // An article whose detail was never fetched can't load offline.
+    await page.locator("[data-index='2']").click();
+    await expect(page.locator("article")).toContainText(/offline/i);
+    // …and no alarming generic error toast.
+    await expect(page.getByText(/Something went wrong/)).toHaveCount(0);
+  });
+
   test("queues read changes offline and replays them exactly once on reconnect", async ({
     page,
     context,

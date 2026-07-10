@@ -8,6 +8,7 @@ import { Check, ChevronLeft, Circle, ExternalLink, Star } from "lucide-react";
 
 import { useSetEntryState } from "../../api/mutations";
 import { useEntry } from "../../api/queries";
+import { useOnline } from "../../app/offline/useOffline";
 import { Favicon } from "../../components/Favicon";
 import { formatDateTime } from "../../lib/time";
 import { useSelection } from "./selection";
@@ -16,6 +17,7 @@ import styles from "./ReaderPane.module.css";
 export function ReaderPane() {
   const { openId, close } = useSelection();
   const query = useEntry(openId);
+  const online = useOnline();
   const setState = useSetEntryState();
   const contentRef = useRef<HTMLDivElement>(null);
   const html = query.data?.content_html;
@@ -57,7 +59,9 @@ export function ReaderPane() {
     return (
       <article className={styles.reader}>
         <div className={styles.state} role="alert">
-          Couldn&rsquo;t load this article.
+          {online
+            ? "Couldn’t load this article."
+            : "You’re offline. Open articles while online to read them here later."}
         </div>
       </article>
     );
