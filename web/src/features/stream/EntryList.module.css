@@ -421,8 +421,15 @@
   overflow: hidden;
 }
 
-/* Mobile: the list header becomes a top app bar — a feeds hamburger on the left,
-   and the desktop-only density toggle + its separator dropped. */
+/* Desktop actions live inline; on mobile they collapse into the overflow menu. */
+.desktopActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Mobile: the list header becomes a top app bar — feeds hamburger on the left, a
+   left-aligned title that takes the space, and a single overflow menu. */
 .menuBtn {
   display: none;
 }
@@ -442,14 +449,13 @@
     color: var(--text);
   }
   .head {
-    gap: 6px;
-    padding: 8px 8px 8px 6px;
-  }
-  .controls {
     gap: 4px;
+    padding: 8px 6px;
   }
-  .density,
-  .sep {
+  .title {
+    flex: 1;
+  }
+  .desktopActions {
     display: none;
   }
 }

@@ -8,7 +8,7 @@
 // the `/` search box filters the stream (or all streams) via `q=`, replacing the
 // summary with a highlighted ts_headline snippet, still newest-first.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 
 import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -37,7 +37,14 @@ import { useKeyboard, type KeyboardActions } from "../../keyboard/useKeyboard";
 import { highlightSnippet } from "../../lib/highlight";
 import type { StreamDescriptor } from "../../lib/streams";
 import { formatDateTime, relativeTime } from "../../lib/time";
+import { useIsMobile } from "../../lib/useMediaQuery";
 import { useDensity, type Density } from "./density";
+
+// Mobile-only overflow menu — lazy so its Radix dropdown code (~18kB gz) never
+// ships to desktop, where the inline controls are used instead.
+const MobileActionsMenu = lazy(() =>
+  import("./MobileActionsMenu").then((m) => ({ default: m.MobileActionsMenu })),
+);
 import { useScrollReadMarker } from "./useScrollReadMarker";
 import { useSelection } from "./selection";
 import styles from "./EntryList.module.css";
@@ -108,6 +115,7 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
   const navigate = useNavigate();
   const online = useOnline();
   const { openSidebar } = useMobileNav();
+  const isMobile = useIsMobile();
 
   const [helpOpen, setHelpOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -346,28 +354,40 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
         </button>
         <h1 className={styles.title}>{title}</h1>
         <div className={styles.controls}>
-          <button
-            type="button"
-            className={styles.toolBtn}
-            title="Refresh"
-            aria-label="Refresh"
-            onClick={refresh}
-          >
-            <RefreshCw size={15} />
-          </button>
-          <button
-            type="button"
-            className={styles.toolBtn}
-            title={online ? "Mark all read" : "Mark all read (unavailable offline)"}
-            aria-label="Mark all read"
-            onClick={() => setConfirmOpen(true)}
-            disabled={!online || (entries.length === 0 && !searching)}
-          >
-            <CheckCheck size={15} />
-          </button>
-          <span className={styles.sep} />
-          <DensityToggle value={density} onChange={setDensity} />
-          <ThemeToggle />
+          {/* Desktop: inline controls. Mobile: collapsed into the overflow menu. */}
+          <div className={styles.desktopActions}>
+            <button
+              type="button"
+              className={styles.toolBtn}
+              title="Refresh"
+              aria-label="Refresh"
+              onClick={refresh}
+            >
+              <RefreshCw size={15} />
+            </button>
+            <button
+              type="button"
+              className={styles.toolBtn}
+              title={online ? "Mark all read" : "Mark all read (unavailable offline)"}
+              aria-label="Mark all read"
+              onClick={() => setConfirmOpen(true)}
+              disabled={!online || (entries.length === 0 && !searching)}
+            >
+              <CheckCheck size={15} />
+            </button>
+            <span className={styles.sep} />
+            <DensityToggle value={density} onChange={setDensity} />
+            <ThemeToggle />
+          </div>
+          {isMobile && (
+            <Suspense fallback={null}>
+              <MobileActionsMenu
+                onRefresh={refresh}
+                onMarkAllRead={() => setConfirmOpen(true)}
+                canMarkAllRead={online && (entries.length > 0 || searching)}
+              />
+            </Suspense>
+          )}
         </div>
       </header>
       <div className={styles.searchBar}>
