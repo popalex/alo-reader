@@ -5,19 +5,19 @@ import { expect, test } from "@playwright/test";
 // SW state into the other specs.
 
 test.describe("offline / PWA", () => {
-  test("opening an uncached article offline shows a calm notice, not an error toast", async ({
-    page,
-    context,
-  }) => {
+  test("prefetched top articles open offline, with no error toast", async ({ page, context }) => {
     await page.goto("/");
     await page.waitForSelector("[data-index]");
+    // Let the deferred (1.5s) top-of-stream prefetch fire and its requests settle.
+    await page.waitForTimeout(2200);
+    await page.waitForLoadState("networkidle");
     await context.setOffline(true);
     await expect(page.getByTestId("offline-bar")).toBeVisible();
 
-    // An article whose detail was never fetched can't load offline.
+    // A top entry was prefetched while online, so it opens with its content offline
+    // (had it not been prefetched, the reader would show the "you're offline" notice).
     await page.locator("[data-index='2']").click();
-    await expect(page.locator("article")).toContainText(/offline/i);
-    // …and no alarming generic error toast.
+    await expect(page.locator("article h1")).toBeVisible();
     await expect(page.getByText(/Something went wrong/)).toHaveCount(0);
   });
 

@@ -1,7 +1,9 @@
 // TanStack Query hooks over the typed endpoints. Query functions resolve the
 // bearer token through the auth seam, so components never touch it.
 
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useCallback } from "react";
+
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useTokenGetter } from "../app/auth";
 import { streamToPath, type StreamDescriptor } from "../lib/streams";
@@ -70,4 +72,21 @@ export function useEntry(id: number | null) {
     queryFn: async () => getEntry(await getToken(), id as number),
     enabled: id != null,
   });
+}
+
+/** Warm an entry's detail into cache (same key/fn as useEntry). Prefetching the
+ *  top of a stream while online means the service worker caches those bodies, so
+ *  they open offline without having been read first. No-op on already-fresh ids. */
+export function usePrefetchEntry(): (id: number) => void {
+  const getToken = useTokenGetter();
+  const qc = useQueryClient();
+  return useCallback(
+    (id) =>
+      void qc.prefetchQuery({
+        queryKey: ["entry", id],
+        queryFn: async () => getEntry(await getToken(), id),
+        staleTime: 5 * 60_000,
+      }),
+    [getToken, qc],
+  );
 }
