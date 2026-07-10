@@ -1,0 +1,96 @@
+.trigger {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    padding: 6px;
+    border-radius: 8px;
+    color: var(--text-dim);
+  }
+  .trigger:hover {
+    background: var(--hover);
+    color: var(--text);
+  }
+}
+
+.content {
+  min-width: 190px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border-2);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(9, 12, 16, 0.2);
+  z-index: 60;
+  animation: pop 120ms ease-out;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  font-size: 13.5px;
+  color: var(--text-2);
+  border-radius: 7px;
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+}
+
+.item svg {
+  flex: none;
+  color: var(--text-dim);
+}
+
+.item[data-highlighted] {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.item[data-disabled] {
+  color: var(--text-faint);
+  pointer-events: none;
+}
+
+.item[data-state="checked"],
+.item[data-state="checked"] svg {
+  color: var(--accent);
+}
+
+.indicator {
+  margin-left: auto;
+  display: inline-flex;
+}
+
+.label {
+  padding: 8px 10px 4px;
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.sep {
+  height: 1px;
+  margin: 5px 4px;
+  background: var(--border-2);
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content {
+    animation-duration: 0.01ms;
+  }
+}

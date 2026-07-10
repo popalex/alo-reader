@@ -1,0 +1,59 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(9, 12, 16, 0.44);
+  animation: fade 140ms ease-out;
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 51;
+  width: min(84vw, 320px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  box-shadow: 6px 0 28px rgba(9, 12, 16, 0.26);
+  animation: slide-in 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.drawer[data-state="closed"] {
+  animation: slide-out 150ms ease-in;
+}
+
+/* The reused <Sidebar/> is the drawer's single child — fill the height, scroll
+   its own overflow, and drop the desktop right-hand rule. */
+.drawer > * {
+  flex: 1;
+  min-height: 0;
+  border-right: none;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes slide-out {
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .drawer,
+  .drawer[data-state="closed"] {
+    animation-duration: 0.01ms;
+  }
+}

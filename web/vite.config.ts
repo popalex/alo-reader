@@ -83,8 +83,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "jsdom",
-    // jsdom has no IndexedDB; the offline queue needs one under test.
-    setupFiles: ["fake-indexeddb/auto"],
+    // jsdom lacks IndexedDB (offline queue) and matchMedia (responsive hook).
+    setupFiles: ["./tests/setup.ts"],
     // Playwright specs live in e2e/ and must not be collected by Vitest.
     exclude: [...configDefaults.exclude, "e2e/**"],
   },

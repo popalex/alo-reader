@@ -70,6 +70,20 @@
   .action span {
     display: none;
   }
+  /* Full-screen mobile reader: comfortable side padding + measure, not desktop's. */
+  .bar {
+    padding: 8px 10px;
+  }
+  .header {
+    padding: 18px 18px 12px;
+  }
+  .title {
+    font-size: 22px;
+  }
+  .content {
+    padding: 4px 18px 64px;
+    font-size: 15.5px;
+  }
 }
 
 .header {

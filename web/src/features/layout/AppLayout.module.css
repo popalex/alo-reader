@@ -16,23 +16,11 @@
   display: flex;
 }
 
-/* Below the tablet breakpoint the three panes can't sit side by side. For now
- * the sidebar stacks above the content; proper single-pane list<->reader
- * navigation with a back affordance lands with the entry list in WP-10. */
+/* Mobile: the sidebar is an off-canvas drawer (not rendered inline), so the shell
+ * is a single full-width column and the content pane owns the whole screen. */
 @media (max-width: 768px) {
   .shell {
-    display: flex;
-    flex-direction: column;
+    grid-template-columns: minmax(0, 1fr);
     height: 100dvh;
-  }
-  /* Cap the stacked sidebar (it scrolls) so the content pane always has room —
-   * otherwise a tall feed list starves it of height. */
-  .shell > :first-child {
-    min-height: 0;
-    max-height: 42vh;
-  }
-  .content {
-    flex: 1;
-    min-height: 0;
   }
 }

@@ -420,3 +420,42 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* Desktop actions live inline; on mobile they collapse into the overflow menu. */
+.desktopActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Mobile: the list header becomes a top app bar — feeds hamburger on the left, a
+   left-aligned title that takes the space, and a single overflow menu. */
+.menuBtn {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .menuBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    padding: 6px;
+    border-radius: 8px;
+    color: var(--text-dim);
+  }
+  .menuBtn:hover {
+    background: var(--hover);
+    color: var(--text);
+  }
+  .head {
+    gap: 4px;
+    padding: 8px 6px;
+  }
+  .title {
+    flex: 1;
+  }
+  .desktopActions {
+    display: none;
+  }
+}
