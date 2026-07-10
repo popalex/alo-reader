@@ -11,7 +11,7 @@ COMPOSE_DEV := docker compose -f deploy/docker-compose.yml -f deploy/docker-comp
 # (see `make db`). Postgres itself is never installed on the host.
 TEST_DATABASE_URL ?= postgresql+asyncpg://alo:alo@localhost:5432/alo
 
-.PHONY: venv lint typecheck test-api test-web e2e lighthouse size up seed dev down db db-down migrate generate-client bench-search
+.PHONY: venv lint typecheck test-api test-web e2e lighthouse size up seed dev down db db-down migrate generate-client bench-search pg-image
 
 ## Create the virtualenv and install the api project (editable, with dev tools).
 venv:
@@ -28,9 +28,13 @@ typecheck:
 	pnpm -C web tsc
 	pnpm -C web lint
 
+## Build the project Postgres image (postgres:18 + rum). Cheap when layers cache.
+pg-image:
+	docker build -f deploy/Dockerfile.postgres -t alo-reader-postgres:local deploy
+
 ## Tests provision their own throwaway Postgres via Testcontainers — no `make db`
-## needed, and the real/dev DB is never touched.
-test-api:
+## needed, and the real/dev DB is never touched. Needs the rum image (migration 0003).
+test-api: pg-image
 	$(VENV)/bin/pytest api
 
 test-web:

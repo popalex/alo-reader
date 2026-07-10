@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, TypedDict
 
-from sqlalchemy import Select, and_, func, literal, literal_column, or_, select
+from sqlalchemy import BigInteger, Select, and_, func, literal, literal_column, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
@@ -203,7 +203,7 @@ async def search_stream_page(
         tsquery,
         _HEADLINE_OPTS,
     ).label("snippet")
-    stmt = _apply_stream(
+    base = _apply_stream(
         select(
             Entry,
             Feed.title.label("feed_title"),
@@ -216,14 +216,39 @@ async def search_stream_page(
         status,
         es,
     ).join(Feed, Feed.id == Entry.feed_id)
-    # Match title/author/content (GIN on entries.search_tsv) OR the feed's name. The
-    # feed-name arm is kept on entries (feed_id IN subquery) so Postgres can BitmapOr
-    # the two entries indexes instead of seq-scanning (DESIGN.md §4.1 perf budget).
-    feed_name_match = select(Feed.id).where(Feed.search_tsv.op("@@")(tsquery)).scalar_subquery()
-    stmt = stmt.where(or_(Entry.search_tsv.op("@@")(tsquery), Entry.feed_id.in_(feed_name_match)))
     if cursor is not None:
-        stmt = stmt.where(Entry.id < cursor)
-    stmt = stmt.order_by(Entry.id.desc()).limit(min(limit, SEARCH_LIMIT))
+        base = base.where(Entry.id < cursor)
+
+    # Feed-name coverage (title/author/content are already in search_tsv; the feed's
+    # own name is not). Resolve the few name-matching feeds first: a query that OR's
+    # in feed membership is no longer a pure `@@`, so the rum index can't drive the
+    # id ordering and we fall back to a sort — acceptable because it only happens
+    # when a query matches a *subscribed feed's name* (rare). The common case stays
+    # on the rum index.
+    feed_ids = (
+        await session.scalars(select(Feed.id).where(Feed.search_tsv.op("@@")(tsquery)))
+    ).all()
+
+    if feed_ids:
+        stmt = base.where(
+            or_(Entry.search_tsv.op("@@")(tsquery), Entry.feed_id.in_(feed_ids))
+        ).order_by(Entry.id.desc())
+    else:
+        # rum index-ordered scan: `id <=| anchor` returns matches by descending id
+        # straight from the index (no sort). The anchor sits at/above the top id
+        # (max id for page 1, the cursor for later pages) so distances stay small and
+        # exact in float; the `id < cursor` filter above keeps a short last page from
+        # pulling in ids above the cursor (DESIGN.md §4.1).
+        anchor = (
+            cursor - 1 if cursor is not None else await session.scalar(select(func.max(Entry.id)))
+        )
+        if anchor is None:
+            return []
+        stmt = base.where(Entry.search_tsv.op("@@")(tsquery)).order_by(
+            Entry.id.op("<=|")(literal(anchor, BigInteger))
+        )
+
+    stmt = stmt.limit(min(limit, SEARCH_LIMIT))
     rows = await session.execute(stmt)
     return [
         SearchRow(

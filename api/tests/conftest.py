@@ -51,8 +51,12 @@ async def client() -> AsyncIterator[httpx.AsyncClient]:
 
 @pytest.fixture(scope="session")
 def database_url() -> Iterator[str]:
-    """Start a throwaway Postgres and apply the migration once for the session."""
-    with PostgresContainer("postgres:18", driver="asyncpg") as pg:
+    """Start a throwaway Postgres and apply the migration once for the session.
+
+    Uses the project's Postgres image (postgres:18 + the rum extension migration
+    0003 needs); override with ALO_TEST_PG_IMAGE. Build it with `make pg-image`."""
+    image = os.getenv("ALO_TEST_PG_IMAGE", "alo-reader-postgres:local")
+    with PostgresContainer(image, driver="asyncpg") as pg:
         url = pg.get_connection_url()
         os.environ["DATABASE_URL"] = url
         get_settings.cache_clear()

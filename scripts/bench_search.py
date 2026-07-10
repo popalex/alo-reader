@@ -1,9 +1,9 @@
 """Search latency benchmark (WP-13 acceptance, DESIGN.md §4.1.6).
 
-Seeds a large synthetic corpus into one feed, then times the exact search query
-shape the API uses (websearch_to_tsquery against search_tsv, feed-name arm,
-strict id-desc, LIMIT 50, ts_headline on the page) and asserts the p95 stays
-under the budget.
+Seeds a large synthetic corpus into one feed, then times the search query shape
+the API uses on its common path (websearch_to_tsquery against search_tsv, ordered
+by the rum index via ``id <=| anchor``, LIMIT 50, ts_headline on the page) and
+asserts the p95 stays under the budget.
 
 Profiles (BENCH_PROFILE, or override with BENCH_ENTRIES):
     pr       100k entries   — per-PR gate (fast enough for CI)
@@ -38,7 +38,11 @@ VOCAB_SIZE = 2000
 WORDS_PER_DOC = 30
 VOCAB = [f"term{i:04d}" for i in range(VOCAB_SIZE)]
 
-# The search shape from store.entries.search_stream_page, stream=all.
+# The common-path search shape from store.entries.search_stream_page, stream=all:
+# pure FTS ordered by the rum index (id <=| anchor), no sort. The rum index comes
+# from migration 0003 (needs the rum extension; see deploy/Dockerfile.postgres).
+# $3 is the anchor (max id); the feed-name arm is resolved separately in the store
+# and only appears when a feed title matches, so it's off this hot path.
 SEARCH_SQL = """
 SELECT e.id,
        ts_headline('english'::regconfig, left(strip_html(e.content_html), 20000), q,
@@ -49,8 +53,7 @@ LEFT JOIN entry_states st ON st.entry_id = e.id AND st.user_id = $2
 JOIN feeds f ON f.id = e.feed_id,
      websearch_to_tsquery('english'::regconfig, $1) AS q
 WHERE e.search_tsv @@ q
-   OR e.feed_id IN (SELECT id FROM feeds WHERE search_tsv @@ q)
-ORDER BY e.id DESC
+ORDER BY e.id <=| $3
 LIMIT 50
 """
 
@@ -109,6 +112,7 @@ async def seed(conn: asyncpg.Connection) -> tuple[int, int]:
 async def measure(conn: asyncpg.Connection, user_id: int) -> list[float]:
     rng = random.Random(42)
     stmt = await conn.prepare(SEARCH_SQL)
+    anchor = await conn.fetchval("SELECT max(id) FROM entries")  # rum ordering anchor
     latencies_ms: list[float] = []
     for _ in range(ITERATIONS):
         # Mix of single-word and two-word (AND) queries — realistic selectivity.
@@ -116,7 +120,7 @@ async def measure(conn: asyncpg.Connection, user_id: int) -> list[float]:
         if rng.random() < 0.3:
             term = f"{term} {rng.choice(VOCAB)}"
         t0 = time.perf_counter()
-        await stmt.fetch(term, user_id)
+        await stmt.fetch(term, user_id, anchor)
         latencies_ms.append((time.perf_counter() - t0) * 1000)
     return latencies_ms
 

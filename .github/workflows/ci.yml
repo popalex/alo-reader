@@ -58,6 +58,10 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install -e "./api[dev]"
+      # Migration 0003 needs the rum extension, so the Testcontainers Postgres
+      # is our postgres:18+rum image (conftest defaults to alo-reader-postgres:local).
+      - name: Build Postgres image (rum)
+        run: docker build -f deploy/Dockerfile.postgres -t alo-reader-postgres:local deploy
       - run: pytest api
         env:
           AUTH_MODE: ${{ matrix.auth_mode }}
@@ -116,20 +120,10 @@ jobs:
 
   bench-search:
     # Search p95 budget (< 100 ms) on the per-PR 100k-entry profile (DESIGN §4.1.6).
-    # The 5M nightly profile runs in nightly.yml.
+    # The 5M nightly profile runs in nightly.yml. Postgres must be our postgres:18
+    # + rum image (built here, since GitHub service containers can't build), so it's
+    # run as a plain container rather than a `services:` entry.
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:18
-        env:
-          POSTGRES_USER: alo
-          POSTGRES_PASSWORD: alo
-          POSTGRES_DB: alo
-        ports:
-          - "5432:5432"
-        options: >-
-          --health-cmd "pg_isready -U alo -d alo"
-          --health-interval 5s --health-timeout 5s --health-retries 20
     env:
       DATABASE_URL: postgresql+asyncpg://alo:alo@localhost:5432/alo
     steps:
@@ -138,6 +132,12 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install -e "./api[dev]"
+      - name: Build + start Postgres (rum)
+        run: |
+          docker build -f deploy/Dockerfile.postgres -t alo-reader-postgres:local deploy
+          docker run -d --name pg -e POSTGRES_USER=alo -e POSTGRES_PASSWORD=alo \
+            -e POSTGRES_DB=alo -p 5432:5432 alo-reader-postgres:local
+          for i in $(seq 1 30); do docker exec pg pg_isready -U alo -d alo && break; sleep 2; done
       - name: Migrate
         run: cd api && alembic upgrade head
       - name: Benchmark (100k profile)
@@ -149,3 +149,4 @@ jobs:
       - uses: actions/checkout@v7
       - run: docker build -f deploy/Dockerfile.api -t alo-reader-api .
       - run: docker build -f deploy/Dockerfile.caddy -t alo-reader-caddy .
+      - run: docker build -f deploy/Dockerfile.postgres -t alo-reader-postgres deploy
