@@ -1,0 +1,12 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Brand mark: the reader as a calm list. Teal accent field (maskable-safe,
+       full-bleed) with three rounded "rows" and the alo dot. Font-free so it
+       rasterises identically everywhere. -->
+  <rect width="512" height="512" fill="#0e7c6d" />
+  <g fill="#ffffff">
+    <rect x="136" y="180" width="176" height="34" rx="17" />
+    <rect x="136" y="248" width="240" height="34" rx="17" fill-opacity="0.85" />
+    <rect x="136" y="316" width="208" height="34" rx="17" fill-opacity="0.7" />
+  </g>
+  <circle cx="356" cy="197" r="20" fill="#7fb2a6" />
+</svg>

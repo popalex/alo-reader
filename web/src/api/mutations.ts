@@ -12,8 +12,10 @@ import {
 } from "@tanstack/react-query";
 
 import { useTokenGetter } from "../app/auth";
+import { enqueue } from "../app/offline/queue";
 import { pushToast } from "../app/toast";
 import { streamToPath, type StreamDescriptor } from "../lib/streams";
+import { ApiError } from "./client";
 import {
   postEntryState,
   postMarkRead,
@@ -71,8 +73,23 @@ export function useSetEntryState() {
   const getToken = useTokenGetter();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (vars: { ids: number[]; read?: boolean; starred?: boolean }) =>
-      postEntryState(await getToken(), { ...vars, changed_at: new Date().toISOString() }),
+    // Offline (or a network failure) queues the change to replay on reconnect and
+    // resolves successfully so the optimistic update stays; a real server error
+    // (ApiError) still rejects and rolls back (DESIGN §0.3 offline scope).
+    mutationFn: async (vars: { ids: number[]; read?: boolean; starred?: boolean }) => {
+      const payload = { ...vars, changed_at: new Date().toISOString() };
+      if (!navigator.onLine) {
+        await enqueue(payload);
+        return { updated: payload.ids.length };
+      }
+      try {
+        return await postEntryState(await getToken(), payload);
+      } catch (err) {
+        if (err instanceof ApiError) throw err; // server rejected → real failure
+        await enqueue(payload); // network error → queue for replay
+        return { updated: payload.ids.length };
+      }
+    },
     onMutate: async (vars) => {
       await qc.cancelQueries({ queryKey: ["entries"] });
       await qc.cancelQueries({ queryKey: queryKeys.counts });

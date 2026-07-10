@@ -8,6 +8,7 @@ import { useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 
+import { OfflineManager } from "./offline/OfflineManager";
 import { createQueryClient } from "./queryClient";
 import { router } from "./router";
 import { Toaster } from "./Toaster";
@@ -18,6 +19,7 @@ export function AppProviders() {
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
       <Toaster />
+      <OfflineManager />
     </QueryClientProvider>
   );
 }
