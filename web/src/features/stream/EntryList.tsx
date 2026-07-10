@@ -17,6 +17,7 @@ import {
   CheckCheck,
   CircleAlert,
   List as ListIcon,
+  Menu,
   RefreshCw,
   Rows3,
   Search,
@@ -28,6 +29,7 @@ import { useMarkStreamRead, useSetEntryState } from "../../api/mutations";
 import { useStreamEntries, useSubscriptions } from "../../api/queries";
 import { useOnline } from "../../app/offline/useOffline";
 import { ThemeToggle } from "../../app/ThemeToggle";
+import { useMobileNav } from "../layout/mobileNav";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Favicon } from "../../components/Favicon";
 import { KeyboardHelp } from "../../keyboard/KeyboardHelp";
@@ -105,6 +107,7 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
   const qc = useQueryClient();
   const navigate = useNavigate();
   const online = useOnline();
+  const { openSidebar } = useMobileNav();
 
   const [helpOpen, setHelpOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -333,6 +336,14 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
   return (
     <section className={styles.list} aria-label={title}>
       <header className={styles.head}>
+        <button
+          type="button"
+          className={styles.menuBtn}
+          aria-label="Open feeds"
+          onClick={openSidebar}
+        >
+          <Menu size={19} />
+        </button>
         <h1 className={styles.title}>{title}</h1>
         <div className={styles.controls}>
           <button

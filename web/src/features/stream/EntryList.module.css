@@ -420,3 +420,36 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* Mobile: the list header becomes a top app bar — a feeds hamburger on the left,
+   and the desktop-only density toggle + its separator dropped. */
+.menuBtn {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .menuBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    padding: 6px;
+    border-radius: 8px;
+    color: var(--text-dim);
+  }
+  .menuBtn:hover {
+    background: var(--hover);
+    color: var(--text);
+  }
+  .head {
+    gap: 6px;
+    padding: 8px 8px 8px 6px;
+  }
+  .controls {
+    gap: 4px;
+  }
+  .density,
+  .sep {
+    display: none;
+  }
+}
