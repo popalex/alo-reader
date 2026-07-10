@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 
 import { useMarkStreamRead, useSetEntryState } from "../../api/mutations";
-import { useStreamEntries, useSubscriptions } from "../../api/queries";
+import { usePrefetchEntry, useStreamEntries, useSubscriptions } from "../../api/queries";
 import { useOnline } from "../../app/offline/useOffline";
 import { ThemeToggle } from "../../app/ThemeToggle";
 import { useMobileNav } from "../layout/mobileNav";
@@ -116,6 +116,7 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
   const online = useOnline();
   const { openSidebar } = useMobileNav();
   const isMobile = useIsMobile();
+  const prefetchEntry = usePrefetchEntry();
 
   const [helpOpen, setHelpOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -171,6 +172,17 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
   // Scroll-past marks read (WP-11) — but not while searching: paging through search
   // hits shouldn't silently mark them read.
   useScrollReadMarker(scrollEl, virtualizer, searching ? [] : entries);
+
+  // Warm the top of the stream while online so those bodies are cached and open
+  // offline without being read first (WP-14). Deferred + cancellable so the burst
+  // never competes with the initial load or the reconnect replay; prefetchQuery
+  // skips already-fresh ids.
+  useEffect(() => {
+    if (!online || entries.length === 0) return;
+    const ids = entries.slice(0, 25).map((e) => e.id);
+    const t = window.setTimeout(() => ids.forEach(prefetchEntry), 1500);
+    return () => window.clearTimeout(t);
+  }, [entries, online, prefetchEntry]);
 
   // Open an entry and mark it read (mark-read-on-open, WP-11).
   const openEntry = (entry: { id: number; is_read: boolean }) => {

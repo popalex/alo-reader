@@ -8,6 +8,9 @@ export function createQueryClient(): QueryClient {
   return new QueryClient({
     queryCache: new QueryCache({
       onError: (error) => {
+        // Offline, uncached data legitimately can't load — the view shows an
+        // in-place "you're offline" state, so don't also fire an alarming toast.
+        if (!navigator.onLine) return;
         const message =
           error instanceof ApiError ? error.message : "Something went wrong. Please try again.";
         pushToast(message, "error");

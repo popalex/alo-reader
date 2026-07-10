@@ -11,9 +11,10 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       injectRegister: "auto",
-      // No SW in `vite dev` (avoids stale-cache surprises during HMR); it's built
-      // for preview/prod, which is what e2e drives through Caddy.
-      devOptions: { enabled: false },
+      // Serve the SW in `vite dev` too, so offline/PWA is testable with `make dev`
+      // (not just the prod build). vite-plugin-pwa's dev SW doesn't precache built
+      // assets, so HMR still serves fresh code.
+      devOptions: { enabled: true, type: "module", navigateFallback: "index.html" },
       includeAssets: ["favicon.ico", "apple-touch-icon-180x180.png"],
       manifest: {
         name: "alo reader",

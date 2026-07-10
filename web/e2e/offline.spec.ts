@@ -5,6 +5,22 @@ import { expect, test } from "@playwright/test";
 // SW state into the other specs.
 
 test.describe("offline / PWA", () => {
+  test("prefetched top articles open offline, with no error toast", async ({ page, context }) => {
+    await page.goto("/");
+    await page.waitForSelector("[data-index]");
+    // Let the deferred (1.5s) top-of-stream prefetch fire and its requests settle.
+    await page.waitForTimeout(2200);
+    await page.waitForLoadState("networkidle");
+    await context.setOffline(true);
+    await expect(page.getByTestId("offline-bar")).toBeVisible();
+
+    // A top entry was prefetched while online, so it opens with its content offline
+    // (had it not been prefetched, the reader would show the "you're offline" notice).
+    await page.locator("[data-index='2']").click();
+    await expect(page.locator("article h1")).toBeVisible();
+    await expect(page.getByText(/Something went wrong/)).toHaveCount(0);
+  });
+
   test("queues read changes offline and replays them exactly once on reconnect", async ({
     page,
     context,
