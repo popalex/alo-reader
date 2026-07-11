@@ -36,9 +36,7 @@ def _log(event: str, **fields: object) -> None:
 def next_wait(settings: Settings, rng: random.Random | None = None) -> float:
     """Jittered delay until the next maintenance sweep, clamped to ``>= 0``."""
     r = rng or _DEFAULT_RNG
-    jitter = r.uniform(
-        -settings.worker_maintenance_jitter_s, settings.worker_maintenance_jitter_s
-    )
+    jitter = r.uniform(-settings.worker_maintenance_jitter_s, settings.worker_maintenance_jitter_s)
     return max(0.0, settings.worker_maintenance_interval_s + jitter)
 
 

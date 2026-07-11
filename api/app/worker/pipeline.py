@@ -12,6 +12,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Protocol
+from urllib.parse import urlsplit
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -22,6 +23,7 @@ from app.ingest.parse import ParsedFeed
 from app.store import entries as entries_store
 from app.store import feeds as feeds_store
 from app.store import icons as icons_store
+from app.store import metrics as metrics_store
 from app.store.entries import NewEntry
 from app.worker.fetch import FetchResult, FetchTarget, fetch_feed
 from app.worker.icons import fetch_favicon
@@ -174,19 +176,36 @@ async def process_feed(
         # unique collision is surfaced as an error, never a silent feed merge.
         if result.permanent_url and result.permanent_url != feed.feed_url:
             if not await feeds_store.update_feed_url(session, feed.id, result.permanent_url):
-                return await _apply_error(
+                return await _record(
                     session,
                     feed,
                     result,
-                    settings,
-                    "permanent redirect target already exists",
-                    status="redirect_conflict",
+                    await _apply_error(
+                        session,
+                        feed,
+                        result,
+                        settings,
+                        "permanent redirect target already exists",
+                        status="redirect_conflict",
+                    ),
                 )
 
         if result.status == "new_body":
-            return await _apply_new_body(session, feed, result, settings, transport)
-        if result.status == "not_modified":
-            return await _apply_not_modified(session, feed, settings)
-        # http_error / network_error / blocked
-        message = result.error or f"HTTP {result.http_status}"
-        return await _apply_error(session, feed, result, settings, message)
+            outcome = await _apply_new_body(session, feed, result, settings, transport)
+        elif result.status == "not_modified":
+            outcome = await _apply_not_modified(session, feed, settings)
+        else:  # http_error / network_error / blocked
+            message = result.error or f"HTTP {result.http_status}"
+            outcome = await _apply_error(session, feed, result, settings, message)
+        return await _record(session, feed, result, outcome)
+
+
+async def _record(
+    session: AsyncSession, feed: FeedRow, result: FetchResult, outcome: FeedOutcome
+) -> FeedOutcome:
+    """Persist the fetch outcome + per-host 4xx into the /metrics counters (WP-15)."""
+    host = urlsplit(feed.feed_url).hostname or ""
+    await metrics_store.record_fetch(
+        session, host=host, outcome=outcome.status, http_status=result.http_status
+    )
+    return outcome

@@ -3,6 +3,16 @@
 :80 {
 	encode gzip
 
+	# /metrics is an internal-only ops surface (WP-15, DESIGN.md §1.4): reachable
+	# from private networks (Prometheus on the same VPS/overlay), 403 from the
+	# public internet. Must precede the general /api/* handler.
+	@metrics path /api/v1/metrics
+	handle @metrics {
+		@external not remote_ip private_ranges
+		respond @external "metrics are internal-only" 403
+		reverse_proxy api:8000
+	}
+
 	@api path /api/*
 	handle @api {
 		reverse_proxy api:8000
