@@ -7,10 +7,10 @@ per-user ``entry_states`` read flag.
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, TypedDict
 
-from sqlalchemy import BigInteger, Select, and_, func, literal, literal_column, or_, select
+from sqlalchemy import BigInteger, Select, and_, func, literal, literal_column, or_, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
@@ -66,6 +66,36 @@ async def insert_batch(session: AsyncSession, feed_id: int, entries: list[NewEnt
 
 async def get(session: AsyncSession, entry_id: int) -> Entry | None:
     return await session.get(Entry, entry_id)
+
+
+# Retention purge (DESIGN.md §0.3, §4): delete an entry only when it is older than
+# the horizon AND starred by no one AND, for every subscriber, either it predates
+# that subscription (id <= since_entry_id) or that subscriber has read it. Unread is
+# never purged. Global content (not user-scoped). Written as SQL because the "every
+# subscriber has read-or-unsubscribed" rule is a NOT EXISTS over the unread set.
+_PURGE_SQL = text("""
+    DELETE FROM entries e
+     WHERE e.created_at < now() - (:horizon_s * interval '1 second')
+       AND NOT EXISTS (
+             SELECT 1 FROM entry_states st
+              WHERE st.entry_id = e.id AND st.is_starred)
+       AND NOT EXISTS (
+             SELECT 1 FROM subscriptions s
+              WHERE s.feed_id = e.feed_id
+                AND e.id > s.since_entry_id
+                AND NOT EXISTS (
+                      SELECT 1 FROM entry_states st2
+                       WHERE st2.entry_id = e.id
+                         AND st2.user_id = s.user_id
+                         AND st2.is_read))
+""")
+
+
+async def purge_retained(session: AsyncSession, *, horizon: timedelta) -> int:
+    """Purge entries past the retention horizon per the DESIGN.md §0.3 rule.
+    Returns the number of entries deleted."""
+    result = await session.execute(_PURGE_SQL, {"horizon_s": horizon.total_seconds()})
+    return rowcount(result)
 
 
 async def max_id_for_feed(session: AsyncSession, feed_id: int) -> int:

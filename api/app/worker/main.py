@@ -25,6 +25,7 @@ from app.db import get_sessionmaker
 from app.models import Feed
 from app.store import feeds as feeds_store
 from app.worker.fetch import fetch_feed
+from app.worker.maintenance import maintenance_loop
 from app.worker.pipeline import FeedOutcome, FetchFn, process_feed
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -155,18 +156,26 @@ async def run(
         for sig in (signal.SIGTERM, signal.SIGINT):
             loop.add_signal_handler(sig, stop.set)
 
+    async def _claim_loop() -> None:
+        while not stop.is_set():
+            try:
+                await poll_once(session_factory, settings=settings, gate=gate, counters=counters)
+            except Exception as exc:  # never let the loop die on a transient DB blip
+                _log("poll_cycle_failed", error=repr(exc))
+            if stop.is_set():
+                break
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=settings.worker_poll_interval_s)
+            except TimeoutError:
+                pass
+
     _log("worker_started", poll_interval_s=settings.worker_poll_interval_s)
-    while not stop.is_set():
-        try:
-            await poll_once(session_factory, settings=settings, gate=gate, counters=counters)
-        except Exception as exc:  # never let the loop die on a transient DB blip
-            _log("poll_cycle_failed", error=repr(exc))
-        if stop.is_set():
-            break
-        try:
-            await asyncio.wait_for(stop.wait(), timeout=settings.worker_poll_interval_s)
-        except TimeoutError:
-            pass
+    # The claim loop and the periodic maintenance sweep run concurrently, both watching
+    # the same stop event so SIGTERM drains everything.
+    await asyncio.gather(
+        _claim_loop(),
+        maintenance_loop(session_factory, settings=settings, stop=stop),
+    )
     _log(
         "worker_stopped",
         polls=counters.polls,

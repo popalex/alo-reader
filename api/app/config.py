@@ -108,6 +108,16 @@ class Settings(BaseSettings):
     worker_backoff_base_s: int = 900
     worker_backoff_cap_s: int = 86_400
 
+    # Worker-embedded maintenance (WP-15, DESIGN.md §0.3, §1.3): orphan-feed GC +
+    # retention purge run periodically, jittered so N workers don't all fire at once.
+    worker_maintenance_interval_s: float = 3600.0
+    worker_maintenance_jitter_s: float = 300.0
+    # Delete a feed with zero subscribers for longer than this (orphan GC grace).
+    orphan_grace_days: int = 7
+    # Purge read+unstarred entries older than this whose every subscriber has read
+    # them (starred kept forever; unread never purged). DESIGN.md §0.3.
+    retention_horizon_days: int = 90
+
 
 @lru_cache
 def get_settings() -> Settings:

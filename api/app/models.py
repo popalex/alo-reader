@@ -87,6 +87,11 @@ class Feed(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
+    # NULL while the feed has subscribers; set to now() when the last one leaves
+    # (trigger-maintained, migration 0005). Drives the orphan-feed GC (WP-15).
+    orphaned_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
     # Generated column (STORED) over the feed title; DDL in migration 0002. Read-only.
     # Used to match a feed's name in search (see store.entries.search_stream_page).
     search_tsv: Mapped[str | None] = mapped_column(TSVECTOR, FetchedValue(), nullable=True)
