@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.provider import AuthedUser
+from app.auth.ratelimit import Cooldown
 from app.auth.runtime import current_user
 from app.config import get_settings
 from app.db import get_session
@@ -29,6 +30,10 @@ Session = Annotated[AsyncSession, Depends(get_session)]
 
 _FEED_TYPES = ("application/rss+xml", "application/atom+xml", "application/feed+json")
 _FALLBACK_PATHS = ("/feed", "/rss", "/atom.xml", "/index.xml")
+
+# Per-user cooldown: discovery makes the server fetch an arbitrary page, so it's
+# gated tighter than the coarse global bucket (DESIGN.md §1.4 quota audit).
+_discover_cooldown = Cooldown()
 
 
 class DiscoverRequest(BaseModel):
@@ -108,6 +113,8 @@ async def discover(
         raise ApiError(400, "invalid_request", "url must be an absolute http(s) URL")
 
     settings = get_settings()
+    if not _discover_cooldown.allow(user.id, settings.discover_window_s):
+        raise ApiError(429, "rate_limited", "discovery was requested too recently")
     result = await guarded_get(
         body.url.strip(),
         max_bytes=settings.discover_max_bytes,

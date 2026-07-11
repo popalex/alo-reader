@@ -7,7 +7,6 @@ never dumped on the new subscriber as unread (DESIGN.md §4). Every id lookup is
 tenant-scoped: another user's id reads as 404, never 403.
 """
 
-import time
 from datetime import datetime
 from typing import Annotated
 from urllib.parse import urlsplit, urlunsplit
@@ -18,6 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.provider import AuthedUser
+from app.auth.ratelimit import Cooldown
 from app.auth.runtime import current_user
 from app.config import get_settings
 from app.db import get_session
@@ -59,25 +59,7 @@ class RefreshResponse(BaseModel):
     status: str
 
 
-class _Cooldown:
-    """Per-key minimum-spacing gate (in-process, per replica) for manual refresh."""
-
-    def __init__(self) -> None:
-        self._last: dict[int, float] = {}
-
-    def allow(self, key: int, window_s: float) -> bool:
-        now = time.monotonic()
-        last = self._last.get(key)
-        if last is not None and now - last < window_s:
-            return False
-        self._last[key] = now
-        return True
-
-    def reset(self) -> None:
-        self._last.clear()
-
-
-_refresh_cooldown = _Cooldown()
+_refresh_cooldown = Cooldown()
 
 
 def normalize_feed_url(raw: str) -> str:

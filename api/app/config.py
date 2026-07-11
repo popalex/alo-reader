@@ -44,6 +44,15 @@ class Settings(BaseSettings):
     # (per API replica), so a user can't hammer the poller.
     subscription_refresh_window_s: float = 300.0
 
+    # Max personal access tokens per user (DESIGN.md §1.4 quota audit). Creating one
+    # past the cap is a 422 quota_exceeded, so a script can't mint unbounded tokens.
+    quota_api_tokens: int = 20
+
+    # Minimum spacing between /discover calls per user (per API replica). Discovery
+    # makes the server fetch an arbitrary page, so it's rate-limited harder than the
+    # coarse global bucket to bound that SSRF/cost surface.
+    discover_window_s: float = 5.0
+
     # Fetcher / poller (DESIGN.md §1.3). An operator may set a contact URL so hosts
     # can reach them; it's optional and empty by default (no personal URL baked in).
     # The caps bound per-fetch cost/abuse.
