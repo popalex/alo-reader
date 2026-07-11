@@ -143,6 +143,30 @@ jobs:
       - name: Benchmark (100k profile)
         run: BENCH_PROFILE=pr python scripts/bench_search.py
 
+  security-audit:
+    # Supply-chain gate (WP-15): pip-audit for Python deps, pnpm audit for the
+    # shipped (prod) web deps. Dev-only build tooling is excluded from the web gate
+    # (it never reaches users); advisories with no available fix are ignored via
+    # web/pnpm-workspace.yaml auditConfig so the gate stays actionable.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e "./api[dev]" pip-audit
+      - name: pip-audit (Python deps)
+        run: pip-audit --skip-editable
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+      - uses: pnpm/action-setup@v6
+        with:
+          version: "11"
+      - run: pnpm -C web install --frozen-lockfile
+      - name: pnpm audit (shipped web deps)
+        run: pnpm -C web audit --prod --audit-level high
+
   build-images:
     runs-on: ubuntu-latest
     steps:
