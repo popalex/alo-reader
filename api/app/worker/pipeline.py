@@ -17,7 +17,7 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.config import Settings
-from app.ingest import compress_text, parse_feed, sanitize_html
+from app.ingest import compress_text, parse_feed, sanitize_and_cap
 from app.ingest.parse import ParsedFeed
 from app.store import entries as entries_store
 from app.store import feeds as feeds_store
@@ -58,14 +58,16 @@ def _build_entries(body: bytes) -> tuple[ParsedFeed, list[NewEntry]]:
     parsed = parse_feed(body)
     rows: list[NewEntry] = []
     for e in parsed.entries:
+        content_html, truncated = sanitize_and_cap(e.content_html)
         rows.append(
             NewEntry(
                 guid_hash=e.guid_hash,
                 url=e.url,
                 title=e.title,
                 author=e.author,
-                content_html=sanitize_html(e.content_html),
+                content_html=content_html,
                 content_raw=compress_text(e.content_html) if e.content_html else None,
+                content_truncated=truncated,
                 published_at=e.published_at,
             )
         )

@@ -44,6 +44,7 @@ class NewEntry(TypedDict, total=False):
     author: str | None
     content_html: str
     content_raw: bytes | None
+    content_truncated: bool
     published_at: datetime | None
 
 

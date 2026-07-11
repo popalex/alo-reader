@@ -126,8 +126,14 @@ _HEIGHT_RE = re.compile(r'\bheight="(\d+)"', re.IGNORECASE)
 # Any run of whitespace collapses to a single space in extracted text.
 _WS_RE = re.compile(r"\s+")
 
-# Entry-content cost ceiling (DESIGN.md §1.4): store roughly the first 500 KB.
-MAX_CONTENT_CHARS = 500_000
+# Entry-content cost ceiling (DESIGN.md §1.4): store roughly the first 500 KB of
+# *sanitized* HTML. Byte-based so the cap is honest about storage cost regardless
+# of multi-byte content; truncation sets a flag so callers can surface it.
+MAX_CONTENT_BYTES = 500 * 1024
+# Absolute guard on raw input handed to the sanitizer (bounds the compressed
+# content_raw and sanitizer cost); generously above MAX_CONTENT_BYTES so the
+# post-sanitize cap is the effective, flagged limit.
+MAX_RAW_CONTENT_CHARS = 1_000_000
 # Summaries are a short lead-in for the list view.
 SUMMARY_CHARS = 300
 
@@ -144,16 +150,7 @@ def _drop_tracking_pixels(safe_html: str) -> str:
     return _IMG_TAG_RE.sub(repl, safe_html)
 
 
-def sanitize_html(raw_html: str) -> str:
-    """Return an allowlist-sanitized copy of ``raw_html`` safe to render.
-
-    Enforces: tag/attribute allowlist, http/https-only URLs, forced
-    ``rel="noopener noreferrer" target="_blank"`` on links, script/style content
-    removal, and tracking-pixel stripping. Output is capped at
-    :data:`MAX_CONTENT_CHARS`.
-    """
-    if not raw_html:
-        return ""
+def _clean(raw_html: str) -> str:
     cleaned = nh3.clean(
         raw_html,
         tags=ALLOWED_TAGS,
@@ -163,10 +160,46 @@ def sanitize_html(raw_html: str) -> str:
         link_rel=_LINK_REL,
         set_tag_attribute_values=_LINK_ATTR_VALUES,
     )
-    cleaned = _drop_tracking_pixels(cleaned)
-    if len(cleaned) > MAX_CONTENT_CHARS:
-        cleaned = cleaned[:MAX_CONTENT_CHARS]
-    return cleaned
+    return _drop_tracking_pixels(cleaned)
+
+
+def _cap(cleaned: str) -> tuple[str, bool]:
+    """Cap sanitized HTML at :data:`MAX_CONTENT_BYTES`. Returns ``(html, truncated)``.
+
+    Truncation happens on the UTF-8 byte length (the real storage cost); a partial
+    trailing codepoint is dropped and the result is re-sanitized so a cut left no
+    dangling/partial tag. Re-sanitizing re-adds closing tags, which can nudge the
+    result back over the cap, so this shrinks the budget by the overflow and repeats
+    (a couple of iterations at most) until the final HTML fits. The output is always
+    valid, allowlisted HTML and never exceeds the cap."""
+    if len(cleaned.encode("utf-8")) <= MAX_CONTENT_BYTES:
+        return cleaned, False
+    raw = cleaned.encode("utf-8")
+    budget = MAX_CONTENT_BYTES
+    for _ in range(8):  # bounded; each pass shrinks the budget monotonically
+        candidate = _clean(raw[:budget].decode("utf-8", "ignore"))
+        overflow = len(candidate.encode("utf-8")) - MAX_CONTENT_BYTES
+        if overflow <= 0 or budget <= MAX_CONTENT_BYTES // 2:
+            return candidate, True
+        budget -= overflow + 64  # drop the overrun plus a little slack for closing tags
+    return candidate, True
+
+
+def sanitize_and_cap(raw_html: str) -> tuple[str, bool]:
+    """Sanitize then cap. Returns ``(safe_html, truncated)``.
+
+    Enforces the tag/attribute allowlist, http/https-only URLs, forced
+    ``rel="noopener noreferrer" target="_blank"`` on links, script/style content
+    removal, and tracking-pixel stripping, then applies the :data:`MAX_CONTENT_BYTES`
+    cap (DESIGN.md §1.4). ``truncated`` is True iff the cap cut the content."""
+    if not raw_html:
+        return "", False
+    return _cap(_clean(raw_html))
+
+
+def sanitize_html(raw_html: str) -> str:
+    """Sanitized + capped HTML (the string only; see :func:`sanitize_and_cap`)."""
+    return sanitize_and_cap(raw_html)[0]
 
 
 def _strip_to_text(raw_html: str) -> str:
