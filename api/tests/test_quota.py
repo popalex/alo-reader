@@ -49,9 +49,11 @@ async def test_api_token_count_cap(
     assert over.status_code == 422
     assert over.json()["error"]["code"] == "quota_exceeded"
 
-    # Deleting one frees a slot again (the cap is on live count, not lifetime).
+    # Deleting one frees a slot again (the cap is on live count, not lifetime). Delete
+    # a spare token, never the one authenticating this request ("test").
     listing = (await api_client.get(TOKENS, headers=pat_user.headers)).json()
-    await api_client.delete(f"{TOKENS}/{listing[0]['id']}", headers=pat_user.headers)
+    spare = next(t for t in listing if t["label"] != "test")
+    await api_client.delete(f"{TOKENS}/{spare['id']}", headers=pat_user.headers)
     again = await api_client.post(TOKENS, json={"label": "after-delete"}, headers=pat_user.headers)
     assert again.status_code == 201
 
