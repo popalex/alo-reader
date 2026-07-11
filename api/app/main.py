@@ -22,6 +22,7 @@ from app.routes.metrics import router as metrics_router
 from app.routes.opml import router as opml_router
 from app.routes.streams import router as streams_router
 from app.routes.subscriptions import router as subscriptions_router
+from app.security import SecurityHeadersMiddleware
 
 
 @asynccontextmanager
@@ -33,6 +34,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="alo-reader", version="0.0.0", lifespan=lifespan)
 register_exception_handlers(app)
 app.add_middleware(AuthMiddleware)
+# Added last → outermost: security headers land on every response, including the
+# auth middleware's 401/429 and error envelopes.
+app.add_middleware(SecurityHeadersMiddleware)
 
 api_v1 = APIRouter(prefix="/api/v1")
 

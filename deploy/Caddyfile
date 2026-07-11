@@ -19,6 +19,20 @@
 	}
 
 	handle {
+		# Security headers for the SPA (WP-15, DESIGN.md §1.6). The CSP is the second
+		# XSS wall after ingest sanitization; it allows 'self' plus what Clerk and
+		# rendered feed images legitimately need (scripts stay 'self' — the build uses
+		# external/bundled scripts, not inline). HSTS matters once WP-16 wires TLS.
+		header {
+			Content-Security-Policy "default-src 'self'; script-src 'self' https://*.clerk.accounts.dev https://challenges.cloudflare.com; connect-src 'self' https://*.clerk.accounts.dev; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src https://*.clerk.accounts.dev https://challenges.cloudflare.com; worker-src 'self' blob:; manifest-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+			X-Content-Type-Options "nosniff"
+			X-Frame-Options "DENY"
+			Referrer-Policy "no-referrer"
+			Cross-Origin-Opener-Policy "same-origin"
+			Permissions-Policy "geolocation=(), camera=(), microphone=(), browsing-topics=()"
+			Strict-Transport-Security "max-age=31536000; includeSubDomains"
+			-Server
+		}
 		root * /srv
 		try_files {path} /index.html
 		file_server
