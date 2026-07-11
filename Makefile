@@ -11,7 +11,7 @@ COMPOSE_DEV := docker compose -f deploy/docker-compose.yml -f deploy/docker-comp
 # (see `make db`). Postgres itself is never installed on the host.
 TEST_DATABASE_URL ?= postgresql+asyncpg://alo:alo@localhost:5432/alo
 
-.PHONY: venv lint typecheck test-api test-web e2e lighthouse size up seed dev down db db-down migrate generate-client bench-search pg-image
+.PHONY: venv lint typecheck test-api test-web e2e lighthouse size up seed dev down db db-down migrate generate-client bench-search loadtest pg-image
 
 ## Create the virtualenv and install the api project (editable, with dev tools).
 venv:
@@ -54,6 +54,12 @@ lighthouse:
 ## BENCH_PROFILE=pr (100k, default) | nightly (5M); BENCH_KEEP=1 keeps the corpus.
 bench-search:
 	DATABASE_URL=$(TEST_DATABASE_URL) $(PY) scripts/bench_search.py
+
+## Multi-tenant load test (WP-15): API p95, worker backlog drain, cross-tenant probe.
+## Needs `make db` + `make migrate`. LOAD_PROFILE=smoke (default) | ci-nightly (5M);
+## LOAD_KEEP=1 keeps the synthetic tenants.
+loadtest:
+	DATABASE_URL=$(TEST_DATABASE_URL) $(PY) scripts/loadtest.py
 
 ## Build the SPA and check the initial bundle stays within the size budget.
 size:
