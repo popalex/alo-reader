@@ -55,12 +55,15 @@ export function useCreateSubscription() {
 
 export function useDeleteSubscription() {
   const getToken = useTokenGetter();
+  const qc = useQueryClient();
   const { refresh } = useFeedListRefreshers();
   return useMutation({
     mutationFn: async (vars: { id: number; title?: string }): Promise<void> =>
       deleteSubscription(await getToken(), vars.id),
     onSuccess: (_data, vars) => {
       refresh();
+      // Drop the unsubscribed feed's entries from every cached stream (e.g. All).
+      void qc.invalidateQueries({ queryKey: ["entries"] });
       pushToast(`Unsubscribed from ${vars.title || "the feed"}.`, "info");
     },
     onError: () => pushToast("Couldn't unsubscribe — try again.", "error"),

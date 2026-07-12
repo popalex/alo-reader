@@ -24,7 +24,9 @@ function useStreamTitle(stream: StreamDescriptor): string {
       case "starred":
         return "Starred";
       case "feed":
-        return subs.data?.find((s) => s.id === stream.id)?.title || "Feed";
+        // A feed stream is keyed by feed_id (what the API filters on), not the
+        // subscription id — they differ once a feed is shared/re-subscribed.
+        return subs.data?.find((s) => s.feed_id === stream.id)?.title || "Feed";
       case "folder":
         return folders.data?.find((f) => f.id === stream.id)?.name || "Folder";
     }

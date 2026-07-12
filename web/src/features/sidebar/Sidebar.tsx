@@ -6,7 +6,7 @@
 
 import { useMemo, useState } from "react";
 
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { ChevronDown, Inbox, Plus, Star, Trash2 } from "lucide-react";
 
 import type { Subscription } from "../../api/endpoints";
@@ -31,7 +31,7 @@ function FeedLink({
     <div className={styles.feedRow}>
       <Link
         to="/feed/$id"
-        params={{ id: String(sub.id) }}
+        params={{ id: String(sub.feed_id) }}
         className={base}
         activeProps={{ className: `${base} ${styles.active}` }}
       >
@@ -67,6 +67,8 @@ export function Sidebar() {
   const [addOpen, setAddOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Subscription | null>(null);
   const deleteSub = useDeleteSubscription();
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   const unreadBySub = useMemo(() => {
     const m = new Map<number, number>();
@@ -142,9 +144,18 @@ export function Sidebar() {
         body={`"${pendingDelete?.title || "Untitled feed"}" will be removed from your list, along with its read/star state.`}
         confirmLabel="Unsubscribe"
         onConfirm={() => {
-          if (pendingDelete) {
-            deleteSub.mutate({ id: pendingDelete.id, title: pendingDelete.title });
-          }
+          if (!pendingDelete) return;
+          const { id, title, feed_id } = pendingDelete;
+          deleteSub.mutate(
+            { id, title },
+            {
+              // If we're viewing the feed we just left, go back to All items so the
+              // list + reader don't keep showing the removed feed's content.
+              onSuccess: () => {
+                if (pathname === `/feed/${feed_id}`) void navigate({ to: "/" });
+              },
+            },
+          );
         }}
       />
 

@@ -18,27 +18,30 @@ const OPML = `<?xml version="1.0" encoding="UTF-8"?>
 test.describe("feed management (AUTH_MODE=none)", () => {
   test("subscribe button opens the add-feed dialog", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("button", { name: /subscribe/i }).click();
+    await page.getByRole("button", { name: "Subscribe", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Add a feed" })).toBeVisible();
     await expect(page.getByLabel(/feed or site url/i)).toBeVisible();
   });
 
-  test("unsubscribe removes a feed from the sidebar", async ({ page }) => {
+  test("unsubscribing the feed you're viewing returns to All items", async ({ page }) => {
     await page.goto("/");
-    const feed = page.getByRole("link", { name: /Hacker News/ });
-    await expect(feed).toBeVisible();
+    // Open the feed's own stream (entries must load — guards the feed_id routing).
+    await page.getByRole("link", { name: /Hacker News/ }).click();
+    await expect(page).toHaveURL(/\/feed\/\d+$/);
+    await expect(page.getByRole("heading", { name: "Hacker News", level: 1 })).toBeVisible();
 
+    const feed = page.getByRole("link", { name: /Hacker News/ });
     await feed.hover(); // reveal the hover-only trash button
     await page.getByRole("button", { name: /unsubscribe from hacker news/i }).click();
-    // Confirm dialog → Unsubscribe.
     await page.getByRole("button", { name: /^unsubscribe$/i }).click();
 
     await expect(page.getByRole("link", { name: /Hacker News/ })).toHaveCount(0);
+    await expect(page).toHaveURL(/\/$/); // bounced back to All items, not left on the dead feed
   });
 
   test("imports an OPML file and the new feeds appear in the sidebar", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("button", { name: /subscribe/i }).click();
+    await page.getByRole("button", { name: "Subscribe", exact: true }).click();
 
     await page.locator('input[type="file"]').setInputFiles({
       name: "feeds.opml",

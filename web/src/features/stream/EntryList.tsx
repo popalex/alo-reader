@@ -259,7 +259,9 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
   useKeyboard(actions, !helpOpen && !confirmOpen);
 
   const feedError =
-    stream.kind === "feed" ? (subs.data?.find((s) => s.id === stream.id)?.last_error ?? null) : null;
+    stream.kind === "feed"
+      ? (subs.data?.find((s) => s.feed_id === stream.id)?.last_error ?? null)
+      : null;
 
   let body: React.ReactNode;
   if (query.isPending) {
