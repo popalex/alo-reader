@@ -141,7 +141,7 @@ export function Sidebar() {
         open={pendingDelete !== null}
         onOpenChange={(open) => !open && setPendingDelete(null)}
         title="Unsubscribe from this feed?"
-        body={`"${pendingDelete?.title || "Untitled feed"}" will be removed from your list, along with its read/star state.`}
+        body={`"${pendingDelete?.title || "Untitled feed"}" will be removed from your list. Your read/star history is kept, so re-subscribing later picks up where you left off.`}
         confirmLabel="Unsubscribe"
         onConfirm={() => {
           if (!pendingDelete) return;
