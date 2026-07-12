@@ -48,6 +48,11 @@ export function importOpml(token: string | null, file: File): Promise<ImportRepo
   return apiFetch<ImportReport>("/opml", { token, method: "POST", body: form });
 }
 
+/** Unsubscribe (delete a subscription). Returns 204. */
+export function deleteSubscription(token: string | null, id: number): Promise<void> {
+  return apiFetch<void>(`/subscriptions/${id}`, { token, method: "DELETE" });
+}
+
 export function getCounts(token: string | null): Promise<Counts> {
   return apiFetch<Counts>("/counts", { token });
 }

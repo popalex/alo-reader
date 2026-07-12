@@ -23,6 +23,19 @@ test.describe("feed management (AUTH_MODE=none)", () => {
     await expect(page.getByLabel(/feed or site url/i)).toBeVisible();
   });
 
+  test("unsubscribe removes a feed from the sidebar", async ({ page }) => {
+    await page.goto("/");
+    const feed = page.getByRole("link", { name: /Hacker News/ });
+    await expect(feed).toBeVisible();
+
+    await feed.hover(); // reveal the hover-only trash button
+    await page.getByRole("button", { name: /unsubscribe from hacker news/i }).click();
+    // Confirm dialog → Unsubscribe.
+    await page.getByRole("button", { name: /^unsubscribe$/i }).click();
+
+    await expect(page.getByRole("link", { name: /Hacker News/ })).toHaveCount(0);
+  });
+
   test("imports an OPML file and the new feeds appear in the sidebar", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("button", { name: /subscribe/i }).click();

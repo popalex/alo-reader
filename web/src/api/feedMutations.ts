@@ -9,6 +9,7 @@ import { useTokenGetter } from "../app/auth";
 import { pushToast } from "../app/toast";
 import {
   createSubscription,
+  deleteSubscription,
   importOpml,
   type CreateSubscriptionInput,
   type ImportReport,
@@ -36,6 +37,20 @@ export function useCreateSubscription() {
       refresh();
       pushToast(`Subscribed to ${sub.title || "the feed"}.`, "info");
     },
+  });
+}
+
+export function useDeleteSubscription() {
+  const getToken = useTokenGetter();
+  const refresh = useRefreshFeedLists();
+  return useMutation({
+    mutationFn: async (vars: { id: number; title?: string }): Promise<void> =>
+      deleteSubscription(await getToken(), vars.id),
+    onSuccess: (_data, vars) => {
+      refresh();
+      pushToast(`Unsubscribed from ${vars.title || "the feed"}.`, "info");
+    },
+    onError: () => pushToast("Couldn't unsubscribe — try again.", "error"),
   });
 }
 
