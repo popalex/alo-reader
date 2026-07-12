@@ -13,7 +13,7 @@ directly in tests without the surrounding loop or signal handling.
 import asyncio
 import logging
 import signal
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from urllib.parse import urlsplit
@@ -169,12 +169,23 @@ async def run(
             except TimeoutError:
                 pass
 
+    async def _supervise(name: str, coro: Awaitable[None]) -> None:
+        """Run a loop; if it dies, log it and set ``stop`` so its sibling also drains
+        rather than being left running as an orphan (graceful shutdown preserved)."""
+        try:
+            await coro
+        except Exception as exc:  # noqa: BLE001 — a crashing loop must not strand the other
+            _log(f"{name}_crashed", error=repr(exc))
+        finally:
+            stop.set()
+
     _log("worker_started", poll_interval_s=settings.worker_poll_interval_s)
     # The claim loop and the periodic maintenance sweep run concurrently, both watching
-    # the same stop event so SIGTERM drains everything.
+    # the same stop event so SIGTERM — or either loop failing — drains everything.
+    sweep = maintenance_loop(session_factory, settings=settings, stop=stop)
     await asyncio.gather(
-        _claim_loop(),
-        maintenance_loop(session_factory, settings=settings, stop=stop),
+        _supervise("claim_loop", _claim_loop()),
+        _supervise("maintenance_loop", sweep),
     )
     _log(
         "worker_stopped",
