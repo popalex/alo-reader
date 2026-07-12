@@ -120,6 +120,10 @@ async def discover(
         max_bytes=settings.discover_max_bytes,
         settings=settings,
         accept="text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        # A big feed (podcast feeds run into megabytes) must still be *detected*: we
+        # only need the head to read <rss>/<feed> and the channel title, so truncate
+        # rather than bailing out — otherwise a valid feed reads as "nothing found".
+        truncate=True,
     )
     if not result.ok or result.body is None:
         return []  # unreachable/blocked page → nothing to discover
