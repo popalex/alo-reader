@@ -170,42 +170,62 @@ async def process_feed(
 ) -> FeedOutcome:
     """Fetch and persist one feed, returning what happened."""
     result = await fetch(feed, transport=transport, settings=settings)
+    outcome = await _persist(session_factory, feed, result, settings=settings, transport=transport)
+    # Metrics are recorded in their own short transaction, decoupled from the ingest
+    # commit above: a hot-row contention or failure on the shared counter rows must
+    # never roll back the entries we just stored, and the counter lock is held only
+    # for this tiny write rather than across the whole parse/insert transaction.
+    await _record(session_factory, feed, result, outcome)
+    return outcome
 
+
+async def _persist(
+    session_factory: async_sessionmaker[AsyncSession],
+    feed: FeedRow,
+    result: FetchResult,
+    *,
+    settings: Settings,
+    transport: httpx.AsyncBaseTransport | None,
+) -> FeedOutcome:
+    """Persist the fetch outcome (entries + rescheduling, or backoff) in one tx."""
     async with session_factory() as session, session.begin():
         # A clean permanent redirect repoints feed_url before anything else; a
         # unique collision is surfaced as an error, never a silent feed merge.
         if result.permanent_url and result.permanent_url != feed.feed_url:
             if not await feeds_store.update_feed_url(session, feed.id, result.permanent_url):
-                return await _record(
+                return await _apply_error(
                     session,
                     feed,
                     result,
-                    await _apply_error(
-                        session,
-                        feed,
-                        result,
-                        settings,
-                        "permanent redirect target already exists",
-                        status="redirect_conflict",
-                    ),
+                    settings,
+                    "permanent redirect target already exists",
+                    status="redirect_conflict",
                 )
 
         if result.status == "new_body":
-            outcome = await _apply_new_body(session, feed, result, settings, transport)
-        elif result.status == "not_modified":
-            outcome = await _apply_not_modified(session, feed, settings)
-        else:  # http_error / network_error / blocked
-            message = result.error or f"HTTP {result.http_status}"
-            outcome = await _apply_error(session, feed, result, settings, message)
-        return await _record(session, feed, result, outcome)
+            return await _apply_new_body(session, feed, result, settings, transport)
+        if result.status == "not_modified":
+            return await _apply_not_modified(session, feed, settings)
+        # http_error / network_error / blocked
+        message = result.error or f"HTTP {result.http_status}"
+        return await _apply_error(session, feed, result, settings, message)
 
 
 async def _record(
-    session: AsyncSession, feed: FeedRow, result: FetchResult, outcome: FeedOutcome
-) -> FeedOutcome:
-    """Persist the fetch outcome + per-host 4xx into the /metrics counters (WP-15)."""
+    session_factory: async_sessionmaker[AsyncSession],
+    feed: FeedRow,
+    result: FetchResult,
+    outcome: FeedOutcome,
+) -> None:
+    """Record the fetch outcome + per-host 4xx into the /metrics counters (WP-15).
+
+    Best-effort and isolated: runs in its own transaction so it can't roll back the
+    ingested entries, and swallows failures (a metrics blip must not fail a feed)."""
     host = urlsplit(feed.feed_url).hostname or ""
-    await metrics_store.record_fetch(
-        session, host=host, outcome=outcome.status, http_status=result.http_status
-    )
-    return outcome
+    try:
+        async with session_factory() as session, session.begin():
+            await metrics_store.record_fetch(
+                session, host=host, outcome=outcome.status, http_status=result.http_status
+            )
+    except Exception as exc:  # noqa: BLE001 — metrics are non-critical telemetry
+        log.warning("metrics_record_failed feed_id=%s error=%r", feed.id, exc)
