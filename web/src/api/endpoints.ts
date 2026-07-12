@@ -21,6 +21,33 @@ export function getSubscriptions(token: string | null): Promise<Subscription[]> 
   return apiFetch<Subscription[]>("/subscriptions", { token });
 }
 
+export type DiscoverCandidate = components["schemas"]["DiscoverCandidate"];
+export type ImportReport = components["schemas"]["ImportReport"];
+
+/** Probe a site or feed URL and return the feed candidates found there. */
+export function discoverFeeds(token: string | null, url: string): Promise<DiscoverCandidate[]> {
+  return apiFetch<DiscoverCandidate[]>("/discover", { token, method: "POST", body: { url } });
+}
+
+export interface CreateSubscriptionInput {
+  feed_url: string;
+  folder_id?: number | null;
+}
+
+export function createSubscription(
+  token: string | null,
+  input: CreateSubscriptionInput,
+): Promise<Subscription> {
+  return apiFetch<Subscription>("/subscriptions", { token, method: "POST", body: input });
+}
+
+/** Import an OPML file (multipart) and return the per-file import report. */
+export function importOpml(token: string | null, file: File): Promise<ImportReport> {
+  const form = new FormData();
+  form.append("file", file);
+  return apiFetch<ImportReport>("/opml", { token, method: "POST", body: form });
+}
+
 export function getCounts(token: string | null): Promise<Counts> {
   return apiFetch<Counts>("/counts", { token });
 }
