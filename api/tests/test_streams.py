@@ -43,9 +43,7 @@ async def test_cursor_pagination_gap_free_during_inserts(session: AsyncSession) 
 
     # New entries arrive mid-pagination; the keyset cursor keeps page 2 stable.
     await add_entries(session, feed, 4)
-    cursor = entries_store.encode_cursor(
-        page1[-1].published_at, page1[-1].created_at, page1[-1].id
-    )
+    cursor = entries_store.encode_cursor(page1[-1].published_at, page1[-1].created_at, page1[-1].id)
     page2 = await entries_store.list_by_stream(
         session, user.id, "all", status="all", cursor=cursor, limit=3
     )
