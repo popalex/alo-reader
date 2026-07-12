@@ -117,6 +117,9 @@ class Settings(BaseSettings):
     # Purge read+unstarred entries older than this whose every subscriber has read
     # them (starred kept forever; unread never purged). DESIGN.md §0.3.
     retention_horizon_days: int = 90
+    # Retention purge runs in bounded batches (per transaction) so a large backlog
+    # never locks the whole entries table in one statement.
+    retention_purge_batch_size: int = 5000
 
 
 @lru_cache

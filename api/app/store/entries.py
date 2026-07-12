@@ -73,28 +73,37 @@ async def get(session: AsyncSession, entry_id: int) -> Entry | None:
 # that subscription (id <= since_entry_id) or that subscriber has read it. Unread is
 # never purged. Global content (not user-scoped). Written as SQL because the "every
 # subscriber has read-or-unsubscribed" rule is a NOT EXISTS over the unread set.
+#
+# Bounded by ``LIMIT`` (via a ctid subselect, the only way to LIMIT a DELETE in
+# Postgres) so a single statement never locks/rewrites an unbounded slice of a
+# large table; the caller loops, committing between batches to release locks.
 _PURGE_SQL = text("""
-    DELETE FROM entries e
-     WHERE e.created_at < now() - (:horizon_s * interval '1 second')
-       AND NOT EXISTS (
-             SELECT 1 FROM entry_states st
-              WHERE st.entry_id = e.id AND st.is_starred)
-       AND NOT EXISTS (
-             SELECT 1 FROM subscriptions s
-              WHERE s.feed_id = e.feed_id
-                AND e.id > s.since_entry_id
-                AND NOT EXISTS (
-                      SELECT 1 FROM entry_states st2
-                       WHERE st2.entry_id = e.id
-                         AND st2.user_id = s.user_id
-                         AND st2.is_read))
+    DELETE FROM entries
+     WHERE ctid IN (
+       SELECT e.ctid FROM entries e
+        WHERE e.created_at < now() - (:horizon_s * interval '1 second')
+          AND NOT EXISTS (
+                SELECT 1 FROM entry_states st
+                 WHERE st.entry_id = e.id AND st.is_starred)
+          AND NOT EXISTS (
+                SELECT 1 FROM subscriptions s
+                 WHERE s.feed_id = e.feed_id
+                   AND e.id > s.since_entry_id
+                   AND NOT EXISTS (
+                         SELECT 1 FROM entry_states st2
+                          WHERE st2.entry_id = e.id
+                            AND st2.user_id = s.user_id
+                            AND st2.is_read))
+        LIMIT :limit)
 """)
 
 
-async def purge_retained(session: AsyncSession, *, horizon: timedelta) -> int:
-    """Purge entries past the retention horizon per the DESIGN.md §0.3 rule.
-    Returns the number of entries deleted."""
-    result = await session.execute(_PURGE_SQL, {"horizon_s": horizon.total_seconds()})
+async def purge_retained(session: AsyncSession, *, horizon: timedelta, limit: int = 5000) -> int:
+    """Purge up to ``limit`` entries past the retention horizon per DESIGN.md §0.3.
+    Returns the number deleted; the caller loops until a batch comes back short."""
+    result = await session.execute(
+        _PURGE_SQL, {"horizon_s": horizon.total_seconds(), "limit": limit}
+    )
     return rowcount(result)
 
 

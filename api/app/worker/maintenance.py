@@ -53,11 +53,17 @@ async def run_maintenance(
             )
     except Exception as exc:  # noqa: BLE001 — never let GC failure sink the loop
         _log("orphan_gc_failed", error=repr(exc))
+    horizon = timedelta(days=settings.retention_horizon_days)
+    batch = settings.retention_purge_batch_size
     try:
-        async with session_factory() as session, session.begin():
-            purged = await entries_store.purge_retained(
-                session, horizon=timedelta(days=settings.retention_horizon_days)
-            )
+        # Purge in bounded batches, each its own transaction, so a large backlog
+        # never locks/rewrites the whole entries table in one long-held statement.
+        while True:
+            async with session_factory() as session, session.begin():
+                n = await entries_store.purge_retained(session, horizon=horizon, limit=batch)
+            purged += n
+            if n < batch:
+                break
     except Exception as exc:  # noqa: BLE001
         _log("retention_purge_failed", error=repr(exc))
     _log("maintenance_swept", feeds_gc=gc, entries_purged=purged)

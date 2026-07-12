@@ -235,6 +235,35 @@ async def test_run_maintenance_sweeps_both(api_db: str) -> None:
     assert gc == 1 and purged == 1
 
 
+async def test_retention_purge_batches_until_drained(api_db: str) -> None:
+    # A single purge_retained call is capped at `limit` (so no statement locks an
+    # unbounded slice); run_maintenance then loops batches until the backlog drains.
+    sf = app_db.get_sessionmaker()
+    async with sf() as s, s.begin():
+        user = await factories.make_user(s)
+        feed = await factories.make_feed(s)
+        await factories.make_subscription(s, user, feed)
+        entries = await factories.add_entries(s, feed, 5)
+        user_id, feed_id = user.id, feed.id
+    for e in entries:
+        await _age_entry(sf, e.id, 100)
+        await _set_state(sf, user_id, e.id, read=True)  # all purgeable
+
+    async with sf() as s, s.begin():  # one capped call deletes at most `limit`
+        first = await entries_store.purge_retained(s, horizon=timedelta(days=90), limit=2)
+    assert first == 2
+    assert len(await _surviving_ids(sf, feed_id)) == 3
+
+    settings = Settings(  # type: ignore[call-arg]
+        database_url="postgresql+asyncpg://x/y",
+        auth_mode="none",
+        retention_purge_batch_size=2,
+    )
+    _, purged = await run_maintenance(sf, settings=settings)
+    assert purged == 3  # remaining rows drained across further batches
+    assert await _surviving_ids(sf, feed_id) == set()
+
+
 def test_next_wait_within_jitter_bounds() -> None:
     settings = Settings(  # type: ignore[call-arg]
         database_url="postgresql+asyncpg://x/y",
