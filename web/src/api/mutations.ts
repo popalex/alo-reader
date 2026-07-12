@@ -190,6 +190,11 @@ export function useMarkStreamRead(stream: StreamDescriptor) {
       qc.setQueryData(queryKeys.counts, ctx?.prevCounts);
       pushToast("Couldn't mark all read — it was rolled back.", "error");
     },
+    onSuccess: () => {
+      // A clear "it's done" signal — the whole stream can be far larger than the
+      // loaded window, so the optimistic change alone isn't obvious feedback.
+      pushToast("Marked all as read.", "info");
+    },
     // Entries below the loaded window also got marked read — reconcile counts.
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.counts });

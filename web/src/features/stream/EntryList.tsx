@@ -17,6 +17,7 @@ import {
   CheckCheck,
   CircleAlert,
   List as ListIcon,
+  Loader2,
   Menu,
   RefreshCw,
   Rows3,
@@ -380,12 +381,23 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
             <button
               type="button"
               className={styles.toolBtn}
-              title={online ? "Mark all read" : "Mark all read (unavailable offline)"}
+              title={
+                markStreamRead.isPending
+                  ? "Marking all read…"
+                  : online
+                    ? "Mark all read"
+                    : "Mark all read (unavailable offline)"
+              }
               aria-label="Mark all read"
+              aria-busy={markStreamRead.isPending || undefined}
               onClick={() => setConfirmOpen(true)}
-              disabled={!online || (entries.length === 0 && !searching)}
+              disabled={!online || markStreamRead.isPending || (entries.length === 0 && !searching)}
             >
-              <CheckCheck size={15} />
+              {markStreamRead.isPending ? (
+                <Loader2 size={15} className={styles.spin} />
+              ) : (
+                <CheckCheck size={15} />
+              )}
             </button>
             <span className={styles.sep} />
             <DensityToggle value={density} onChange={setDensity} />
