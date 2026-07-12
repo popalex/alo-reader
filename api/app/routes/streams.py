@@ -91,7 +91,7 @@ async def list_entries(
     user: CurrentUser,
     session: Session,
     status: Annotated[str, Query(pattern="^(unread|all)$")] = "unread",
-    cursor: int | None = None,
+    cursor: str | None = None,
     limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = 50,
     q: str | None = None,
 ) -> StreamPage:
@@ -119,7 +119,16 @@ async def list_entries(
             session, user.id, parsed, status=status, cursor=cursor, limit=limit
         )
     items = [_list_item(r) for r in rows]
-    next_cursor = str(items[-1].id) if len(items) == effective_limit else None
+    next_cursor: str | None = None
+    if len(items) == effective_limit:
+        last = rows[-1].entry
+        # Search paginates by id (rum, id-desc); the normal listing by a composite
+        # (recency, id) keyset cursor.
+        next_cursor = (
+            str(last.id)
+            if query
+            else entries_store.encode_cursor(last.published_at, last.created_at, last.id)
+        )
     return StreamPage(entries=items, next_cursor=next_cursor)
 
 

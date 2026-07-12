@@ -68,9 +68,9 @@ async def test_cursor_pagination_gap_free_during_inserts(
 
     page1 = (await api_client.get(f"{BASE}/all/entries?status=all&limit=3", headers=h)).json()
     assert [e["id"] for e in page1["entries"]] == list(reversed(first[3:]))
-    assert page1["next_cursor"] == str(first[3])
+    assert page1["next_cursor"]  # opaque keyset cursor
 
-    # New entries arrive mid-pagination; the exclusive cursor keeps page 2 stable.
+    # New entries arrive mid-pagination; the keyset cursor keeps page 2 stable.
     await add_entries(feed_id, 4, start=100)
     page2 = (
         await api_client.get(
