@@ -90,7 +90,7 @@ export function AddSubscriptionDialog({
     }
   }
 
-  async function subscribe(feedUrl: string) {
+  async function subscribe(feedUrl: string, title?: string) {
     setError(null);
     try {
       let folder_id: number | null = null;
@@ -107,7 +107,7 @@ export function AddSubscriptionDialog({
       } else if (folderId) {
         folder_id = Number(folderId);
       }
-      await create.mutateAsync({ feed_url: feedUrl, folder_id });
+      await create.mutateAsync({ feed_url: feedUrl, folder_id, title });
       handleOpenChange(false);
     } catch (err) {
       setError(messageOf(err, "Couldn't subscribe to that feed."));
@@ -196,7 +196,7 @@ export function AddSubscriptionDialog({
                       type="button"
                       className={styles.add}
                       disabled={create.isPending}
-                      onClick={() => void subscribe(c.feed_url)}
+                      onClick={() => void subscribe(c.feed_url, c.title)}
                     >
                       <Plus size={14} />
                       <span>Add</span>

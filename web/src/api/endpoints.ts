@@ -37,6 +37,7 @@ export function discoverFeeds(token: string | null, url: string): Promise<Discov
 export interface CreateSubscriptionInput {
   feed_url: string;
   folder_id?: number | null;
+  title?: string;
 }
 
 export function createSubscription(

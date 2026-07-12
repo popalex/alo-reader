@@ -48,6 +48,10 @@ class SubscriptionResponse(BaseModel):
 class CreateSubscriptionRequest(BaseModel):
     feed_url: str = Field(min_length=1, max_length=2048)
     folder_id: int | None = None
+    # Optional placeholder title (e.g. the discovered feed's title) so a brand-new
+    # feed shows a real name immediately instead of "Untitled" until the worker polls.
+    # Only seeds a newly-created feed; the worker overwrites it with the real title.
+    title: str | None = Field(default=None, max_length=200)
 
 
 class UpdateSubscriptionRequest(BaseModel):
@@ -106,7 +110,9 @@ async def create_subscription(
     if body.folder_id is not None:
         await _require_own_folder(session, user.id, body.folder_id)
 
-    feed = await feeds_store.upsert_by_url(session, feed_url=feed_url)
+    feed = await feeds_store.upsert_by_url(
+        session, feed_url=feed_url, title=(body.title or "").strip()
+    )
     if await subs_store.get_by_feed(session, user.id, feed.id) is not None:
         raise ApiError(409, "conflict", "already subscribed to this feed")
 

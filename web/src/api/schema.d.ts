@@ -378,6 +378,8 @@ export interface components {
             feed_url: string;
             /** Folder Id */
             folder_id?: number | null;
+            /** Title */
+            title?: string | null;
         };
         /** CreateTokenRequest */
         CreateTokenRequest: {
