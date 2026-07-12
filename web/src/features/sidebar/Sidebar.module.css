@@ -234,3 +234,16 @@
 .empty:hover {
   color: var(--accent);
 }
+
+.fetching {
+  flex: none;
+  margin-left: auto;
+  color: var(--text-faint);
+  animation: spin 800ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

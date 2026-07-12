@@ -7,7 +7,7 @@
 import { useMemo, useState } from "react";
 
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { ChevronDown, Inbox, Plus, Star, Trash2 } from "lucide-react";
+import { ChevronDown, Inbox, Loader2, Plus, Star, Trash2 } from "lucide-react";
 
 import type { Subscription } from "../../api/endpoints";
 import { useDeleteSubscription } from "../../api/feedMutations";
@@ -39,6 +39,8 @@ function FeedLink({
         <span className={styles.name}>{sub.title || "Untitled feed"}</span>
         {sub.last_error ? (
           <span className={styles.errorDot} title="This feed failed to update" />
+        ) : !sub.last_fetched_at ? (
+          <Loader2 size={13} className={styles.fetching} aria-label="Fetching articles…" />
         ) : null}
         {unread > 0 ? <span className={styles.count}>{unread}</span> : null}
       </Link>

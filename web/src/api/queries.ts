@@ -1,7 +1,7 @@
 // TanStack Query hooks over the typed endpoints. Query functions resolve the
 // bearer token through the auth seam, so components never touch it.
 
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -35,6 +35,30 @@ export function useSubscriptions() {
     queryKey: queryKeys.subscriptions,
     queryFn: async () => getSubscriptions(await getToken()),
   });
+}
+
+/** While any subscribed feed hasn't been polled yet (no last_fetched_at, no error),
+ *  refetch the feed list + counts + entries on a short interval so its title, unread
+ *  count, and articles appear on their own once the worker fetches it — no manual
+ *  refresh. Stops as soon as nothing is pending (or after a safety cap). */
+export function usePendingFeedPolling(): void {
+  const qc = useQueryClient();
+  const subs = useSubscriptions();
+  const pending = (subs.data ?? []).some((s) => !s.last_fetched_at && !s.last_error);
+  useEffect(() => {
+    if (!pending) return;
+    const startedAt = Date.now();
+    const id = window.setInterval(() => {
+      if (Date.now() - startedAt > 90_000) {
+        window.clearInterval(id);
+        return;
+      }
+      void qc.invalidateQueries({ queryKey: queryKeys.subscriptions });
+      void qc.invalidateQueries({ queryKey: queryKeys.counts });
+      void qc.invalidateQueries({ queryKey: ["entries"] });
+    }, 2500);
+    return () => window.clearInterval(id);
+  }, [pending, qc]);
 }
 
 export function useCounts() {
