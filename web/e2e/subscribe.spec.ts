@@ -23,7 +23,7 @@ test.describe("feed management (AUTH_MODE=none)", () => {
     await expect(page.getByLabel(/feed or site url/i)).toBeVisible();
   });
 
-  test("unsubscribing the feed you're viewing returns to All items", async ({ page }) => {
+  test("deleting the feed you're viewing returns to All items", async ({ page }) => {
     await page.goto("/");
     // Open the feed's own stream (entries must load — guards the feed_id routing).
     await page.getByRole("link", { name: /Hacker News/ }).click();
@@ -32,8 +32,8 @@ test.describe("feed management (AUTH_MODE=none)", () => {
 
     const feed = page.getByRole("link", { name: /Hacker News/ });
     await feed.hover(); // reveal the hover-only trash button
-    await page.getByRole("button", { name: /unsubscribe from hacker news/i }).click();
-    await page.getByRole("button", { name: /^unsubscribe$/i }).click();
+    await page.getByRole("button", { name: /delete hacker news/i }).click();
+    await page.getByRole("button", { name: /^delete$/i }).click();
 
     await expect(page.getByRole("link", { name: /Hacker News/ })).toHaveCount(0);
     await expect(page).toHaveURL(/\/$/); // bounced back to All items, not left on the dead feed

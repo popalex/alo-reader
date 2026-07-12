@@ -45,8 +45,8 @@ function FeedLink({
       <button
         type="button"
         className={styles.del}
-        title="Unsubscribe"
-        aria-label={`Unsubscribe from ${sub.title || "this feed"}`}
+        title="Delete feed"
+        aria-label={`Delete ${sub.title || "this feed"}`}
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -140,9 +140,9 @@ export function Sidebar() {
       <ConfirmDialog
         open={pendingDelete !== null}
         onOpenChange={(open) => !open && setPendingDelete(null)}
-        title="Unsubscribe from this feed?"
-        body={`"${pendingDelete?.title || "Untitled feed"}" will be removed from your list. Your read/star history is kept, so re-subscribing later picks up where you left off.`}
-        confirmLabel="Unsubscribe"
+        title="Delete this feed?"
+        body={`"${pendingDelete?.title || "Untitled feed"}" will be removed along with its articles and your read/star history. Re-subscribing later starts fresh.`}
+        confirmLabel="Delete"
         onConfirm={() => {
           if (!pendingDelete) return;
           const { id, title, feed_id } = pendingDelete;
