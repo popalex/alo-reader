@@ -473,6 +473,12 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
           <span>This feed failed to update: {feedError}</span>
         </div>
       ) : null}
+      {markStreamRead.isPending ? (
+        <div className={styles.progressBanner} role="status" aria-live="polite">
+          <Loader2 size={15} className={styles.spin} />
+          <span>Marking all as read…</span>
+        </div>
+      ) : null}
       {body}
 
       <KeyboardHelp open={helpOpen} onOpenChange={setHelpOpen} />
