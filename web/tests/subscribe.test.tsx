@@ -5,14 +5,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../src/api/client";
 
 // Stub the network endpoints; keep everything else (types, apiFetch) real.
-const { discoverFeeds, createSubscription, importOpml } = vi.hoisted(() => ({
+const { discoverFeeds, createSubscription, importOpml, createFolder } = vi.hoisted(() => ({
   discoverFeeds: vi.fn(),
   createSubscription: vi.fn(),
   importOpml: vi.fn(),
+  createFolder: vi.fn(),
 }));
 vi.mock("../src/api/endpoints", async () => {
   const actual = await vi.importActual<typeof import("../src/api/endpoints")>("../src/api/endpoints");
-  return { ...actual, discoverFeeds, createSubscription, importOpml };
+  return { ...actual, discoverFeeds, createSubscription, importOpml, createFolder };
 });
 // AUTH_MODE=none: the token getter yields null, no Clerk needed.
 vi.mock("../src/app/auth", () => ({ useTokenGetter: () => async () => null }));
@@ -63,6 +64,29 @@ describe("AddSubscriptionDialog", () => {
     );
     // Subscribing closes the dialog.
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+  });
+
+  it("creates a new folder then subscribes into it", async () => {
+    discoverFeeds.mockResolvedValue([{ feed_url: "https://ex.com/feed.xml", title: "Example" }]);
+    createFolder.mockResolvedValue({ id: 7, name: "Podcasts", position: 0 });
+    createSubscription.mockResolvedValue({ ...aSub, folder_id: 7 });
+    renderDialog();
+
+    fireEvent.change(screen.getByLabelText(/feed or site url/i), { target: { value: "ex.com" } });
+    fireEvent.click(screen.getByRole("button", { name: /find/i }));
+    await screen.findByRole("button", { name: /^add$/i });
+
+    fireEvent.change(screen.getByLabelText(/^folder$/i), { target: { value: "__new__" } });
+    fireEvent.change(screen.getByLabelText(/new folder name/i), { target: { value: "Podcasts" } });
+    fireEvent.click(screen.getByRole("button", { name: /^add$/i }));
+
+    await waitFor(() => expect(createFolder).toHaveBeenCalledWith(null, "Podcasts"));
+    await waitFor(() =>
+      expect(createSubscription).toHaveBeenCalledWith(null, {
+        feed_url: "https://ex.com/feed.xml",
+        folder_id: 7,
+      }),
+    );
   });
 
   it("surfaces a server error (already subscribed) without closing", async () => {

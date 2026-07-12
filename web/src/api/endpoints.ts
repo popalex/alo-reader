@@ -24,6 +24,11 @@ export function getSubscriptions(token: string | null): Promise<Subscription[]> 
 export type DiscoverCandidate = components["schemas"]["DiscoverCandidate"];
 export type ImportReport = components["schemas"]["ImportReport"];
 
+/** Create a folder (category). */
+export function createFolder(token: string | null, name: string): Promise<Folder> {
+  return apiFetch<Folder>("/folders", { token, method: "POST", body: { name } });
+}
+
 /** Probe a site or feed URL and return the feed candidates found there. */
 export function discoverFeeds(token: string | null, url: string): Promise<DiscoverCandidate[]> {
   return apiFetch<DiscoverCandidate[]>("/discover", { token, method: "POST", body: { url } });

@@ -12,8 +12,16 @@ import { FileUp, Loader2, Plus, Search } from "lucide-react";
 import { useTokenGetter } from "../../app/auth";
 import { ApiError } from "../../api/client";
 import { useCreateSubscription, useImportOpml } from "../../api/feedMutations";
-import { discoverFeeds, type DiscoverCandidate, type Folder, type ImportReport } from "../../api/endpoints";
+import {
+  createFolder,
+  discoverFeeds,
+  type DiscoverCandidate,
+  type Folder,
+  type ImportReport,
+} from "../../api/endpoints";
 import styles from "./AddSubscriptionDialog.module.css";
+
+const NEW_FOLDER = "__new__";
 
 function messageOf(err: unknown, fallback: string): string {
   return err instanceof ApiError ? err.message : fallback;
@@ -34,6 +42,7 @@ export function AddSubscriptionDialog({
 
   const [url, setUrl] = useState("");
   const [folderId, setFolderId] = useState("");
+  const [newFolderName, setNewFolderName] = useState("");
   const [candidates, setCandidates] = useState<DiscoverCandidate[] | null>(null);
   const [directUrl, setDirectUrl] = useState<string | null>(null);
   const [discovering, setDiscovering] = useState(false);
@@ -43,6 +52,7 @@ export function AddSubscriptionDialog({
   function reset() {
     setUrl("");
     setFolderId("");
+    setNewFolderName("");
     setCandidates(null);
     setDirectUrl(null);
     setDiscovering(false);
@@ -83,10 +93,21 @@ export function AddSubscriptionDialog({
   async function subscribe(feedUrl: string) {
     setError(null);
     try {
-      await create.mutateAsync({
-        feed_url: feedUrl,
-        folder_id: folderId ? Number(folderId) : null,
-      });
+      let folder_id: number | null = null;
+      if (folderId === NEW_FOLDER) {
+        const name = newFolderName.trim();
+        if (!name) {
+          setError("Enter a name for the new folder.");
+          return;
+        }
+        const folder = await createFolder(await getToken(), name);
+        folder_id = folder.id;
+        // Reuse it if the user adds more than one candidate.
+        setFolderId(String(folder.id));
+      } else if (folderId) {
+        folder_id = Number(folderId);
+      }
+      await create.mutateAsync({ feed_url: feedUrl, folder_id });
       handleOpenChange(false);
     } catch (err) {
       setError(messageOf(err, "Couldn't subscribe to that feed."));
@@ -135,22 +156,32 @@ export function AddSubscriptionDialog({
               </button>
             </div>
 
-            {folders.length > 0 && (
-              <label className={styles.folderRow}>
-                <span className={styles.folderLabel}>Folder</span>
-                <select
-                  className={styles.select}
-                  value={folderId}
-                  onChange={(e) => setFolderId(e.target.value)}
-                >
-                  <option value="">No folder</option>
-                  {folders.map((f) => (
-                    <option key={f.id} value={String(f.id)}>
-                      {f.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+            <label className={styles.folderRow}>
+              <span className={styles.folderLabel}>Folder</span>
+              <select
+                className={styles.select}
+                value={folderId}
+                onChange={(e) => setFolderId(e.target.value)}
+              >
+                <option value="">No folder</option>
+                {folders.map((f) => (
+                  <option key={f.id} value={String(f.id)}>
+                    {f.name}
+                  </option>
+                ))}
+                <option value={NEW_FOLDER}>+ New folder…</option>
+              </select>
+            </label>
+
+            {folderId === NEW_FOLDER && (
+              <input
+                className={styles.input}
+                type="text"
+                placeholder="New folder name"
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                aria-label="New folder name"
+              />
             )}
 
             {candidates && candidates.length > 0 && (
