@@ -33,7 +33,11 @@ UPGRADE_STATEMENTS: list[str] = [
     CREATE OR REPLACE FUNCTION feeds_track_orphan() RETURNS trigger AS $$
     BEGIN
       IF TG_OP = 'INSERT' THEN
-        UPDATE feeds SET orphaned_at = NULL WHERE id = NEW.feed_id;
+        -- Only write when actually clearing an orphan; the common case (subscribing
+        -- to an already-subscribed feed) leaves the row untouched, avoiding a dead
+        -- tuple + row lock on the shared global feed row for every subscribe.
+        UPDATE feeds SET orphaned_at = NULL
+         WHERE id = NEW.feed_id AND orphaned_at IS NOT NULL;
         RETURN NEW;
       ELSE
         UPDATE feeds SET orphaned_at = now()
