@@ -170,19 +170,26 @@ def _cap(cleaned: str) -> tuple[str, bool]:
     trailing codepoint is dropped and the result is re-sanitized so a cut left no
     dangling/partial tag. Re-sanitizing re-adds closing tags, which can nudge the
     result back over the cap, so this shrinks the budget by the overflow and repeats
-    (a couple of iterations at most) until the final HTML fits. The output is always
-    valid, allowlisted HTML and never exceeds the cap."""
+    (a couple of iterations at most) until the re-cleaned HTML fits. If that loop
+    can't converge (pathological input), a final hard byte-truncation guarantees the
+    ceiling — so the returned string's UTF-8 length is always <= the cap."""
     if len(cleaned.encode("utf-8")) <= MAX_CONTENT_BYTES:
         return cleaned, False
     raw = cleaned.encode("utf-8")
     budget = MAX_CONTENT_BYTES
+    candidate = cleaned
     for _ in range(8):  # bounded; each pass shrinks the budget monotonically
         candidate = _clean(raw[:budget].decode("utf-8", "ignore"))
         overflow = len(candidate.encode("utf-8")) - MAX_CONTENT_BYTES
-        if overflow <= 0 or budget <= MAX_CONTENT_BYTES // 2:
+        if overflow <= 0:
             return candidate, True
+        if budget <= MAX_CONTENT_BYTES // 2:
+            break
         budget -= overflow + 64  # drop the overrun plus a little slack for closing tags
-    return candidate, True
+    # Last resort: hard-truncate the sanitized bytes to the ceiling. May leave a tag
+    # unclosed, but the content is already allowlist-clean (no scripts/handlers), so
+    # this is a cosmetic cut, not a safety one — the byte cap is now guaranteed.
+    return candidate.encode("utf-8")[:MAX_CONTENT_BYTES].decode("utf-8", "ignore"), True
 
 
 def sanitize_and_cap(raw_html: str) -> tuple[str, bool]:
