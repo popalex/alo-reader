@@ -106,11 +106,12 @@ export function postEntryState(
 export function postMarkRead(
   token: string | null,
   streamPath: string,
-  maxEntryId: number,
+  maxEntryId?: number,
 ): Promise<UpdatedResponse> {
+  // No bound → mark the whole stream ("mark all read").
   return apiFetch<UpdatedResponse>(`/streams/${streamPath}/mark-read`, {
     token,
     method: "POST",
-    body: { max_entry_id: maxEntryId },
+    body: maxEntryId != null ? { max_entry_id: maxEntryId } : {},
   });
 }

@@ -197,8 +197,9 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
   };
 
   const doMarkAllRead = () => {
-    const maxId = entries[0]?.id; // newest observed entry bounds the action
-    if (maxId != null) markStreamRead.mutate(maxId);
+    // Mark the whole stream (no id bound): with publish-date ordering the top row's
+    // id is not the max id, so a bound would miss most of the feed.
+    markStreamRead.mutate(undefined);
   };
 
   // Keyboard model (WP-12). Actions operate on the cursor row; they read the

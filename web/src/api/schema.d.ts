@@ -494,7 +494,7 @@ export interface components {
         /** MarkReadRequest */
         MarkReadRequest: {
             /** Max Entry Id */
-            max_entry_id: number;
+            max_entry_id?: number | null;
         };
         /** MeCountsSummary */
         MeCountsSummary: {
@@ -1003,7 +1003,7 @@ export interface operations {
         parameters: {
             query?: {
                 status?: string;
-                cursor?: number | null;
+                cursor?: string | null;
                 limit?: number;
                 q?: string | null;
             };

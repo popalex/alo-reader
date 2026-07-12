@@ -52,7 +52,9 @@ class StreamPage(BaseModel):
 
 
 class MarkReadRequest(BaseModel):
-    max_entry_id: int
+    # Omit to mark the whole stream ("mark all read"); provide to bound the action to
+    # id <= max_entry_id (leaves items that arrived mid-action unread).
+    max_entry_id: int | None = None
 
 
 class UpdatedResponse(BaseModel):

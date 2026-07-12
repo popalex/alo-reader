@@ -373,11 +373,12 @@ async def get_for_user(session: AsyncSession, user_id: int, entry_id: int) -> St
 
 
 async def mark_read_bounded(
-    session: AsyncSession, user_id: int, stream: str | Stream, max_entry_id: int
+    session: AsyncSession, user_id: int, stream: str | Stream, max_entry_id: int | None = None
 ) -> int:
-    """Mark every entry in ``stream`` with ``id <= max_entry_id`` read for this user.
-    Bounded so items arriving mid-action stay unread (DESIGN.md §4). Returns the number
-    of entries newly flipped from unread to read."""
+    """Mark entries in ``stream`` read for this user. With ``max_entry_id`` only entries
+    with ``id <= max_entry_id`` are marked (a caller that wants to leave mid-action
+    arrivals unread); with ``None`` the *entire* stream is marked — the plain "mark all
+    read". Returns the number of entries newly flipped from unread to read."""
     parsed = stream if isinstance(stream, Stream) else parse_stream(stream)
     es = aliased(EntryState)
     src = _apply_stream(
@@ -392,7 +393,9 @@ async def mark_read_bounded(
         parsed,
         status="all",
         es=es,
-    ).where(Entry.id <= max_entry_id)
+    )
+    if max_entry_id is not None:
+        src = src.where(Entry.id <= max_entry_id)
     stmt = pg_insert(EntryState).from_select(
         ["user_id", "entry_id", "is_read", "is_starred", "changed_at"], src
     )

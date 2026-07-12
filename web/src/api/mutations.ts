@@ -157,7 +157,8 @@ export function useMarkStreamRead(stream: StreamDescriptor) {
   const qc = useQueryClient();
   const path = streamToPath(stream);
   return useMutation({
-    mutationFn: async (maxEntryId: number) => postMarkRead(await getToken(), path, maxEntryId),
+    // No argument → mark the whole stream read; a number bounds it to id <= that.
+    mutationFn: async (maxEntryId?: number) => postMarkRead(await getToken(), path, maxEntryId),
     onMutate: async (maxEntryId) => {
       await qc.cancelQueries({ queryKey: ["entries"] });
       await qc.cancelQueries({ queryKey: queryKeys.counts });
@@ -174,7 +175,7 @@ export function useMarkStreamRead(stream: StreamDescriptor) {
       if (streamData) {
         for (const page of streamData.pages)
           for (const e of page.entries)
-            if (e.id <= maxEntryId && !e.is_read) {
+            if ((maxEntryId == null || e.id <= maxEntryId) && !e.is_read) {
               affected.add(e.id);
               total -= 1;
               const sid = subIdForFeed(subs, e.feed_id);
