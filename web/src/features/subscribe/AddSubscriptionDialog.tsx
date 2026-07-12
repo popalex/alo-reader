@@ -35,6 +35,7 @@ export function AddSubscriptionDialog({
   const [url, setUrl] = useState("");
   const [folderId, setFolderId] = useState("");
   const [candidates, setCandidates] = useState<DiscoverCandidate[] | null>(null);
+  const [directUrl, setDirectUrl] = useState<string | null>(null);
   const [discovering, setDiscovering] = useState(false);
   const [report, setReport] = useState<ImportReport | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +44,7 @@ export function AddSubscriptionDialog({
     setUrl("");
     setFolderId("");
     setCandidates(null);
+    setDirectUrl(null);
     setDiscovering(false);
     setReport(null);
     setError(null);
@@ -59,14 +61,20 @@ export function AddSubscriptionDialog({
     if (!u) return;
     setError(null);
     setCandidates(null);
+    setDirectUrl(null);
     setReport(null);
     setDiscovering(true);
     try {
       const found = await discoverFeeds(await getToken(), u);
-      if (found.length === 0) setError("No feeds found at that address.");
+      // Nothing auto-detected: still let the user add the exact URL they typed —
+      // it may be a feed discovery couldn't scan (unreachable during discovery,
+      // odd content type, etc.). If it turns out not to be a feed, the worker
+      // marks it failed and it shows an error in the sidebar.
+      if (found.length === 0) setDirectUrl(u);
       else setCandidates(found);
     } catch (err) {
-      setError(messageOf(err, "Couldn't reach that address."));
+      setDirectUrl(u);
+      setError(messageOf(err, "Couldn't scan that address for feeds."));
     } finally {
       setDiscovering(false);
     }
@@ -165,6 +173,23 @@ export function AddSubscriptionDialog({
                   </li>
                 ))}
               </ul>
+            )}
+
+            {directUrl && (
+              <div className={styles.fallback}>
+                <span className={styles.fallbackNote}>
+                  No feeds were auto-detected. Add the URL as a feed directly?
+                </span>
+                <button
+                  type="button"
+                  className={styles.add}
+                  disabled={create.isPending}
+                  onClick={() => void subscribe(directUrl)}
+                >
+                  <Plus size={14} />
+                  <span>Add directly</span>
+                </button>
+              </div>
             )}
           </form>
 

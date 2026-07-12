@@ -97,14 +97,25 @@ describe("AddSubscriptionDialog", () => {
     await screen.findByText(/not a feed/i); // failure row rendered
   });
 
-  it("shows a message when no feeds are found", async () => {
+  it("offers a direct subscribe when discovery finds nothing", async () => {
+    // A valid feed URL discovery can't scan (e.g. too large) must still be addable
+    // directly, rather than dead-ending on "no feeds found".
     discoverFeeds.mockResolvedValue([]);
+    createSubscription.mockResolvedValue(aSub);
     renderDialog();
 
-    fireEvent.change(screen.getByLabelText(/feed or site url/i), { target: { value: "nope.example" } });
+    fireEvent.change(screen.getByLabelText(/feed or site url/i), {
+      target: { value: "https://big.example/feed.xml" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /find/i }));
 
-    const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toMatch(/no feeds found/i);
+    const direct = await screen.findByRole("button", { name: /add directly/i });
+    fireEvent.click(direct);
+    await waitFor(() =>
+      expect(createSubscription).toHaveBeenCalledWith(null, {
+        feed_url: "https://big.example/feed.xml",
+        folder_id: null,
+      }),
+    );
   });
 });

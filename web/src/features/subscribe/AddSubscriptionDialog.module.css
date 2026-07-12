@@ -165,6 +165,23 @@
   cursor: default;
 }
 
+.fallback {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: var(--surface-2);
+  border: 1px dashed var(--border-2);
+  border-radius: var(--radius-sm);
+}
+
+.fallbackNote {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
 .divider {
   display: flex;
   align-items: center;
