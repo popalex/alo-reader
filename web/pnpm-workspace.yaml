@@ -5,10 +5,3 @@ allowBuilds:
   '@clerk/shared': true
   esbuild: true
 verifyDepsBeforeRun: false
-# `pnpm audit` (CI security gate, WP-15) ignores advisories with no fix available to
-# us yet, so the gate stays meaningful for actionable ones. Revisit on each bump.
-#   GHSA-w24r-5266-9c3c — @clerk/clerk-react; "patched" 5.61.6 is unpublished
-#     (latest is 5.61.3), so there is nothing to upgrade to. Drop when Clerk ships it.
-auditConfig:
-  ignoreGhsas:
-    - GHSA-w24r-5266-9c3c
