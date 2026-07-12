@@ -113,7 +113,9 @@ async def _apply_new_body(
         site_url=site_url,
     )
     if settings.worker_fetch_favicons and feed.icon_id is None:
-        await _maybe_fetch_favicon(session, feed.id, site_url, settings, transport)
+        await _maybe_fetch_favicon(
+            session, feed.id, site_url, settings, transport, image_url=parsed.image_url
+        )
     return FeedOutcome(feed.id, "new_body", new_entries=count)
 
 
@@ -123,10 +125,14 @@ async def _maybe_fetch_favicon(
     site_url: str | None,
     settings: Settings,
     transport: httpx.AsyncBaseTransport | None,
+    *,
+    image_url: str | None = None,
 ) -> None:
     """Best-effort: a missing/broken favicon must never fail the poll."""
     try:
-        favicon = await fetch_favicon(site_url, settings=settings, transport=transport)
+        favicon = await fetch_favicon(
+            site_url, settings=settings, transport=transport, image_url=image_url
+        )
         if favicon is not None:
             icon = await icons_store.get_or_create(
                 session, url=favicon.url, mime=favicon.mime, data=favicon.data

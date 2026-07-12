@@ -97,6 +97,39 @@ async def test_favicon_falls_back_to_favicon_ico(api_db: str) -> None:
     assert favicon.url == "https://feed.example/favicon.ico"
 
 
+async def test_favicon_prefers_feed_image_over_site_favicon(api_db: str) -> None:
+    # A feed's own artwork (<image>/<itunes:image>) beats the generic site favicon.
+    art = b"\x89PNG\r\n\x1a\nSHOWART"
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        # Only the artwork is reachable; the site favicon would 404 — so a passing
+        # test proves the artwork was preferred (the site was never needed).
+        if req.url.path == "/cover.jpg":
+            return httpx.Response(200, headers={"content-type": "image/jpeg"}, content=art)
+        return httpx.Response(404)
+
+    favicon = await fetch_favicon(
+        "https://feed.example/",
+        image_url="https://feed.example/cover.jpg",
+        settings=wutil.worker_settings(worker_fetch_favicons=True),
+        transport=httpx.MockTransport(handler),
+    )
+    assert favicon is not None
+    assert favicon.data == art  # the feed's artwork, not the /favicon PNG
+    assert favicon.mime == "image/jpeg"
+
+
+async def test_favicon_falls_back_when_feed_image_fails(api_db: str) -> None:
+    # Feed image URL 404s → fall back to the site favicon.
+    favicon = await fetch_favicon(
+        "https://feed.example/",
+        image_url="https://feed.example/missing.jpg",
+        settings=wutil.worker_settings(worker_fetch_favicons=True),
+        transport=_site_transport(),
+    )
+    assert favicon is not None and favicon.data == PNG  # the site favicon
+
+
 async def test_missing_icon_is_404(api_client: httpx.AsyncClient) -> None:
     resp = await api_client.get("/api/v1/icons/999999")
     assert resp.status_code == 404

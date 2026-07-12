@@ -43,14 +43,47 @@ def _icon_href(body: bytes) -> str | None:
     return parser.href
 
 
+async def _fetch_image(
+    url: str,
+    *,
+    max_bytes: int,
+    settings: Settings,
+    transport: httpx.AsyncBaseTransport | None,
+) -> Favicon | None:
+    """Fetch + validate an image URL (SSRF-guarded, size-capped, image/* only)."""
+    parts = urlsplit(url)
+    if parts.scheme not in ("http", "https") or not parts.netloc:
+        return None
+    got = await guarded_get(url, max_bytes=max_bytes, settings=settings, transport=transport)
+    if not got.ok or not got.body:
+        return None
+    mime = (got.content_type or "").split(";")[0].strip()
+    if mime and not mime.startswith("image/"):
+        return None  # not an image (e.g. an HTML 404 page served as 200)
+    return Favicon(url=got.final_url or url, mime=mime or "image/x-icon", data=got.body)
+
+
 async def fetch_favicon(
     site_url: str | None,
     *,
     settings: Settings,
     transport: httpx.AsyncBaseTransport | None = None,
+    image_url: str | None = None,
 ) -> Favicon | None:
-    """Resolve and fetch a feed's favicon, or None. ``transport`` is reused for both
-    the page and icon fetch (tests inject a MockTransport)."""
+    """Resolve and fetch a feed's icon, or None. Prefers the feed's own artwork
+    (``image_url`` from <image>/<itunes:image>) over the site favicon — the favicon is
+    usually the generic platform logo. ``transport`` is reused across fetches (tests
+    inject a MockTransport)."""
+    if image_url:
+        icon = await _fetch_image(
+            image_url,
+            max_bytes=settings.feed_image_max_bytes,
+            settings=settings,
+            transport=transport,
+        )
+        if icon is not None:
+            return icon  # fall through to the site favicon only if the artwork fails
+
     if not site_url:
         return None
     parts = urlsplit(site_url)
@@ -68,12 +101,6 @@ async def fetch_favicon(
     if icon_url is None:
         icon_url = f"{parts.scheme}://{parts.netloc}/favicon.ico"
 
-    got = await guarded_get(
+    return await _fetch_image(
         icon_url, max_bytes=settings.favicon_max_bytes, settings=settings, transport=transport
     )
-    if not got.ok or not got.body:
-        return None
-    mime = (got.content_type or "").split(";")[0].strip()
-    if mime and not mime.startswith("image/"):
-        return None  # not an image (e.g. an HTML 404 page served as 200)
-    return Favicon(url=got.final_url or icon_url, mime=mime or "image/x-icon", data=got.body)
