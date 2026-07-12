@@ -73,6 +73,21 @@ async def test_dedup_when_server_ignores_conditional(api_db: str) -> None:
     assert await wutil.count_entries(sf, feed_id) == 3  # (feed_id, guid_hash) dedup
 
 
+async def test_non_feed_html_is_marked_as_error(api_db: str) -> None:
+    # A 200 that isn't a parseable feed (a wrong URL that serves an HTML page) must
+    # fail loudly — not create a silent, untitled, article-less feed.
+    sf = app_db.get_sessionmaker()
+    feed_id = await wutil.seed_feed(sf, "https://feed.example/notafeed")
+    html = b"<!doctype html><html><head><title>Not a feed</title></head><body>hi</body></html>"
+    await poll_once(sf, settings=wutil.worker_settings(), transport=wutil.serve(html))
+
+    feed = await wutil.get_feed(sf, feed_id)
+    assert feed.error_count == 1
+    assert "not a valid feed" in (feed.last_error or "")
+    assert (feed.title or "") == ""  # never adopted a title
+    assert await wutil.count_entries(sf, feed_id) == 0
+
+
 async def test_http_error_sets_backoff_and_last_error(api_db: str) -> None:
     sf = app_db.get_sessionmaker()
     feed_id = await wutil.seed_feed(sf, "https://feed.example/boom")

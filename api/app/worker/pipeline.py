@@ -86,6 +86,14 @@ async def _apply_new_body(
     if result.body is None:  # defensive: new_body always carries a body
         return await _apply_error(session, feed, result, settings, "empty body")
     parsed, rows = await asyncio.to_thread(_build_entries, result.body)
+    # A 200 that feedparser can't recognize as a feed (empty ``version``) and that
+    # yields no items is almost always an HTML page — a wrong or removed feed URL.
+    # Record it as an error so the UI shows a failing feed with a message, instead
+    # of a silent, untitled, article-less one that looks broken for no reason.
+    if not rows and not parsed.version:
+        return await _apply_error(
+            session, feed, result, settings, "response is not a valid feed", status="not_a_feed"
+        )
     inserted = await entries_store.insert_batch(session, feed.id, rows)
     count = len(inserted)
     interval = adaptive_interval(

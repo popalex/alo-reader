@@ -3,7 +3,16 @@
 :3000 {
 	@api path /api/*
 	handle @api {
-		reverse_proxy api:8000
+		# Dev-only: don't pool idle upstream connections. uvicorn --reload drops an
+		# idle keepalive channel and emits a stray bare "HTTP/1.1 400 Bad Request",
+		# which Caddy logs as "Unsolicited response received on idle HTTP channel".
+		# Not reusing connections avoids the whole class of warning (prod keeps
+		# keepalive — the prod Caddyfile/entrypoint handle the timeout properly).
+		reverse_proxy api:8000 {
+			transport http {
+				keepalive off
+			}
+		}
 	}
 
 	handle {

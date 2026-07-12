@@ -37,13 +37,21 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   if (options.token) {
     headers["Authorization"] = `Bearer ${options.token}`;
   }
-  if (options.body !== undefined) {
+  // FormData (OPML upload) is sent as-is so the browser sets the multipart
+  // boundary; only JSON bodies get an explicit Content-Type.
+  const isForm = options.body instanceof FormData;
+  if (options.body !== undefined && !isForm) {
     headers["Content-Type"] = "application/json";
   }
   const response = await fetch(`/api/v1${path}`, {
     method: options.method ?? "GET",
     headers,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    body:
+      options.body === undefined
+        ? undefined
+        : isForm
+          ? (options.body as FormData)
+          : JSON.stringify(options.body),
   });
   if (!response.ok) {
     let code = "internal";

@@ -6,29 +6,56 @@
 
 import { useMemo, useState } from "react";
 
-import { Link } from "@tanstack/react-router";
-import { ChevronDown, Inbox, Plus, Star } from "lucide-react";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { ChevronDown, Inbox, Plus, Star, Trash2 } from "lucide-react";
 
 import type { Subscription } from "../../api/endpoints";
+import { useDeleteSubscription } from "../../api/feedMutations";
 import { useCounts, useFolders, useSubscriptions } from "../../api/queries";
-import { pushToast } from "../../app/toast";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Favicon } from "../../components/Favicon";
+import { AddSubscriptionDialog } from "../subscribe/AddSubscriptionDialog";
 import styles from "./Sidebar.module.css";
 
-function FeedLink({ sub, unread }: { sub: Subscription; unread: number }) {
+function FeedLink({
+  sub,
+  unread,
+  onDelete,
+}: {
+  sub: Subscription;
+  unread: number;
+  onDelete: (sub: Subscription) => void;
+}) {
   const base = unread > 0 ? `${styles.feed} ${styles.feedUnread}` : styles.feed;
   return (
-    <Link
-      to="/feed/$id"
-      params={{ id: String(sub.id) }}
-      className={base}
-      activeProps={{ className: `${base} ${styles.active}` }}
-    >
-      <Favicon title={sub.title || sub.site_url || "?"} iconUrl={sub.icon_url} />
-      <span className={styles.name}>{sub.title || "Untitled feed"}</span>
-      {sub.last_error ? <span className={styles.errorDot} title="This feed failed to update" /> : null}
-      {unread > 0 ? <span className={styles.count}>{unread}</span> : null}
-    </Link>
+    <div className={styles.feedRow}>
+      <Link
+        to="/feed/$id"
+        params={{ id: String(sub.feed_id) }}
+        className={base}
+        activeProps={{ className: `${base} ${styles.active}` }}
+      >
+        <Favicon title={sub.title || sub.site_url || "?"} iconUrl={sub.icon_url} />
+        <span className={styles.name}>{sub.title || "Untitled feed"}</span>
+        {sub.last_error ? (
+          <span className={styles.errorDot} title="This feed failed to update" />
+        ) : null}
+        {unread > 0 ? <span className={styles.count}>{unread}</span> : null}
+      </Link>
+      <button
+        type="button"
+        className={styles.del}
+        title="Delete feed"
+        aria-label={`Delete ${sub.title || "this feed"}`}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onDelete(sub);
+        }}
+      >
+        <Trash2 size={13} />
+      </button>
+    </div>
   );
 }
 
@@ -37,6 +64,11 @@ export function Sidebar() {
   const subs = useSubscriptions();
   const counts = useCounts();
   const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(() => new Set<number>());
+  const [addOpen, setAddOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<Subscription | null>(null);
+  const deleteSub = useDeleteSubscription();
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   const unreadBySub = useMemo(() => {
     const m = new Map<number, number>();
@@ -92,12 +124,40 @@ export function Sidebar() {
           type="button"
           className={styles.subscribe}
           title="Subscribe to a feed"
-          onClick={() => pushToast("Adding subscriptions lands in an upcoming update.", "info")}
+          onClick={() => setAddOpen(true)}
         >
           <Plus size={15} />
           <span>Subscribe</span>
         </button>
       </div>
+
+      <AddSubscriptionDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        folders={folders.data ?? []}
+      />
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        title="Delete this feed?"
+        body={`"${pendingDelete?.title || "Untitled feed"}" will be removed along with its articles and your read/star history. Re-subscribing later starts fresh.`}
+        confirmLabel="Delete"
+        onConfirm={() => {
+          if (!pendingDelete) return;
+          const { id, title, feed_id } = pendingDelete;
+          deleteSub.mutate(
+            { id, title },
+            {
+              // If we're viewing the feed we just left, go back to All items so the
+              // list + reader don't keep showing the removed feed's content.
+              onSuccess: () => {
+                if (pathname === `/feed/${feed_id}`) void navigate({ to: "/" });
+              },
+            },
+          );
+        }}
+      />
 
       <nav className={styles.views} aria-label="Views">
         <Link
@@ -152,7 +212,7 @@ export function Sidebar() {
                 </div>
                 {!isCollapsed &&
                   feeds.map((sub) => (
-                    <FeedLink key={sub.id} sub={sub} unread={unreadBySub.get(sub.id) ?? 0} />
+                    <FeedLink key={sub.id} sub={sub} unread={unreadBySub.get(sub.id) ?? 0} onDelete={setPendingDelete} />
                   ))}
               </div>
             );
@@ -164,13 +224,15 @@ export function Sidebar() {
                 .slice()
                 .sort(byTitle)
                 .map((sub) => (
-                  <FeedLink key={sub.id} sub={sub} unread={unreadBySub.get(sub.id) ?? 0} />
+                  <FeedLink key={sub.id} sub={sub} unread={unreadBySub.get(sub.id) ?? 0} onDelete={setPendingDelete} />
                 ))}
             </div>
           )}
 
           {sortedFolders.length === 0 && ungrouped.length === 0 && (
-            <div className={styles.status}>No feeds yet. Subscribe to get started.</div>
+            <button type="button" className={styles.empty} onClick={() => setAddOpen(true)}>
+              No feeds yet — add your first feed.
+            </button>
           )}
         </div>
       )}

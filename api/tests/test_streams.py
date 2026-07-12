@@ -2,11 +2,19 @@
 
 from datetime import UTC, datetime
 
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models import Entry
 from app.store import entries as entries_store
 from app.store import entry_states as states_store
 from tests.factories import add_entries, make_feed, make_subscription, make_user
+
+
+async def _set_published(session: AsyncSession, entry_id: int, iso: str) -> None:
+    await session.execute(
+        update(Entry).where(Entry.id == entry_id).values(published_at=datetime.fromisoformat(iso))
+    )
 
 
 async def test_since_entry_id_hides_pre_subscription(session: AsyncSession) -> None:
@@ -33,16 +41,70 @@ async def test_cursor_pagination_gap_free_during_inserts(session: AsyncSession) 
     page1 = await entries_store.list_by_stream(session, user.id, "all", status="all", limit=3)
     assert [e.id for e in page1] == [e.id for e in reversed(first[3:])]
 
-    # New entries arrive mid-pagination; the exclusive cursor keeps page 2 stable.
+    # New entries arrive mid-pagination; the keyset cursor keeps page 2 stable.
     await add_entries(session, feed, 4)
+    cursor = entries_store.encode_cursor(page1[-1].published_at, page1[-1].created_at, page1[-1].id)
     page2 = await entries_store.list_by_stream(
-        session, user.id, "all", status="all", cursor=page1[-1].id, limit=3
+        session, user.id, "all", status="all", cursor=cursor, limit=3
     )
     assert [e.id for e in page2] == [e.id for e in reversed(first[:3])]
 
     ids = [e.id for e in page1] + [e.id for e in page2]
     assert len(ids) == len(set(ids))  # no duplicates
     assert ids == sorted(ids, reverse=True)  # strictly newest-first
+
+
+async def test_listing_orders_by_publish_date_not_id(session: AsyncSession) -> None:
+    # Operator ordering: the feed's own publish date drives the list, even when it
+    # runs opposite to insertion/id order (a backfill loaded newest-first).
+    user = await make_user(session)
+    feed = await make_feed(session)
+    await make_subscription(session, user, feed)
+    e = await add_entries(session, feed, 3)  # ids ascending: e[0] < e[1] < e[2]
+    await _set_published(session, e[0].id, "2024-01-01T00:00:00+00:00")  # newest
+    await _set_published(session, e[1].id, "2022-01-01T00:00:00+00:00")  # oldest
+    await _set_published(session, e[2].id, "2023-01-01T00:00:00+00:00")  # middle
+
+    rows = await entries_store.list_by_stream(session, user.id, "all", status="all")
+    assert [r.id for r in rows] == [e[0].id, e[2].id, e[1].id]  # 2024, 2023, 2022
+
+
+async def test_recency_cursor_paginates_gap_free(session: AsyncSession) -> None:
+    user = await make_user(session)
+    feed = await make_feed(session)
+    await make_subscription(session, user, feed)
+    e = await add_entries(session, feed, 5)
+    # Publish dates scrambled vs id order.
+    for entry, iso in zip(
+        e,
+        [
+            "2020-01-01T00:00:00+00:00",
+            "2024-01-01T00:00:00+00:00",
+            "2021-01-01T00:00:00+00:00",
+            "2023-01-01T00:00:00+00:00",
+            "2022-01-01T00:00:00+00:00",
+        ],
+        strict=True,
+    ):
+        await _set_published(session, entry.id, iso)
+
+    full = await entries_store.list_by_stream(session, user.id, "all", status="all")
+    expected = [r.id for r in full]  # by publish date desc
+
+    # Walk it in pages of 2 via the composite cursor; must reproduce the full order.
+    seen: list[int] = []
+    cursor: str | None = None
+    for _ in range(10):
+        page = await entries_store.list_by_stream(
+            session, user.id, "all", status="all", cursor=cursor, limit=2
+        )
+        if not page:
+            break
+        seen += [r.id for r in page]
+        last = page[-1]
+        cursor = entries_store.encode_cursor(last.published_at, last.created_at, last.id)
+    assert seen == expected
+    assert len(seen) == len(set(seen))  # gap-free, dup-free
 
 
 async def test_starred_stream(session: AsyncSession) -> None:

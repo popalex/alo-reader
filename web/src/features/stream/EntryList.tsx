@@ -17,6 +17,7 @@ import {
   CheckCheck,
   CircleAlert,
   List as ListIcon,
+  Loader2,
   Menu,
   RefreshCw,
   Rows3,
@@ -196,8 +197,9 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
   };
 
   const doMarkAllRead = () => {
-    const maxId = entries[0]?.id; // newest observed entry bounds the action
-    if (maxId != null) markStreamRead.mutate(maxId);
+    // Mark the whole stream (no id bound): with publish-date ordering the top row's
+    // id is not the max id, so a bound would miss most of the feed.
+    markStreamRead.mutate(undefined);
   };
 
   // Keyboard model (WP-12). Actions operate on the cursor row; they read the
@@ -258,7 +260,9 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
   useKeyboard(actions, !helpOpen && !confirmOpen);
 
   const feedError =
-    stream.kind === "feed" ? (subs.data?.find((s) => s.id === stream.id)?.last_error ?? null) : null;
+    stream.kind === "feed"
+      ? (subs.data?.find((s) => s.feed_id === stream.id)?.last_error ?? null)
+      : null;
 
   let body: React.ReactNode;
   if (query.isPending) {
@@ -338,11 +342,14 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
                 )}
                 <time
                   className={styles.time}
-                  dateTime={e.created_at}
+                  dateTime={e.published_at ?? e.created_at}
                   title={formatDateTime(e.published_at ?? e.created_at)}
                 >
                   {e.is_starred ? <Star className={styles.star} size={12} /> : null}
-                  {relativeTime(e.created_at)}
+                  {/* The feed's own publish date; fall back to ingest time only when
+                      the feed provides none (so a backfilled feed doesn't show every
+                      entry as "just now"). */}
+                  {relativeTime(e.published_at ?? e.created_at)}
                 </time>
               </div>
             );
@@ -380,12 +387,23 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
             <button
               type="button"
               className={styles.toolBtn}
-              title={online ? "Mark all read" : "Mark all read (unavailable offline)"}
+              title={
+                markStreamRead.isPending
+                  ? "Marking all read…"
+                  : online
+                    ? "Mark all read"
+                    : "Mark all read (unavailable offline)"
+              }
               aria-label="Mark all read"
+              aria-busy={markStreamRead.isPending || undefined}
               onClick={() => setConfirmOpen(true)}
-              disabled={!online || (entries.length === 0 && !searching)}
+              disabled={!online || markStreamRead.isPending || (entries.length === 0 && !searching)}
             >
-              <CheckCheck size={15} />
+              {markStreamRead.isPending ? (
+                <Loader2 size={15} className={styles.spin} />
+              ) : (
+                <CheckCheck size={15} />
+              )}
             </button>
             <span className={styles.sep} />
             <DensityToggle value={density} onChange={setDensity} />
@@ -459,6 +477,12 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
         <div className={styles.errorBanner} role="alert">
           <CircleAlert size={15} />
           <span>This feed failed to update: {feedError}</span>
+        </div>
+      ) : null}
+      {markStreamRead.isPending ? (
+        <div className={styles.progressBanner} role="status" aria-live="polite">
+          <Loader2 size={15} className={styles.spin} />
+          <span>Marking all as read…</span>
         </div>
       ) : null}
       {body}

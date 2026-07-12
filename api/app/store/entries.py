@@ -7,7 +7,7 @@ per-user ``entry_states`` read flag.
 """
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any, TypedDict
 
 from sqlalchemy import BigInteger, Select, and_, func, literal, literal_column, or_, select, text
@@ -145,21 +145,60 @@ def _apply_stream[S: Select[Any]](stmt: S, user_id: int, parsed: Stream, status:
     return stmt
 
 
+# Listing order (operator decision, overrides the original id-only rule): newest by
+# the feed's own publish date first, ``created_at`` standing in when a feed gives no
+# date (matches what the UI shows). ``id`` breaks ties so the order is total and the
+# keyset cursor is stable. Paging uses a composite ``(recency, id)`` cursor rather than
+# a bare id so it stays gap-free under this ordering.
+_CURSOR_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
+
+
+def _recency() -> Any:
+    return func.coalesce(Entry.published_at, Entry.created_at)
+
+
+def encode_cursor(published_at: datetime | None, created_at: datetime, entry_id: int) -> str:
+    """Opaque keyset cursor ``"<micros>:<id>"`` for the recency ordering."""
+    dt = published_at or created_at
+    delta = dt - _CURSOR_EPOCH
+    micros = (delta.days * 86_400 + delta.seconds) * 1_000_000 + delta.microseconds
+    return f"{micros}:{entry_id}"
+
+
+def _decode_cursor(cursor: str) -> tuple[datetime, int] | None:
+    """Parse an ``encode_cursor`` value; ``None`` if malformed (treated as first page)."""
+    try:
+        micros_str, sep, id_str = cursor.partition(":")
+        if not sep:
+            return None
+        return _CURSOR_EPOCH + timedelta(microseconds=int(micros_str)), int(id_str)
+    except (ValueError, TypeError):
+        return None
+
+
+def _paginate_by_recency[S: Select[Any]](stmt: S, cursor: str | None, limit: int) -> S:
+    rec = _recency()
+    decoded = _decode_cursor(cursor) if cursor else None
+    if decoded is not None:
+        ct, cid = decoded
+        # Keyset "row < cursor" for DESC ordering on (recency, id).
+        stmt = stmt.where(or_(rec < ct, and_(rec == ct, Entry.id < cid)))
+    return stmt.order_by(rec.desc(), Entry.id.desc()).limit(limit)
+
+
 async def list_by_stream(
     session: AsyncSession,
     user_id: int,
     stream: str | Stream,
     *,
     status: str = "unread",
-    cursor: int | None = None,
+    cursor: str | None = None,
     limit: int = 50,
 ) -> list[Entry]:
     parsed = stream if isinstance(stream, Stream) else parse_stream(stream)
     es = aliased(EntryState)
     stmt = _apply_stream(select(Entry), user_id, parsed, status, es)
-    if cursor is not None:
-        stmt = stmt.where(Entry.id < cursor)
-    stmt = stmt.order_by(Entry.id.desc()).limit(limit)
+    stmt = _paginate_by_recency(stmt, cursor, limit)
     result = await session.scalars(stmt)
     return list(result.all())
 
@@ -170,7 +209,7 @@ async def list_stream_page(
     stream: str | Stream,
     *,
     status: str = "unread",
-    cursor: int | None = None,
+    cursor: str | None = None,
     limit: int = 50,
 ) -> list[StreamRow]:
     """Like :func:`list_by_stream` but returns the feed title and per-user read/starred
@@ -189,9 +228,7 @@ async def list_stream_page(
         status,
         es,
     ).join(Feed, Feed.id == Entry.feed_id)
-    if cursor is not None:
-        stmt = stmt.where(Entry.id < cursor)
-    stmt = stmt.order_by(Entry.id.desc()).limit(limit)
+    stmt = _paginate_by_recency(stmt, cursor, limit)
     rows = await session.execute(stmt)
     return [
         StreamRow(entry=r[0], feed_title=r.feed_title, is_read=r.is_read, is_starred=r.is_starred)
@@ -223,7 +260,7 @@ async def search_stream_page(
     *,
     q: str,
     status: str = "all",
-    cursor: int | None = None,
+    cursor: str | None = None,
     limit: int = SEARCH_LIMIT,
 ) -> list[SearchRow]:
     """Full-text search within a stream (DESIGN.md §4.1).
@@ -235,6 +272,9 @@ async def search_stream_page(
     page because ``limit`` is capped (§4.1.5); the caller must not exceed ``SEARCH_LIMIT``.
     """
     parsed = stream if isinstance(stream, Stream) else parse_stream(stream)
+    # Search stays strictly id-desc (rum index-driven, §4.1.4), so its cursor is just
+    # the last id — parse it out of the opaque cursor string.
+    cursor_id = int(cursor) if cursor else None
     es = aliased(EntryState)
     tsquery = func.websearch_to_tsquery(_ENGLISH, q)
     snippet = func.ts_headline(
@@ -256,8 +296,8 @@ async def search_stream_page(
         status,
         es,
     ).join(Feed, Feed.id == Entry.feed_id)
-    if cursor is not None:
-        base = base.where(Entry.id < cursor)
+    if cursor_id is not None:
+        base = base.where(Entry.id < cursor_id)
 
     # Feed-name coverage (title/author/content are already in search_tsv; the feed's
     # own name is not). Resolve the few name-matching feeds first: a query that OR's
@@ -280,7 +320,9 @@ async def search_stream_page(
         # exact in float; the `id < cursor` filter above keeps a short last page from
         # pulling in ids above the cursor (DESIGN.md §4.1).
         anchor = (
-            cursor - 1 if cursor is not None else await session.scalar(select(func.max(Entry.id)))
+            cursor_id - 1
+            if cursor_id is not None
+            else await session.scalar(select(func.max(Entry.id)))
         )
         if anchor is None:
             return []
@@ -331,11 +373,12 @@ async def get_for_user(session: AsyncSession, user_id: int, entry_id: int) -> St
 
 
 async def mark_read_bounded(
-    session: AsyncSession, user_id: int, stream: str | Stream, max_entry_id: int
+    session: AsyncSession, user_id: int, stream: str | Stream, max_entry_id: int | None = None
 ) -> int:
-    """Mark every entry in ``stream`` with ``id <= max_entry_id`` read for this user.
-    Bounded so items arriving mid-action stay unread (DESIGN.md §4). Returns the number
-    of entries newly flipped from unread to read."""
+    """Mark entries in ``stream`` read for this user. With ``max_entry_id`` only entries
+    with ``id <= max_entry_id`` are marked (a caller that wants to leave mid-action
+    arrivals unread); with ``None`` the *entire* stream is marked — the plain "mark all
+    read". Returns the number of entries newly flipped from unread to read."""
     parsed = stream if isinstance(stream, Stream) else parse_stream(stream)
     es = aliased(EntryState)
     src = _apply_stream(
@@ -350,7 +393,9 @@ async def mark_read_bounded(
         parsed,
         status="all",
         es=es,
-    ).where(Entry.id <= max_entry_id)
+    )
+    if max_entry_id is not None:
+        src = src.where(Entry.id <= max_entry_id)
     stmt = pg_insert(EntryState).from_select(
         ["user_id", "entry_id", "is_read", "is_starred", "changed_at"], src
     )

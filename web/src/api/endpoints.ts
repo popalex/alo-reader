@@ -21,6 +21,43 @@ export function getSubscriptions(token: string | null): Promise<Subscription[]> 
   return apiFetch<Subscription[]>("/subscriptions", { token });
 }
 
+export type DiscoverCandidate = components["schemas"]["DiscoverCandidate"];
+export type ImportReport = components["schemas"]["ImportReport"];
+
+/** Create a folder (category). */
+export function createFolder(token: string | null, name: string): Promise<Folder> {
+  return apiFetch<Folder>("/folders", { token, method: "POST", body: { name } });
+}
+
+/** Probe a site or feed URL and return the feed candidates found there. */
+export function discoverFeeds(token: string | null, url: string): Promise<DiscoverCandidate[]> {
+  return apiFetch<DiscoverCandidate[]>("/discover", { token, method: "POST", body: { url } });
+}
+
+export interface CreateSubscriptionInput {
+  feed_url: string;
+  folder_id?: number | null;
+}
+
+export function createSubscription(
+  token: string | null,
+  input: CreateSubscriptionInput,
+): Promise<Subscription> {
+  return apiFetch<Subscription>("/subscriptions", { token, method: "POST", body: input });
+}
+
+/** Import an OPML file (multipart) and return the per-file import report. */
+export function importOpml(token: string | null, file: File): Promise<ImportReport> {
+  const form = new FormData();
+  form.append("file", file);
+  return apiFetch<ImportReport>("/opml", { token, method: "POST", body: form });
+}
+
+/** Unsubscribe (delete a subscription). Returns 204. */
+export function deleteSubscription(token: string | null, id: number): Promise<void> {
+  return apiFetch<void>(`/subscriptions/${id}`, { token, method: "DELETE" });
+}
+
 export function getCounts(token: string | null): Promise<Counts> {
   return apiFetch<Counts>("/counts", { token });
 }
@@ -69,11 +106,12 @@ export function postEntryState(
 export function postMarkRead(
   token: string | null,
   streamPath: string,
-  maxEntryId: number,
+  maxEntryId?: number,
 ): Promise<UpdatedResponse> {
+  // No bound → mark the whole stream ("mark all read").
   return apiFetch<UpdatedResponse>(`/streams/${streamPath}/mark-read`, {
     token,
     method: "POST",
-    body: { max_entry_id: maxEntryId },
+    body: maxEntryId != null ? { max_entry_id: maxEntryId } : {},
   });
 }

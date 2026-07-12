@@ -34,9 +34,14 @@ async def guarded_get(
     settings: Settings | None = None,
     transport: httpx.AsyncBaseTransport | None = None,
     accept: str | None = None,
+    truncate: bool = False,
 ) -> GetResult:
     """GET ``url`` safely. Returns ``ok=True`` with body/content_type on a 2xx,
-    otherwise ``ok=False`` with a status or error (never raises for network/SSRF)."""
+    otherwise ``ok=False`` with a status or error (never raises for network/SSRF).
+
+    With ``truncate=True`` an over-cap response is cut to ``max_bytes`` and still
+    returned ``ok=True`` (feed discovery only needs the head to detect the feed);
+    otherwise exceeding ``max_bytes`` is an error (the caller wants the whole body)."""
     settings = settings or get_settings()
     allow_hosts = settings.fetch_allow_hosts_set
     owns_transport = transport is None
@@ -77,12 +82,15 @@ async def guarded_get(
                             async for chunk in resp.aiter_bytes():
                                 chunks += chunk
                                 if len(chunks) > max_bytes:
-                                    return GetResult(
-                                        ok=False,
-                                        status=resp.status_code,
-                                        final_url=str(resp.url),
-                                        error=f"response exceeded {max_bytes} bytes",
-                                    )
+                                    if not truncate:
+                                        return GetResult(
+                                            ok=False,
+                                            status=resp.status_code,
+                                            final_url=str(resp.url),
+                                            error=f"response exceeded {max_bytes} bytes",
+                                        )
+                                    del chunks[max_bytes:]  # keep the head, stop reading
+                                    break
                             return GetResult(
                                 ok=True,
                                 status=resp.status_code,

@@ -68,9 +68,9 @@ async def test_cursor_pagination_gap_free_during_inserts(
 
     page1 = (await api_client.get(f"{BASE}/all/entries?status=all&limit=3", headers=h)).json()
     assert [e["id"] for e in page1["entries"]] == list(reversed(first[3:]))
-    assert page1["next_cursor"] == str(first[3])
+    assert page1["next_cursor"]  # opaque keyset cursor
 
-    # New entries arrive mid-pagination; the exclusive cursor keeps page 2 stable.
+    # New entries arrive mid-pagination; the keyset cursor keeps page 2 stable.
     await add_entries(feed_id, 4, start=100)
     page2 = (
         await api_client.get(
@@ -133,3 +133,18 @@ async def test_mark_read_is_bounded(api_client: httpx.AsyncClient, pat_user: Pat
     # Idempotent: a second identical call flips nothing.
     again = await api_client.post(f"{BASE}/all/mark-read", json={"max_entry_id": ids[2]}, headers=h)
     assert again.json()["updated"] == 0
+
+
+async def test_mark_read_no_bound_marks_whole_stream(
+    api_client: httpx.AsyncClient, pat_user: PatUser
+) -> None:
+    # "Mark all read": no max_entry_id → the entire stream, regardless of id (the row
+    # order is by publish date now, so the top row's id is not the max id).
+    await seed_feed_with_entries(pat_user.user_id, 5)
+    h = pat_user.headers
+
+    resp = await api_client.post(f"{BASE}/all/mark-read", json={}, headers=h)
+    assert resp.status_code == 200 and resp.json()["updated"] == 5
+
+    unread = await api_client.get(f"{BASE}/all/entries?status=unread", headers=h)
+    assert unread.json()["entries"] == []

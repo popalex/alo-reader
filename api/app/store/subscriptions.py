@@ -6,8 +6,7 @@ from sqlalchemy import Row, func, select
 from sqlalchemy import delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Feed, Subscription
-from app.store import rowcount
+from app.models import Entry, EntryState, Feed, Subscription
 
 
 async def create(
@@ -98,7 +97,32 @@ async def update(
 
 
 async def delete(session: AsyncSession, user_id: int, sub_id: int) -> bool:
-    result = await session.execute(
+    """Unsubscribe and clean up. Removes the subscription plus this user's read/star
+    state for the feed's entries; and if no one is left subscribed, deletes the feed
+    itself (its entries + every read/star row cascade). So "delete a feed" really does
+    remove all of it, and re-subscribing later starts fresh."""
+    feed_id = await session.scalar(
+        select(Subscription.feed_id).where(
+            Subscription.id == sub_id, Subscription.user_id == user_id
+        )
+    )
+    if feed_id is None:
+        return False
+    await session.execute(
         sql_delete(Subscription).where(Subscription.id == sub_id, Subscription.user_id == user_id)
     )
-    return rowcount(result) > 0
+    remaining = await session.scalar(
+        select(func.count()).select_from(Subscription).where(Subscription.feed_id == feed_id)
+    )
+    if remaining:
+        # Feed still has other subscribers: keep it, drop only this user's state.
+        await session.execute(
+            sql_delete(EntryState).where(
+                EntryState.user_id == user_id,
+                EntryState.entry_id.in_(select(Entry.id).where(Entry.feed_id == feed_id)),
+            )
+        )
+    else:
+        # Nobody left subscribed → delete the feed; entries + read/star state cascade.
+        await session.execute(sql_delete(Feed).where(Feed.id == feed_id))
+    return True
