@@ -11,8 +11,8 @@ import { ChevronDown, Inbox, Plus, Star } from "lucide-react";
 
 import type { Subscription } from "../../api/endpoints";
 import { useCounts, useFolders, useSubscriptions } from "../../api/queries";
-import { pushToast } from "../../app/toast";
 import { Favicon } from "../../components/Favicon";
+import { AddSubscriptionDialog } from "../subscribe/AddSubscriptionDialog";
 import styles from "./Sidebar.module.css";
 
 function FeedLink({ sub, unread }: { sub: Subscription; unread: number }) {
@@ -37,6 +37,7 @@ export function Sidebar() {
   const subs = useSubscriptions();
   const counts = useCounts();
   const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(() => new Set<number>());
+  const [addOpen, setAddOpen] = useState(false);
 
   const unreadBySub = useMemo(() => {
     const m = new Map<number, number>();
@@ -92,12 +93,18 @@ export function Sidebar() {
           type="button"
           className={styles.subscribe}
           title="Subscribe to a feed"
-          onClick={() => pushToast("Adding subscriptions lands in an upcoming update.", "info")}
+          onClick={() => setAddOpen(true)}
         >
           <Plus size={15} />
           <span>Subscribe</span>
         </button>
       </div>
+
+      <AddSubscriptionDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        folders={folders.data ?? []}
+      />
 
       <nav className={styles.views} aria-label="Views">
         <Link
@@ -170,7 +177,9 @@ export function Sidebar() {
           )}
 
           {sortedFolders.length === 0 && ungrouped.length === 0 && (
-            <div className={styles.status}>No feeds yet. Subscribe to get started.</div>
+            <button type="button" className={styles.empty} onClick={() => setAddOpen(true)}>
+              No feeds yet — add your first feed.
+            </button>
           )}
         </div>
       )}
