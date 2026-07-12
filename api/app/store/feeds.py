@@ -6,6 +6,7 @@ functions are not user-scoped.
 
 from datetime import timedelta
 
+from sqlalchemy import delete as sql_delete
 from sqlalchemy import func, select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -151,6 +152,20 @@ async def record_error(session: AsyncSession, feed_id: int, *, delay_s: int, mes
             claimed_until=_RELEASED,
         )
     )
+
+
+async def delete_orphaned(session: AsyncSession, *, grace: timedelta) -> int:
+    """Delete feeds that have had zero subscribers for longer than ``grace``
+    (DESIGN.md §1.3). ``orphaned_at`` is trigger-maintained (migration 0005). The
+    feed's entries go with it via ``entries.feed_id`` ON DELETE CASCADE. Global data
+    (feeds are deduped across all users), so this is not user-scoped."""
+    result = await session.execute(
+        sql_delete(Feed).where(
+            Feed.orphaned_at.is_not(None),
+            Feed.orphaned_at < func.now() - grace,
+        )
+    )
+    return rowcount(result)
 
 
 async def update_feed_url(session: AsyncSession, feed_id: int, new_url: str) -> bool:

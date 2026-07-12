@@ -17,7 +17,7 @@ from typing import Any, Literal
 
 import feedparser  # type: ignore[import-untyped]
 
-from app.ingest.sanitize import MAX_CONTENT_CHARS, title_to_text
+from app.ingest.sanitize import MAX_RAW_CONTENT_CHARS, title_to_text
 
 # A date claimed to be more than this far ahead is treated as unknown, not honored
 # (feeds routinely emit garbage/typo'd future dates; DESIGN normalization rule).
@@ -76,8 +76,8 @@ def _content_html(entry: dict[str, Any]) -> str:
     else:
         value = entry.get("summary", "")
     value = value or ""
-    if len(value) > MAX_CONTENT_CHARS:
-        value = value[:MAX_CONTENT_CHARS]
+    if len(value) > MAX_RAW_CONTENT_CHARS:
+        value = value[:MAX_RAW_CONTENT_CHARS]
     return value
 
 

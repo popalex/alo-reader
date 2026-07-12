@@ -13,7 +13,7 @@ directly in tests without the surrounding loop or signal handling.
 import asyncio
 import logging
 import signal
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from urllib.parse import urlsplit
@@ -25,6 +25,7 @@ from app.db import get_sessionmaker
 from app.models import Feed
 from app.store import feeds as feeds_store
 from app.worker.fetch import fetch_feed
+from app.worker.maintenance import maintenance_loop
 from app.worker.pipeline import FeedOutcome, FetchFn, process_feed
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -155,18 +156,37 @@ async def run(
         for sig in (signal.SIGTERM, signal.SIGINT):
             loop.add_signal_handler(sig, stop.set)
 
+    async def _claim_loop() -> None:
+        while not stop.is_set():
+            try:
+                await poll_once(session_factory, settings=settings, gate=gate, counters=counters)
+            except Exception as exc:  # never let the loop die on a transient DB blip
+                _log("poll_cycle_failed", error=repr(exc))
+            if stop.is_set():
+                break
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=settings.worker_poll_interval_s)
+            except TimeoutError:
+                pass
+
+    async def _supervise(name: str, coro: Awaitable[None]) -> None:
+        """Run a loop; if it dies, log it and set ``stop`` so its sibling also drains
+        rather than being left running as an orphan (graceful shutdown preserved)."""
+        try:
+            await coro
+        except Exception as exc:  # noqa: BLE001 — a crashing loop must not strand the other
+            _log(f"{name}_crashed", error=repr(exc))
+        finally:
+            stop.set()
+
     _log("worker_started", poll_interval_s=settings.worker_poll_interval_s)
-    while not stop.is_set():
-        try:
-            await poll_once(session_factory, settings=settings, gate=gate, counters=counters)
-        except Exception as exc:  # never let the loop die on a transient DB blip
-            _log("poll_cycle_failed", error=repr(exc))
-        if stop.is_set():
-            break
-        try:
-            await asyncio.wait_for(stop.wait(), timeout=settings.worker_poll_interval_s)
-        except TimeoutError:
-            pass
+    # The claim loop and the periodic maintenance sweep run concurrently, both watching
+    # the same stop event so SIGTERM — or either loop failing — drains everything.
+    sweep = maintenance_loop(session_factory, settings=settings, stop=stop)
+    await asyncio.gather(
+        _supervise("claim_loop", _claim_loop()),
+        _supervise("maintenance_loop", sweep),
+    )
     _log(
         "worker_stopped",
         polls=counters.polls,

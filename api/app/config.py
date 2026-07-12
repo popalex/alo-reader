@@ -44,6 +44,15 @@ class Settings(BaseSettings):
     # (per API replica), so a user can't hammer the poller.
     subscription_refresh_window_s: float = 300.0
 
+    # Max personal access tokens per user (DESIGN.md §1.4 quota audit). Creating one
+    # past the cap is a 422 quota_exceeded, so a script can't mint unbounded tokens.
+    quota_api_tokens: int = 20
+
+    # Minimum spacing between /discover calls per user (per API replica). Discovery
+    # makes the server fetch an arbitrary page, so it's rate-limited harder than the
+    # coarse global bucket to bound that SSRF/cost surface.
+    discover_window_s: float = 5.0
+
     # Fetcher / poller (DESIGN.md §1.3). An operator may set a contact URL so hosts
     # can reach them; it's optional and empty by default (no personal URL baked in).
     # The caps bound per-fetch cost/abuse.
@@ -98,6 +107,19 @@ class Settings(BaseSettings):
     # error, clamped to the cap.
     worker_backoff_base_s: int = 900
     worker_backoff_cap_s: int = 86_400
+
+    # Worker-embedded maintenance (WP-15, DESIGN.md §0.3, §1.3): orphan-feed GC +
+    # retention purge run periodically, jittered so N workers don't all fire at once.
+    worker_maintenance_interval_s: float = 3600.0
+    worker_maintenance_jitter_s: float = 300.0
+    # Delete a feed with zero subscribers for longer than this (orphan GC grace).
+    orphan_grace_days: int = 7
+    # Purge read+unstarred entries older than this whose every subscriber has read
+    # them (starred kept forever; unread never purged). DESIGN.md §0.3.
+    retention_horizon_days: int = 90
+    # Retention purge runs in bounded batches (per transaction) so a large backlog
+    # never locks the whole entries table in one statement.
+    retention_purge_batch_size: int = 5000
 
 
 @lru_cache

@@ -24,3 +24,26 @@ class TokenBucket:
             tokens -= 1.0
         self._buckets[key] = (tokens, now)
         return allowed
+
+
+class Cooldown:
+    """Per-key minimum-spacing gate (in-process, per replica).
+
+    ``allow(key, window_s)`` returns True at most once per ``window_s`` for a key —
+    the abuse control behind manual feed refresh and feed discovery, where the cost
+    is a server-side fetch rather than a cheap read.
+    """
+
+    def __init__(self) -> None:
+        self._last: dict[int, float] = {}
+
+    def allow(self, key: int, window_s: float) -> bool:
+        now = time.monotonic()
+        last = self._last.get(key)
+        if last is not None and now - last < window_s:
+            return False
+        self._last[key] = now
+        return True
+
+    def reset(self) -> None:
+        self._last.clear()

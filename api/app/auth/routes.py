@@ -97,6 +97,10 @@ async def list_tokens(user: CurrentUser, session: Session) -> list[TokenInfo]:
 async def create_token(
     body: CreateTokenRequest, user: CurrentUser, session: Session
 ) -> CreateTokenResponse:
+    cap = get_settings().quota_api_tokens
+    await pat.lock_for_create(session, user.id)  # serialize concurrent creates (no TOCTOU)
+    if await pat.count_for_user(session, user.id) >= cap:
+        raise ApiError(422, "quota_exceeded", f"API token limit ({cap}) reached")
     _, token = await pat.create(session, user.id, label=body.label)
     return CreateTokenResponse(token=token)  # plaintext shown exactly once
 

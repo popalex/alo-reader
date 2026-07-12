@@ -169,12 +169,14 @@ async def pat_user(api_db: str) -> PatUser:
 
 
 @pytest.fixture(autouse=True)
-def _reset_refresh_cooldown() -> Iterator[None]:
-    """The per-feed refresh cooldown is process-global; feed ids repeat across the
-    fresh per-test databases, so clear it between tests to avoid cross-test bleed."""
-    from app.routes import subscriptions
+def _reset_cooldowns() -> Iterator[None]:
+    """The per-feed refresh and per-user discover cooldowns are process-global; feed
+    and user ids repeat across the fresh per-test databases, so clear them between
+    tests to avoid cross-test bleed."""
+    from app.routes import discover, subscriptions
 
     subscriptions._refresh_cooldown.reset()
+    discover._discover_cooldown.reset()
     yield
 
 

@@ -11,7 +11,7 @@ import secrets
 from collections.abc import Callable
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.requests import Request
 
@@ -40,6 +40,21 @@ async def create(session: AsyncSession, user_id: int, *, label: str) -> tuple[Ap
     session.add(row)
     await session.flush()
     return row, token
+
+
+async def count_for_user(session: AsyncSession, user_id: int) -> int:
+    """Number of PATs a user holds (for the per-user token-count quota)."""
+    result = await session.scalar(
+        select(func.count()).select_from(ApiToken).where(ApiToken.user_id == user_id)
+    )
+    return result or 0
+
+
+async def lock_for_create(session: AsyncSession, user_id: int) -> None:
+    """Take a transaction-scoped lock on the user's row so concurrent token creation
+    serializes: without it, two simultaneous creates can both pass the count-based
+    quota check (TOCTOU) and overshoot the cap. Released automatically at commit."""
+    await session.execute(text("SELECT 1 FROM users WHERE id = :uid FOR UPDATE"), {"uid": user_id})
 
 
 async def list_for_user(session: AsyncSession, user_id: int) -> list[ApiToken]:
