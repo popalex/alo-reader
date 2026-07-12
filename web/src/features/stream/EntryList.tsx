@@ -341,11 +341,14 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
                 )}
                 <time
                   className={styles.time}
-                  dateTime={e.created_at}
+                  dateTime={e.published_at ?? e.created_at}
                   title={formatDateTime(e.published_at ?? e.created_at)}
                 >
                   {e.is_starred ? <Star className={styles.star} size={12} /> : null}
-                  {relativeTime(e.created_at)}
+                  {/* The feed's own publish date; fall back to ingest time only when
+                      the feed provides none (so a backfilled feed doesn't show every
+                      entry as "just now"). */}
+                  {relativeTime(e.published_at ?? e.created_at)}
                 </time>
               </div>
             );
