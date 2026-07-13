@@ -1,9 +1,10 @@
 """Stream entry listing + bounded mark-read (DESIGN.md §5).
 
 A stream is ``all | feed/{id} | folder/{id} | starred`` — the single query
-abstraction. Listing is newest-first by id with an exclusive cursor (stable under
-concurrent inserts); ``status=unread`` honors ``since_entry_id`` and the per-user
-read flag. Search (``q=``) is not implemented yet and is rejected explicitly.
+abstraction. Listing is newest-first by recency with an exclusive cursor (stable
+under concurrent inserts); ``status=unread`` honors ``since_entry_id`` and the
+per-user read flag. A ``q=`` term switches the same endpoint into full-text search
+(chronological, page-capped) via ``search_stream_page`` (DESIGN.md §4.1).
 """
 
 from datetime import datetime
