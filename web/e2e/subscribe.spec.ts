@@ -23,6 +23,18 @@ test.describe("feed management (AUTH_MODE=none)", () => {
     await expect(page.getByLabel(/feed or site url/i)).toBeVisible();
   });
 
+  test("category: rename from the sidebar", async ({ page }) => {
+    await page.goto("/");
+    // The seeded "Tech" category — hover its header, rename it inline.
+    const tech = page.getByRole("link", { name: /^tech$/i });
+    await tech.hover();
+    await page.getByRole("button", { name: /rename tech/i }).click();
+    const input = page.getByRole("textbox", { name: /rename tech/i });
+    await input.fill("Reading");
+    await input.press("Enter");
+    await expect(page.getByRole("link", { name: /^reading$/i })).toBeVisible();
+  });
+
   test("mobile: the settings gear is visible without hover in the drawer", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 780 });
     await page.goto("/");

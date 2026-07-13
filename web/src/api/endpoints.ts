@@ -29,6 +29,16 @@ export function createFolder(token: string | null, name: string): Promise<Folder
   return apiFetch<Folder>("/folders", { token, method: "POST", body: { name } });
 }
 
+/** Rename a folder (category). */
+export function updateFolder(token: string | null, id: number, name: string): Promise<Folder> {
+  return apiFetch<Folder>(`/folders/${id}`, { token, method: "PATCH", body: { name } });
+}
+
+/** Delete a folder (category). 409 if it still has feeds. */
+export function deleteFolder(token: string | null, id: number): Promise<void> {
+  return apiFetch<void>(`/folders/${id}`, { token, method: "DELETE" });
+}
+
 /** Probe a site or feed URL and return the feed candidates found there. */
 export function discoverFeeds(token: string | null, url: string): Promise<DiscoverCandidate[]> {
   return apiFetch<DiscoverCandidate[]>("/discover", { token, method: "POST", body: { url } });

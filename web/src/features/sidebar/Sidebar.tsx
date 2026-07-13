@@ -7,10 +7,10 @@
 import { useMemo, useState } from "react";
 
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { ChevronDown, Inbox, Loader2, Plus, Settings2, Star } from "lucide-react";
+import { ChevronDown, Inbox, Loader2, Pencil, Plus, Settings2, Star, Trash2 } from "lucide-react";
 
-import type { Subscription } from "../../api/endpoints";
-import { useDeleteSubscription } from "../../api/feedMutations";
+import type { Folder, Subscription } from "../../api/endpoints";
+import { useDeleteFolder, useDeleteSubscription, useUpdateFolder } from "../../api/feedMutations";
 import { useCounts, useFolders, useSubscriptions } from "../../api/queries";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Favicon } from "../../components/Favicon";
@@ -62,6 +62,100 @@ function FeedLink({
   );
 }
 
+function FolderHeader({
+  folder,
+  unread,
+  isCollapsed,
+  onToggle,
+  onDelete,
+}: {
+  folder: Folder;
+  unread: number;
+  isCollapsed: boolean;
+  onToggle: () => void;
+  onDelete: (folder: Folder) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(folder.name);
+  const rename = useUpdateFolder();
+
+  function commit() {
+    setEditing(false);
+    const next = name.trim();
+    if (next && next !== folder.name) rename.mutate({ id: folder.id, name: next });
+    else setName(folder.name);
+  }
+
+  return (
+    <div className={styles.folderHead}>
+      <button
+        type="button"
+        className={styles.chevron}
+        aria-expanded={!isCollapsed}
+        aria-label={isCollapsed ? `Expand ${folder.name}` : `Collapse ${folder.name}`}
+        onClick={onToggle}
+      >
+        <ChevronDown size={13} data-collapsed={isCollapsed || undefined} />
+      </button>
+
+      {editing ? (
+        <input
+          className={styles.folderEdit}
+          value={name}
+          autoFocus
+          aria-label={`Rename ${folder.name}`}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+            else if (e.key === "Escape") {
+              setName(folder.name);
+              setEditing(false);
+            }
+          }}
+        />
+      ) : (
+        <Link
+          to="/folder/$id"
+          params={{ id: String(folder.id) }}
+          className={styles.folderName}
+          activeProps={{ className: `${styles.folderName} ${styles.folderActive}` }}
+        >
+          {folder.name}
+        </Link>
+      )}
+
+      {!editing && (
+        <div className={styles.folderActions}>
+          <button
+            type="button"
+            className={styles.folderAction}
+            title="Rename category"
+            aria-label={`Rename ${folder.name}`}
+            onClick={() => {
+              setName(folder.name);
+              setEditing(true);
+            }}
+          >
+            <Pencil size={12} />
+          </button>
+          <button
+            type="button"
+            className={styles.folderAction}
+            title="Delete category"
+            aria-label={`Delete ${folder.name}`}
+            onClick={() => onDelete(folder)}
+          >
+            <Trash2 size={12} />
+          </button>
+        </div>
+      )}
+
+      {unread > 0 && !editing ? <span className={styles.count}>{unread}</span> : null}
+    </div>
+  );
+}
+
 export function Sidebar() {
   const folders = useFolders();
   const subs = useSubscriptions();
@@ -70,7 +164,9 @@ export function Sidebar() {
   const [addOpen, setAddOpen] = useState(false);
   const [settingsSub, setSettingsSub] = useState<Subscription | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Subscription | null>(null);
+  const [pendingDeleteFolder, setPendingDeleteFolder] = useState<Folder | null>(null);
   const deleteSub = useDeleteSubscription();
+  const deleteFolder = useDeleteFolder();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
@@ -150,6 +246,23 @@ export function Sidebar() {
       />
 
       <ConfirmDialog
+        open={pendingDeleteFolder !== null}
+        onOpenChange={(open) => !open && setPendingDeleteFolder(null)}
+        title="Delete this category?"
+        body={(() => {
+          if (!pendingDeleteFolder) return "";
+          const n = grouped.get(pendingDeleteFolder.id)?.length ?? 0;
+          return n > 0
+            ? `"${pendingDeleteFolder.name}" will be removed. Its ${n} feed${n === 1 ? "" : "s"} will move to Uncategorized.`
+            : `The empty category "${pendingDeleteFolder.name}" will be removed.`;
+        })()}
+        confirmLabel="Delete"
+        onConfirm={() => {
+          if (pendingDeleteFolder) deleteFolder.mutate(pendingDeleteFolder.id);
+        }}
+      />
+
+      <ConfirmDialog
         open={pendingDelete !== null}
         onOpenChange={(open) => !open && setPendingDelete(null)}
         title="Delete this feed?"
@@ -202,26 +315,13 @@ export function Sidebar() {
             const fUnread = folderUnread(feeds);
             return (
               <div className={styles.folder} key={folder.id}>
-                <div className={styles.folderHead}>
-                  <button
-                    type="button"
-                    className={styles.chevron}
-                    aria-expanded={!isCollapsed}
-                    aria-label={isCollapsed ? `Expand ${folder.name}` : `Collapse ${folder.name}`}
-                    onClick={() => toggle(folder.id)}
-                  >
-                    <ChevronDown size={13} data-collapsed={isCollapsed || undefined} />
-                  </button>
-                  <Link
-                    to="/folder/$id"
-                    params={{ id: String(folder.id) }}
-                    className={styles.folderName}
-                    activeProps={{ className: `${styles.folderName} ${styles.folderActive}` }}
-                  >
-                    {folder.name}
-                  </Link>
-                  {fUnread > 0 ? <span className={styles.count}>{fUnread}</span> : null}
-                </div>
+                <FolderHeader
+                  folder={folder}
+                  unread={fUnread}
+                  isCollapsed={isCollapsed}
+                  onToggle={() => toggle(folder.id)}
+                  onDelete={setPendingDeleteFolder}
+                />
                 {!isCollapsed &&
                   feeds.map((sub) => (
                     <FeedLink key={sub.id} sub={sub} unread={unreadBySub.get(sub.id) ?? 0} onSettings={setSettingsSub} />

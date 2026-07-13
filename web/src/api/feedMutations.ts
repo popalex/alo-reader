@@ -9,8 +9,10 @@ import { useTokenGetter } from "../app/auth";
 import { pushToast } from "../app/toast";
 import {
   createSubscription,
+  deleteFolder,
   deleteSubscription,
   importOpml,
+  updateFolder,
   updateSubscription,
   type CreateSubscriptionInput,
   type ImportReport,
@@ -41,6 +43,31 @@ export function useCreateSubscription() {
       refresh();
       pushToast(`Subscribed to ${sub.title || "the feed"}.`, "info");
     },
+  });
+}
+
+export function useUpdateFolder() {
+  const getToken = useTokenGetter();
+  const refresh = useRefreshFeedLists();
+  return useMutation({
+    mutationFn: async (vars: { id: number; name: string }) =>
+      updateFolder(await getToken(), vars.id, vars.name),
+    onSuccess: () => refresh(),
+    onError: () => pushToast("Couldn't rename the category.", "error"),
+  });
+}
+
+export function useDeleteFolder() {
+  const getToken = useTokenGetter();
+  const refresh = useRefreshFeedLists();
+  return useMutation({
+    mutationFn: async (id: number) => deleteFolder(await getToken(), id),
+    onSuccess: () => {
+      // refresh() re-fetches subscriptions too, so feeds now show under Uncategorized.
+      refresh();
+      pushToast("Category deleted.", "info");
+    },
+    onError: () => pushToast("Couldn't delete the category.", "error"),
   });
 }
 
