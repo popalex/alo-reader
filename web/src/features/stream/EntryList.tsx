@@ -161,14 +161,17 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
     getItemKey: (i) => entries[i]?.id ?? i,
   });
 
-  // Fetch the next page as the tail of the list scrolls into view.
+  // Fetch the next page as the tail of the list scrolls into view. Depend on the
+  // specific query fields (fetchNextPage is stable) rather than the whole query
+  // object, which gets a new identity every render.
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = query;
   const items = virtualizer.getVirtualItems();
   const lastIndex = items.length ? items[items.length - 1].index : 0;
   useEffect(() => {
-    if (lastIndex >= entries.length - 8 && query.hasNextPage && !query.isFetchingNextPage) {
-      void query.fetchNextPage();
+    if (lastIndex >= entries.length - 8 && hasNextPage && !isFetchingNextPage) {
+      void fetchNextPage();
     }
-  }, [lastIndex, entries.length, query]);
+  }, [lastIndex, entries.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // Scroll-past marks read (WP-11) — but not while searching: paging through search
   // hits shouldn't silently mark them read.
@@ -355,7 +358,7 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
             );
           })}
         </div>
-        {query.isFetchingNextPage ? <div className={styles.more}>Loading more…</div> : null}
+        {isFetchingNextPage ? <div className={styles.more}>Loading more…</div> : null}
       </div>
     );
   }
