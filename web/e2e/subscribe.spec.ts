@@ -68,6 +68,18 @@ test.describe("feed management (AUTH_MODE=none)", () => {
     await expect(url).toHaveValue("example.com");
   });
 
+  test("mobile: feed settings dialog opens above the drawer", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 780 });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Open feeds" }).click();
+    await page.getByRole("button", { name: /settings for hacker news/i }).click();
+
+    await expect(page.getByRole("heading", { name: "Feed settings" })).toBeVisible();
+    const title = page.getByLabel(/^title$/i); // interactable → not covered by the drawer
+    await title.fill("HN Mobile");
+    await expect(title).toHaveValue("HN Mobile");
+  });
+
   test("feed settings: rename a feed and see it update", async ({ page }) => {
     await page.goto("/");
     // Rename a feed the other tests don't touch (they use Hacker News).

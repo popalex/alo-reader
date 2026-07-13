@@ -1,12 +1,14 @@
 .overlay {
   position: fixed;
   inset: 0;
+  z-index: 70; /* above app-level banners; consistent with the other dialogs */
   background: rgba(9, 12, 16, 0.44);
   animation: fade 120ms ease-out;
 }
 
 .content {
   position: fixed;
+  z-index: 71;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
