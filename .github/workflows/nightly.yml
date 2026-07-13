@@ -23,9 +23,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
-      - uses: pnpm/action-setup@v6
-        with:
-          version: "11"
+      - run: corepack enable && corepack prepare pnpm@latest --activate
       - run: pnpm -C web install
       - name: Install Playwright Chromium
         run: pnpm -C web exec playwright install --with-deps chromium
@@ -41,9 +39,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
-      - uses: pnpm/action-setup@v6
-        with:
-          version: "11"
+      - run: corepack enable && corepack prepare pnpm@latest --activate
       - run: pnpm -C web install
       - name: Install Chromium for Lighthouse
         # Populates ~/.cache/ms-playwright so lighthouse.sh finds a Chrome.

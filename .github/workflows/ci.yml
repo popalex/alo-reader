@@ -37,9 +37,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
-      - uses: pnpm/action-setup@v6
-        with:
-          version: "11"
+      - run: corepack enable && corepack prepare pnpm@latest --activate
       - run: pnpm -C web install
       - run: pnpm -C web tsc
       - run: pnpm -C web lint
@@ -73,9 +71,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
-      - uses: pnpm/action-setup@v6
-        with:
-          version: "11"
+      - run: corepack enable && corepack prepare pnpm@latest --activate
       - run: pnpm -C web install
       - run: pnpm -C web test
 
@@ -87,9 +83,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
-      - uses: pnpm/action-setup@v6
-        with:
-          version: "11"
+      - run: corepack enable && corepack prepare pnpm@latest --activate
       - run: pnpm -C web install
       - run: pnpm -C web build
       - run: pnpm -C web size
@@ -107,9 +101,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
-      - uses: pnpm/action-setup@v6
-        with:
-          version: "11"
+      - run: corepack enable && corepack prepare pnpm@latest --activate
       - run: pnpm -C web install
       - name: Regenerate typed client
         run: |
@@ -160,9 +152,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
-      - uses: pnpm/action-setup@v6
-        with:
-          version: "11"
+      - run: corepack enable && corepack prepare pnpm@latest --activate
       - run: pnpm -C web install --frozen-lockfile
       - name: pnpm audit (shipped web deps)
         run: pnpm -C web audit --prod --audit-level high
