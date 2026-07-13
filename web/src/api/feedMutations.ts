@@ -11,9 +11,11 @@ import {
   createSubscription,
   deleteSubscription,
   importOpml,
+  updateSubscription,
   type CreateSubscriptionInput,
   type ImportReport,
   type Subscription,
+  type UpdateSubscriptionInput,
 } from "./endpoints";
 import { queryKeys } from "./queries";
 
@@ -39,6 +41,19 @@ export function useCreateSubscription() {
       refresh();
       pushToast(`Subscribed to ${sub.title || "the feed"}.`, "info");
     },
+  });
+}
+
+export function useUpdateSubscription() {
+  const getToken = useTokenGetter();
+  const refresh = useRefreshFeedLists();
+  return useMutation({
+    mutationFn: async (vars: { id: number } & UpdateSubscriptionInput): Promise<Subscription> => {
+      const { id, ...input } = vars;
+      return updateSubscription(await getToken(), id, input);
+    },
+    onSuccess: () => refresh(),
+    onError: () => pushToast("Couldn't save the feed's settings.", "error"),
   });
 }
 

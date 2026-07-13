@@ -7,7 +7,7 @@
 import { useMemo, useState } from "react";
 
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { ChevronDown, Inbox, Loader2, Plus, Star, Trash2 } from "lucide-react";
+import { ChevronDown, Inbox, Loader2, Plus, Settings2, Star } from "lucide-react";
 
 import type { Subscription } from "../../api/endpoints";
 import { useDeleteSubscription } from "../../api/feedMutations";
@@ -15,16 +15,17 @@ import { useCounts, useFolders, useSubscriptions } from "../../api/queries";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Favicon } from "../../components/Favicon";
 import { AddSubscriptionDialog } from "../subscribe/AddSubscriptionDialog";
+import { FeedSettingsDialog } from "../subscribe/FeedSettingsDialog";
 import styles from "./Sidebar.module.css";
 
 function FeedLink({
   sub,
   unread,
-  onDelete,
+  onSettings,
 }: {
   sub: Subscription;
   unread: number;
-  onDelete: (sub: Subscription) => void;
+  onSettings: (sub: Subscription) => void;
 }) {
   const base = unread > 0 ? `${styles.feed} ${styles.feedUnread}` : styles.feed;
   return (
@@ -47,15 +48,15 @@ function FeedLink({
       <button
         type="button"
         className={styles.del}
-        title="Delete feed"
-        aria-label={`Delete ${sub.title || "this feed"}`}
+        title="Feed settings"
+        aria-label={`Settings for ${sub.title || "this feed"}`}
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          onDelete(sub);
+          onSettings(sub);
         }}
       >
-        <Trash2 size={13} />
+        <Settings2 size={13} />
       </button>
     </div>
   );
@@ -67,6 +68,7 @@ export function Sidebar() {
   const counts = useCounts();
   const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(() => new Set<number>());
   const [addOpen, setAddOpen] = useState(false);
+  const [settingsSub, setSettingsSub] = useState<Subscription | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Subscription | null>(null);
   const deleteSub = useDeleteSubscription();
   const navigate = useNavigate();
@@ -137,6 +139,14 @@ export function Sidebar() {
         open={addOpen}
         onOpenChange={setAddOpen}
         folders={folders.data ?? []}
+      />
+
+      <FeedSettingsDialog
+        sub={settingsSub}
+        open={settingsSub !== null}
+        onOpenChange={(open) => !open && setSettingsSub(null)}
+        folders={folders.data ?? []}
+        onDelete={setPendingDelete}
       />
 
       <ConfirmDialog
@@ -214,7 +224,7 @@ export function Sidebar() {
                 </div>
                 {!isCollapsed &&
                   feeds.map((sub) => (
-                    <FeedLink key={sub.id} sub={sub} unread={unreadBySub.get(sub.id) ?? 0} onDelete={setPendingDelete} />
+                    <FeedLink key={sub.id} sub={sub} unread={unreadBySub.get(sub.id) ?? 0} onSettings={setSettingsSub} />
                   ))}
               </div>
             );
@@ -226,7 +236,7 @@ export function Sidebar() {
                 .slice()
                 .sort(byTitle)
                 .map((sub) => (
-                  <FeedLink key={sub.id} sub={sub} unread={unreadBySub.get(sub.id) ?? 0} onDelete={setPendingDelete} />
+                  <FeedLink key={sub.id} sub={sub} unread={unreadBySub.get(sub.id) ?? 0} onSettings={setSettingsSub} />
                 ))}
             </div>
           )}

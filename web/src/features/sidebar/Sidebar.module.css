@@ -178,8 +178,17 @@
    the right edge where the unread count sits. */
 .feedRow {
   position: relative;
+  display: flex;
+  align-items: center;
 }
 
+.feedRow .feed {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Desktop: the gear is hover-revealed and overlays the unread count (which is
+   hidden on hover), so the resting row stays clean. */
 .del {
   position: absolute;
   right: 6px;
@@ -203,14 +212,30 @@
 }
 
 .del:hover {
-  color: var(--danger);
+  color: var(--text);
   background: var(--hover);
 }
 
-/* The trash overlays the unread count on hover — hide the count so they don't
-   sit on top of each other. */
 .feedRow:hover .count {
   opacity: 0;
+}
+
+/* No hover (touch) or the mobile drawer layout (≤768px, matching useIsMobile): a
+   hover-revealed gear is unreachable, so show it permanently in the row's flow
+   (after the count, no overlap) with a bigger tap target. */
+@media (hover: none), (max-width: 768px) {
+  .del {
+    position: static;
+    transform: none;
+    flex: none;
+    opacity: 1;
+    padding: 8px;
+    margin-left: 2px;
+  }
+
+  .feedRow:hover .count {
+    opacity: 1;
+  }
 }
 
 .status {

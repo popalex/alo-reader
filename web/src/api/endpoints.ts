@@ -54,6 +54,21 @@ export function importOpml(token: string | null, file: File): Promise<ImportRepo
   return apiFetch<ImportReport>("/opml", { token, method: "POST", body: form });
 }
 
+export interface UpdateSubscriptionInput {
+  title_override?: string | null;
+  folder_id?: number | null;
+}
+
+/** Patch a subscription (rename via title_override, move category via folder_id).
+ *  Only the keys present are changed (PATCH semantics). */
+export function updateSubscription(
+  token: string | null,
+  id: number,
+  input: UpdateSubscriptionInput,
+): Promise<Subscription> {
+  return apiFetch<Subscription>(`/subscriptions/${id}`, { token, method: "PATCH", body: input });
+}
+
 /** Unsubscribe (delete a subscription). Returns 204. */
 export function deleteSubscription(token: string | null, id: number): Promise<void> {
   return apiFetch<void>(`/subscriptions/${id}`, { token, method: "DELETE" });
