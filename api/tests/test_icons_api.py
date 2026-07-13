@@ -83,7 +83,8 @@ async def test_worker_fetches_and_stores_favicon(
         headers=pat_user.headers,
     )
     subs = (await api_client.get("/api/v1/subscriptions", headers=pat_user.headers)).json()
-    assert subs[0]["icon_url"] == f"/api/v1/icons/{icon_id}"
+    # Content-versioned (?v=<hash>) so a changed icon busts the immutable cache.
+    assert subs[0]["icon_url"].startswith(f"/api/v1/icons/{icon_id}?v=")
 
 
 async def test_favicon_falls_back_to_favicon_ico(api_db: str) -> None:

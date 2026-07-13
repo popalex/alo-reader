@@ -7,6 +7,7 @@ never dumped on the new subscriber as unread (DESIGN.md §4). Every id lookup is
 tenant-scoped: another user's id reads as 404, never 403.
 """
 
+import hashlib
 from datetime import datetime
 from typing import Annotated
 from urllib.parse import urlsplit, urlunsplit
@@ -75,14 +76,29 @@ def normalize_feed_url(raw: str) -> str:
     return urlunsplit((scheme, parts.netloc.lower(), parts.path or "/", parts.query, ""))
 
 
-def _shape(sub: Subscription, feed: Feed) -> SubscriptionResponse:
+def _icon_url(icon_id: int | None, source_url: str | None) -> str | None:
+    """The served icon URL, content-versioned by a hash of the icon's source URL.
+    Icons are cached ``immutable``, but an icon id can be reused for different content
+    (e.g. after a DB reset, or favicon→artwork); the ``?v=`` makes a changed icon a
+    new URL so the browser doesn't serve a stale one."""
+    if icon_id is None:
+        return None
+    if source_url:
+        ver = hashlib.sha1(source_url.encode(), usedforsecurity=False).hexdigest()[:8]
+        return f"/api/v1/icons/{icon_id}?v={ver}"
+    return f"/api/v1/icons/{icon_id}"
+
+
+def _shape(
+    sub: Subscription, feed: Feed, icon_source_url: str | None = None
+) -> SubscriptionResponse:
     return SubscriptionResponse(
         id=sub.id,
         feed_id=sub.feed_id,
         title=sub.title_override or feed.title,
         site_url=feed.site_url,
         folder_id=sub.folder_id,
-        icon_url=f"/api/v1/icons/{feed.icon_id}" if feed.icon_id is not None else None,
+        icon_url=_icon_url(feed.icon_id, icon_source_url),
         last_error=feed.last_error,
         last_fetched_at=feed.last_fetched_at,
     )
@@ -96,7 +112,7 @@ async def _require_own_folder(session: AsyncSession, user_id: int, folder_id: in
 @router.get("", response_model=list[SubscriptionResponse])
 async def list_subscriptions(user: CurrentUser, session: Session) -> list[SubscriptionResponse]:
     rows = await subs_store.list_with_feed(session, user.id)
-    return [_shape(sub, feed) for sub, feed in rows]
+    return [_shape(sub, feed, icon_src) for sub, feed, icon_src in rows]
 
 
 @router.post("", response_model=SubscriptionResponse, status_code=201)
