@@ -9,7 +9,7 @@ import hashlib
 import hmac
 import secrets
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -21,6 +21,12 @@ from app.store import rowcount
 from .provider import AuthedUser, authed, bearer_token
 
 TOKEN_PREFIX = "alo_pat_"
+
+# `last_used_at` is a coarse "recently active" signal, not an audit log, so it's
+# only rewritten when it's this stale. Without the throttle every authenticated
+# request — including a script polling in a tight loop — turns a read into a write
+# on a hot row.
+_LAST_USED_THROTTLE = timedelta(minutes=1)
 
 SessionFactory = Callable[[], async_sessionmaker[AsyncSession]]
 
@@ -96,5 +102,8 @@ class PatProvider:
             api_token, user = row._tuple()
             if not hmac.compare_digest(api_token.token_hash, digest):
                 return None
-            api_token.last_used_at = datetime.now(UTC)
+            now = datetime.now(UTC)
+            last = api_token.last_used_at
+            if last is None or now - last >= _LAST_USED_THROTTLE:
+                api_token.last_used_at = now
             return authed(user)
