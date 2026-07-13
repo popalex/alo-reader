@@ -55,6 +55,19 @@ test.describe("feed management (AUTH_MODE=none)", () => {
     ).toBeVisible();
   });
 
+  test("mobile: add-feed dialog opens above the drawer and is interactable", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 780 });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Open feeds" }).click();
+    await page.getByRole("button", { name: "Subscribe", exact: true }).click();
+
+    await expect(page.getByRole("heading", { name: "Add a feed" })).toBeVisible();
+    // Filling would fail if the drawer/hamburger covered the dialog (regression).
+    const url = page.getByLabel(/feed or site url/i);
+    await url.fill("example.com");
+    await expect(url).toHaveValue("example.com");
+  });
+
   test("feed settings: rename a feed and see it update", async ({ page }) => {
     await page.goto("/");
     // Rename a feed the other tests don't touch (they use Hacker News).
