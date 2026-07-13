@@ -544,6 +544,8 @@ export interface components {
         SubscriptionResponse: {
             /** Feed Id */
             feed_id: number;
+            /** Feed Url */
+            feed_url: string;
             /** Folder Id */
             folder_id: number | null;
             /** Icon Url */

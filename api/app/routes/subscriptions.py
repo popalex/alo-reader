@@ -39,6 +39,7 @@ class SubscriptionResponse(BaseModel):
     id: int
     feed_id: int
     title: str
+    feed_url: str  # the RSS/Atom URL (shown read-only in feed settings)
     site_url: str | None
     folder_id: int | None
     icon_url: str | None  # populated in WP-08 (icons); always null for now
@@ -96,6 +97,7 @@ def _shape(
         id=sub.id,
         feed_id=sub.feed_id,
         title=sub.title_override or feed.title,
+        feed_url=feed.feed_url,
         site_url=feed.site_url,
         folder_id=sub.folder_id,
         icon_url=_icon_url(feed.icon_id, icon_source_url),
