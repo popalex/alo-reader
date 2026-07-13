@@ -9,6 +9,7 @@ import { Check, ChevronLeft, Circle, ExternalLink, Star } from "lucide-react";
 import { useSetEntryState } from "../../api/mutations";
 import { useEntry } from "../../api/queries";
 import { useOnline } from "../../app/offline/useOffline";
+import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { Favicon } from "../../components/Favicon";
 import { formatDateTime } from "../../lib/time";
 import { useSelection } from "./selection";
@@ -115,12 +116,23 @@ export function ReaderPane() {
         <h1 className={styles.title}>{entry.title}</h1>
         {meta ? <div className={styles.meta}>{meta}</div> : null}
       </header>
-      <div
-        ref={contentRef}
-        className={styles.content}
-        // Sanitized at ingest (nh3, strict allowlist) — see DESIGN.md §1.3.
-        dangerouslySetInnerHTML={{ __html: entry.content_html }}
-      />
+      {/* A malformed article shouldn't take down the list — degrade to a notice,
+          reset when a different entry opens. */}
+      <ErrorBoundary
+        resetKey={entry.id}
+        fallback={
+          <div className={styles.state} role="alert">
+            Couldn’t display this article.
+          </div>
+        }
+      >
+        <div
+          ref={contentRef}
+          className={styles.content}
+          // Sanitized at ingest (nh3, strict allowlist) — see DESIGN.md §1.3.
+          dangerouslySetInnerHTML={{ __html: entry.content_html }}
+        />
+      </ErrorBoundary>
     </article>
   );
 }

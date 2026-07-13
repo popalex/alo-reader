@@ -9,6 +9,7 @@ import { Outlet, useRouterState } from "@tanstack/react-router";
 
 import { usePendingFeedPolling } from "../../api/queries";
 import { UnreadAnnouncer } from "../../app/UnreadAnnouncer";
+import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { useIsMobile } from "../../lib/useMediaQuery";
 import { Sidebar } from "../sidebar/Sidebar";
 import { MobileSidebar } from "./MobileSidebar";
@@ -29,7 +30,26 @@ export function AppLayout() {
       <div className={styles.shell}>
         {!isMobile && <Sidebar />}
         <div className={styles.content}>
-          <Outlet />
+          {/* A render error in one stream shouldn't blank the whole app; reset on
+              navigation so moving to another view recovers. */}
+          <ErrorBoundary
+            resetKey={pathname}
+            fallback={
+              <div className={styles.crash} role="alert">
+                <p className={styles.crashTitle}>Something went wrong</p>
+                <p>This view ran into an error. Try reloading the page.</p>
+                <button
+                  type="button"
+                  className={styles.crashBtn}
+                  onClick={() => window.location.reload()}
+                >
+                  Reload
+                </button>
+              </div>
+            }
+          >
+            <Outlet />
+          </ErrorBoundary>
         </div>
         <UnreadAnnouncer />
       </div>
