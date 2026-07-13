@@ -1,9 +1,13 @@
-// The reading pane: renders the selected entry's sanitized content_html.
-// Content is sanitized at ingest (nh3), so it's rendered directly; images are
-// made lazy after render and constrained by CSS. Marking read on open is WP-11.
+// The reading pane: renders the selected entry's content_html.
+// Content is sanitized server-side at ingest (nh3, strict allowlist), and then
+// sanitized again here with DOMPurify as defense-in-depth — so a single backend
+// regression, or a pre-sanitization row imported by a migration, can't become
+// stored XSS with full session/token access. Images are made lazy after render
+// and constrained by CSS. Marking read on open is WP-11.
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
+import DOMPurify from "dompurify";
 import { Check, ChevronLeft, Circle, ExternalLink, Star } from "lucide-react";
 
 import { useSetEntryState } from "../../api/mutations";
@@ -21,7 +25,11 @@ export function ReaderPane() {
   const online = useOnline();
   const setState = useSetEntryState();
   const contentRef = useRef<HTMLDivElement>(null);
-  const html = query.data?.content_html;
+  // Defense-in-depth: re-sanitize the already-nh3-cleaned HTML in the browser.
+  const html = useMemo(
+    () => (query.data?.content_html ? DOMPurify.sanitize(query.data.content_html) : undefined),
+    [query.data?.content_html],
+  );
 
   // Make feed images lazy/async after each content change (the container is
   // reused across entries, so a ref callback alone wouldn't re-run).
@@ -129,8 +137,8 @@ export function ReaderPane() {
         <div
           ref={contentRef}
           className={styles.content}
-          // Sanitized at ingest (nh3, strict allowlist) — see DESIGN.md §1.3.
-          dangerouslySetInnerHTML={{ __html: entry.content_html }}
+          // nh3 at ingest + DOMPurify here (see the file header) — double-sanitized.
+          dangerouslySetInnerHTML={{ __html: html ?? "" }}
         />
       </ErrorBoundary>
     </article>
