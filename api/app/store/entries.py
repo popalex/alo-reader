@@ -241,18 +241,22 @@ async def list_stream_page(
     flags each entry needs for the HTTP response (DESIGN.md §5)."""
     parsed = stream if isinstance(stream, Stream) else parse_stream(stream)
     es = aliased(EntryState)
-    stmt = _apply_stream(
-        select(
-            Entry,
-            Feed.title.label("feed_title"),
-            func.coalesce(es.is_read, False).label("is_read"),
-            func.coalesce(es.is_starred, False).label("is_starred"),
-        ),
-        user_id,
-        parsed,
-        status,
-        es,
-    ).join(Feed, Feed.id == Entry.feed_id).options(load_only(*_LIST_COLUMNS))
+    stmt = (
+        _apply_stream(
+            select(
+                Entry,
+                Feed.title.label("feed_title"),
+                func.coalesce(es.is_read, False).label("is_read"),
+                func.coalesce(es.is_starred, False).label("is_starred"),
+            ),
+            user_id,
+            parsed,
+            status,
+            es,
+        )
+        .join(Feed, Feed.id == Entry.feed_id)
+        .options(load_only(*_LIST_COLUMNS))
+    )
     stmt = _paginate_by_recency(stmt, cursor, limit)
     rows = await session.execute(stmt)
     return [
@@ -308,19 +312,23 @@ async def search_stream_page(
         tsquery,
         _HEADLINE_OPTS,
     ).label("snippet")
-    base = _apply_stream(
-        select(
-            Entry,
-            Feed.title.label("feed_title"),
-            func.coalesce(es.is_read, False).label("is_read"),
-            func.coalesce(es.is_starred, False).label("is_starred"),
-            snippet,
-        ),
-        user_id,
-        parsed,
-        status,
-        es,
-    ).join(Feed, Feed.id == Entry.feed_id).options(load_only(*_LIST_COLUMNS))
+    base = (
+        _apply_stream(
+            select(
+                Entry,
+                Feed.title.label("feed_title"),
+                func.coalesce(es.is_read, False).label("is_read"),
+                func.coalesce(es.is_starred, False).label("is_starred"),
+                snippet,
+            ),
+            user_id,
+            parsed,
+            status,
+            es,
+        )
+        .join(Feed, Feed.id == Entry.feed_id)
+        .options(load_only(*_LIST_COLUMNS))
+    )
     if cursor_id is not None:
         base = base.where(Entry.id < cursor_id)
 
