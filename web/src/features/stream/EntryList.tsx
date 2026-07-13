@@ -99,7 +99,7 @@ function scopeLabel(stream: StreamDescriptor): string {
     case "feed":
       return "This feed";
     case "folder":
-      return "This folder";
+      return "This category";
     case "starred":
       return "Starred";
     case "all":
