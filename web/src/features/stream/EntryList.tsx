@@ -8,7 +8,7 @@
 // the `/` search box filters the stream (or all streams) via `q=`, replacing the
 // summary with a highlighted ts_headline snippet, still newest-first.
 
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -22,24 +22,22 @@ import {
   RefreshCw,
   Rows3,
   Search,
-  Star,
   X,
 } from "lucide-react";
 
+import type { EntryListItem } from "../../api/endpoints";
 import { useMarkStreamRead, useSetEntryState } from "../../api/mutations";
 import { usePrefetchEntry, useStreamEntries, useSubscriptions } from "../../api/queries";
 import { useOnline } from "../../app/offline/useOffline";
 import { ThemeToggle } from "../../app/ThemeToggle";
 import { useMobileNav } from "../layout/mobileNav";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
-import { Favicon } from "../../components/Favicon";
 import { KeyboardHelp } from "../../keyboard/KeyboardHelp";
 import { useKeyboard, type KeyboardActions } from "../../keyboard/useKeyboard";
-import { highlightSnippet } from "../../lib/highlight";
 import type { StreamDescriptor } from "../../lib/streams";
-import { formatDateTime, relativeTime } from "../../lib/time";
 import { useIsMobile } from "../../lib/useMediaQuery";
 import { useDensity, type Density } from "./density";
+import { EntryRow } from "./EntryRow";
 
 // Mobile-only overflow menu — lazy so its Radix dropdown code (~18kB gz) never
 // ships to desktop, where the inline controls are used instead.
@@ -111,6 +109,7 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
   const [density, setDensity] = useDensity();
   const { cursorId, openId, setCursor, open, close } = useSelection();
   const setState = useSetEntryState();
+  const { mutate: mutateEntryState } = setState;
   const markStreamRead = useMarkStreamRead(stream);
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -188,11 +187,23 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
     return () => window.clearTimeout(t);
   }, [entries, online, prefetchEntry]);
 
-  // Open an entry and mark it read (mark-read-on-open, WP-11).
-  const openEntry = (entry: { id: number; is_read: boolean }) => {
-    open(entry.id);
-    if (!entry.is_read) setState.mutate({ ids: [entry.id], read: true });
-  };
+  // Open an entry and mark it read (mark-read-on-open, WP-11). Memoized (stable
+  // deps) so EntryRow's memo isn't defeated by a fresh handler each render.
+  const openEntry = useCallback(
+    (entry: { id: number; is_read: boolean }) => {
+      open(entry.id);
+      if (!entry.is_read) mutateEntryState({ ids: [entry.id], read: true });
+    },
+    [open, mutateEntryState],
+  );
+  // Row click / Enter: move the cursor here and open it.
+  const activateEntry = useCallback(
+    (entry: EntryListItem) => {
+      setCursor(entry.id);
+      openEntry(entry);
+    },
+    [setCursor, openEntry],
+  );
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["entries"] });
@@ -210,11 +221,16 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
   const cursorIndex = cursorId == null ? -1 : entries.findIndex((e) => e.id === cursorId);
 
   // Move the keyboard cursor, scroll it into view and take DOM focus (so the
-  // ring is real focus and screen readers announce the row).
+  // ring is real focus and screen readers announce the row). On a large jump the
+  // target row isn't virtualized in yet on the first frame, so retry a few frames.
   const focusRowSoon = (index: number) => {
-    requestAnimationFrame(() => {
-      scrollEl?.querySelector<HTMLElement>(`[data-index="${index}"]`)?.focus();
-    });
+    let tries = 0;
+    const attempt = () => {
+      const el = scrollEl?.querySelector<HTMLElement>(`[data-index="${index}"]`);
+      if (el) el.focus();
+      else if (tries++ < 3) requestAnimationFrame(attempt);
+    };
+    requestAnimationFrame(attempt);
   };
   const moveCursor = (index: number) => {
     const e = entries[index];
@@ -311,51 +327,19 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
           {items.map((vi) => {
             const e = entries[vi.index];
             return (
-              <div
+              <EntryRow
                 key={vi.key}
-                role="listitem"
-                tabIndex={-1}
-                data-index={vi.index}
-                ref={virtualizer.measureElement}
-                className={styles.row}
-                data-density={density}
-                data-read={e.is_read || undefined}
-                data-selected={openId === e.id || undefined}
-                data-cursor={cursorId === e.id || undefined}
-                aria-current={openId === e.id}
-                onClick={() => {
-                  setCursor(e.id);
-                  openEntry(e);
-                }}
-                style={{ transform: `translateY(${vi.start}px)` }}
-              >
-                <span className={styles.dot} aria-hidden="true" />
-                <span className={styles.fav}>
-                  <Favicon title={e.feed_title} iconUrl={iconByFeed.get(e.feed_id)} />
-                </span>
-                <span className={styles.feed}>{e.feed_title}</span>
-                <span className={styles.rowtitle}>{e.title}</span>
-                {searching && e.snippet ? (
-                  <span
-                    className={styles.summary}
-                    // Safe: highlightSnippet escapes all content, re-allows only <b>.
-                    dangerouslySetInnerHTML={{ __html: highlightSnippet(e.snippet) }}
-                  />
-                ) : (
-                  <span className={styles.summary}>{e.summary}</span>
-                )}
-                <time
-                  className={styles.time}
-                  dateTime={e.published_at ?? e.created_at}
-                  title={formatDateTime(e.published_at ?? e.created_at)}
-                >
-                  {e.is_starred ? <Star className={styles.star} size={12} /> : null}
-                  {/* The feed's own publish date; fall back to ingest time only when
-                      the feed provides none (so a backfilled feed doesn't show every
-                      entry as "just now"). */}
-                  {relativeTime(e.published_at ?? e.created_at)}
-                </time>
-              </div>
+                entry={e}
+                iconUrl={iconByFeed.get(e.feed_id)}
+                density={density}
+                isOpen={openId === e.id}
+                isCursor={cursorId === e.id}
+                searching={searching}
+                start={vi.start}
+                index={vi.index}
+                measureElement={virtualizer.measureElement}
+                onActivate={activateEntry}
+              />
             );
           })}
         </div>
