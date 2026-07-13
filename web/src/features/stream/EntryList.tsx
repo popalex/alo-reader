@@ -250,8 +250,9 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
       if (e) setState.mutate({ ids: [e.id], starred: !e.is_starred });
     },
     markAllRead: () => {
-      // Mark-all is stream-bounded by a live max id — it can't be queued offline.
-      if (online && entries.length > 0) setConfirmOpen(true);
+      // Mark-all marks the whole base stream, so it's ambiguous while a search
+      // filters the view — disabled then. It also can't be queued offline.
+      if (online && !searching && entries.length > 0) setConfirmOpen(true);
     },
     refresh,
     goAll: () => void navigate({ to: "/" }),
@@ -393,14 +394,16 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
               title={
                 markStreamRead.isPending
                   ? "Marking all read…"
-                  : online
-                    ? "Mark all read"
-                    : "Mark all read (unavailable offline)"
+                  : searching
+                    ? "Mark all read (clear search first)"
+                    : online
+                      ? "Mark all read"
+                      : "Mark all read (unavailable offline)"
               }
               aria-label="Mark all read"
               aria-busy={markStreamRead.isPending || undefined}
               onClick={() => setConfirmOpen(true)}
-              disabled={!online || markStreamRead.isPending || (entries.length === 0 && !searching)}
+              disabled={!online || markStreamRead.isPending || searching || entries.length === 0}
             >
               {markStreamRead.isPending ? (
                 <Loader2 size={15} className={styles.spin} />
@@ -417,7 +420,7 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
               <MobileActionsMenu
                 onRefresh={refresh}
                 onMarkAllRead={() => setConfirmOpen(true)}
-                canMarkAllRead={online && (entries.length > 0 || searching)}
+                canMarkAllRead={online && !searching && entries.length > 0}
               />
             </Suspense>
           )}
