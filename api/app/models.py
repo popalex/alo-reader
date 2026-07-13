@@ -139,6 +139,9 @@ class Entry(Base):
     author: Mapped[str | None] = mapped_column(Text)
     content_html: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
     content_raw: Mapped[bytes | None] = mapped_column(LargeBinary)
+    # Plain-text list preview, derived from content_html once at ingest (migration
+    # 0008) so the hot stream-listing endpoint never re-strips HTML per row/request.
+    summary: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
     # True when content_html was cut to the ~500 KB cap (WP-15, DESIGN.md §1.4).
     content_truncated: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=text("false")

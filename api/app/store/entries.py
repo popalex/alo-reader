@@ -13,11 +13,26 @@ from typing import Any, TypedDict
 from sqlalchemy import BigInteger, Select, and_, func, literal, literal_column, or_, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased
+from sqlalchemy.orm import aliased, load_only
 
+from app.ingest.sanitize import summarize
 from app.models import Entry, EntryState, Feed, Subscription
 from app.store import rowcount
 from app.store.stream import Stream, parse_stream
+
+# Entry columns the list/search views actually render — everything except the heavy
+# content_html/content_raw blobs. Deferring those keeps a listing from pulling up to
+# 500 KB of HTML (plus compressed raw bytes) per row just to show a title + preview.
+_LIST_COLUMNS = (
+    Entry.id,
+    Entry.feed_id,
+    Entry.url,
+    Entry.title,
+    Entry.author,
+    Entry.summary,
+    Entry.published_at,
+    Entry.created_at,
+)
 
 
 @dataclass(frozen=True)
@@ -45,15 +60,25 @@ class NewEntry(TypedDict, total=False):
     content_html: str
     content_raw: bytes | None
     content_truncated: bool
+    summary: str
     published_at: datetime | None
 
 
 async def insert_batch(session: AsyncSession, feed_id: int, entries: list[NewEntry]) -> list[Entry]:
     """Insert new entries for a feed, skipping duplicates on ``(feed_id, guid_hash)``.
-    Returns only the rows actually inserted."""
+    Returns only the rows actually inserted.
+
+    Every row's plain-text ``summary`` is derived from its ``content_html`` here (once,
+    at write time) unless the caller already supplied one, so every insert path — the
+    worker pipeline and tests alike — stores a preview and the read path never strips
+    HTML again."""
     if not entries:
         return []
-    rows: list[dict[str, Any]] = [{"feed_id": feed_id, **e} for e in entries]
+    rows: list[dict[str, Any]] = []
+    for e in entries:
+        row: dict[str, Any] = {"feed_id": feed_id, **e}
+        row.setdefault("summary", summarize(row.get("content_html") or ""))
+        rows.append(row)
     stmt = (
         pg_insert(Entry)
         .values(rows)
@@ -227,7 +252,7 @@ async def list_stream_page(
         parsed,
         status,
         es,
-    ).join(Feed, Feed.id == Entry.feed_id)
+    ).join(Feed, Feed.id == Entry.feed_id).options(load_only(*_LIST_COLUMNS))
     stmt = _paginate_by_recency(stmt, cursor, limit)
     rows = await session.execute(stmt)
     return [
@@ -295,7 +320,7 @@ async def search_stream_page(
         parsed,
         status,
         es,
-    ).join(Feed, Feed.id == Entry.feed_id)
+    ).join(Feed, Feed.id == Entry.feed_id).options(load_only(*_LIST_COLUMNS))
     if cursor_id is not None:
         base = base.where(Entry.id < cursor_id)
 
