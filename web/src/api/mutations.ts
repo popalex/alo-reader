@@ -166,16 +166,17 @@ export function useMarkStreamRead(stream: StreamDescriptor) {
       const prevCounts = qc.getQueryData<Counts>(queryKeys.counts);
       const subs = qc.getQueryData<Subscription[]>(queryKeys.subscriptions);
 
-      const streamData =
-        qc.getQueryData<EntriesData>(["entries", path, "all"]) ??
-        qc.getQueryData<EntriesData>(["entries", path, "unread"]);
       const affected = new Set<number>();
       const perSub = new Map<number, number>();
       let total = 0;
-      if (streamData) {
-        for (const page of streamData.pages)
+      // Loaded entries live under ["entries", path, status, q] — several variants
+      // (unread/all/search). Scan every cached variant of THIS stream rather than one
+      // exact-key lookup (the old 3-element key never matched, so nothing updated).
+      for (const [key, data] of prevEntries) {
+        if (key[1] !== path || !data) continue;
+        for (const page of data.pages)
           for (const e of page.entries)
-            if ((maxEntryId == null || e.id <= maxEntryId) && !e.is_read) {
+            if ((maxEntryId == null || e.id <= maxEntryId) && !e.is_read && !affected.has(e.id)) {
               affected.add(e.id);
               total -= 1;
               const sid = subIdForFeed(subs, e.feed_id);
@@ -196,9 +197,12 @@ export function useMarkStreamRead(stream: StreamDescriptor) {
       // loaded window, so the optimistic change alone isn't obvious feedback.
       pushToast("Marked all as read.", "info");
     },
-    // Entries below the loaded window also got marked read — reconcile counts.
+    // The whole stream got marked read — reconcile counts AND refetch the entries so
+    // the list reflects the server (incl. entries below the loaded window), instead
+    // of needing a manual refresh.
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.counts });
+      void qc.invalidateQueries({ queryKey: ["entries"] });
     },
   });
 }

@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 
 import { Outlet, useRouterState } from "@tanstack/react-router";
 
+import { usePendingFeedPolling } from "../../api/queries";
 import { UnreadAnnouncer } from "../../app/UnreadAnnouncer";
 import { useIsMobile } from "../../lib/useMediaQuery";
 import { Sidebar } from "../sidebar/Sidebar";
@@ -17,6 +18,7 @@ import styles from "./AppLayout.module.css";
 export function AppLayout() {
   const isMobile = useIsMobile();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  usePendingFeedPolling(); // auto-refresh a just-added feed until the worker fills it in
 
   // Close the drawer whenever the stream changes (tapping a feed navigates).
   const pathname = useRouterState({ select: (s) => s.location.pathname });

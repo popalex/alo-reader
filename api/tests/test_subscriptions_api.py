@@ -166,6 +166,20 @@ async def test_delete_subscription(api_client: httpx.AsyncClient, pat_user: PatU
     assert (await api_client.get(SUBS, headers=pat_user.headers)).json() == []
 
 
+async def test_subscribe_seeds_placeholder_title(
+    api_client: httpx.AsyncClient, pat_user: PatUser
+) -> None:
+    # A new feed shows the provided title immediately (before the worker polls), so
+    # the sidebar isn't "Untitled feed" until the first fetch.
+    resp = await api_client.post(
+        SUBS,
+        json={"feed_url": "https://titled.example/rss", "title": "My Podcast"},
+        headers=pat_user.headers,
+    )
+    assert resp.status_code == 201
+    assert resp.json()["title"] == "My Podcast"
+
+
 async def test_refresh_rate_limited(api_client: httpx.AsyncClient, pat_user: PatUser) -> None:
     sub_id = (
         await api_client.post(

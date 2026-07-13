@@ -29,6 +29,16 @@ export function createFolder(token: string | null, name: string): Promise<Folder
   return apiFetch<Folder>("/folders", { token, method: "POST", body: { name } });
 }
 
+/** Rename a folder (category). */
+export function updateFolder(token: string | null, id: number, name: string): Promise<Folder> {
+  return apiFetch<Folder>(`/folders/${id}`, { token, method: "PATCH", body: { name } });
+}
+
+/** Delete a folder (category). 409 if it still has feeds. */
+export function deleteFolder(token: string | null, id: number): Promise<void> {
+  return apiFetch<void>(`/folders/${id}`, { token, method: "DELETE" });
+}
+
 /** Probe a site or feed URL and return the feed candidates found there. */
 export function discoverFeeds(token: string | null, url: string): Promise<DiscoverCandidate[]> {
   return apiFetch<DiscoverCandidate[]>("/discover", { token, method: "POST", body: { url } });
@@ -37,6 +47,7 @@ export function discoverFeeds(token: string | null, url: string): Promise<Discov
 export interface CreateSubscriptionInput {
   feed_url: string;
   folder_id?: number | null;
+  title?: string;
 }
 
 export function createSubscription(
@@ -51,6 +62,21 @@ export function importOpml(token: string | null, file: File): Promise<ImportRepo
   const form = new FormData();
   form.append("file", file);
   return apiFetch<ImportReport>("/opml", { token, method: "POST", body: form });
+}
+
+export interface UpdateSubscriptionInput {
+  title_override?: string | null;
+  folder_id?: number | null;
+}
+
+/** Patch a subscription (rename via title_override, move category via folder_id).
+ *  Only the keys present are changed (PATCH semantics). */
+export function updateSubscription(
+  token: string | null,
+  id: number,
+  input: UpdateSubscriptionInput,
+): Promise<Subscription> {
+  return apiFetch<Subscription>(`/subscriptions/${id}`, { token, method: "PATCH", body: input });
 }
 
 /** Unsubscribe (delete a subscription). Returns 204. */

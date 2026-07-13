@@ -20,7 +20,7 @@ export function MobileSidebar({
       <Dialog.Portal>
         <Dialog.Overlay className={styles.overlay} />
         <Dialog.Content className={styles.drawer} aria-describedby={undefined}>
-          <Dialog.Title className="sr-only">Feeds and folders</Dialog.Title>
+          <Dialog.Title className="sr-only">Feeds and categories</Dialog.Title>
           <Sidebar />
         </Dialog.Content>
       </Dialog.Portal>

@@ -44,6 +44,9 @@ class ParsedFeed:
     version: str
     bozo: bool
     encoding: str | None
+    # The feed's own artwork (<image><url> / <itunes:image>), preferred over the site
+    # favicon as the feed icon — the favicon is usually the generic platform logo.
+    image_url: str | None = None
     entries: list[ParsedEntry] = field(default_factory=list)
 
 
@@ -131,5 +134,6 @@ def parse_feed(raw: bytes, *, now: datetime | None = None) -> ParsedFeed:
         version=d.get("version", "") or "",
         bozo=bool(d.get("bozo", False)),
         encoding=d.get("encoding") or None,
+        image_url=(feed.get("image") or {}).get("href") or None,
         entries=[_normalize_entry(e, now) for e in d.get("entries", [])],
     )

@@ -44,7 +44,7 @@ async def export_opml(user: CurrentUser, session: Session) -> Response:
     rows = await subs_store.list_with_feed(session, user.id)
 
     by_folder: dict[int | None, list[OpmlFeed]] = {}
-    for sub, feed in rows:
+    for sub, feed, _icon in rows:
         by_folder.setdefault(sub.folder_id, []).append(
             OpmlFeed(
                 title=sub.title_override or feed.title or feed.feed_url,

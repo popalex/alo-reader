@@ -101,5 +101,8 @@ test.describe("read-state", () => {
     await confirm.getByRole("button", { name: "Mark all read" }).click();
     // The feed's sidebar badge disappears (unread → 0).
     await expect.poll(async () => (await feed.textContent()) ?? "").not.toMatch(/\d/);
+    // And the list itself updates in place — every loaded row reads read, no manual
+    // refresh needed.
+    await expect.poll(() => page.locator("[data-index]:not([data-read])").count()).toBe(0);
   });
 });

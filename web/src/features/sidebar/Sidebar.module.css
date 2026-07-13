@@ -100,10 +100,77 @@
 }
 
 .folderHead {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 4px;
   padding: 2px 10px 2px 4px;
+}
+
+.folderEdit {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 4px;
+  border: 1px solid var(--accent-border);
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.folderEdit:focus {
+  outline: none;
+}
+
+/* Rename/delete actions: hover-revealed, overlaying the unread count on desktop. */
+.folderActions {
+  position: absolute;
+  right: 8px;
+  /* Above the unread count: on hover the count gets opacity:0, which makes it a
+     stacking context that would otherwise paint over (and swallow clicks on) the
+     delete button. */
+  z-index: 1;
+  display: flex;
+  gap: 1px;
+  opacity: 0;
+}
+
+.folderHead:hover .folderActions,
+.folderActions:focus-within {
+  opacity: 1;
+}
+
+.folderHead:hover .count {
+  opacity: 0;
+}
+
+.folderAction {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 5px;
+  color: var(--text-faint);
+  line-height: 0;
+  cursor: pointer;
+}
+
+.folderAction:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+/* Touch / mobile drawer: no hover, so keep the actions in flow and visible. */
+@media (hover: none), (max-width: 768px) {
+  .folderActions {
+    position: static;
+    opacity: 1;
+  }
+
+  .folderHead:hover .count {
+    opacity: 1;
+  }
 }
 
 .chevron {
@@ -178,13 +245,23 @@
    the right edge where the unread count sits. */
 .feedRow {
   position: relative;
+  display: flex;
+  align-items: center;
 }
 
+.feedRow .feed {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Desktop: the gear is hover-revealed and overlays the unread count (which is
+   hidden on hover), so the resting row stays clean. */
 .del {
   position: absolute;
   right: 6px;
   top: 50%;
   transform: translateY(-50%);
+  z-index: 1; /* above the opacity:0 count so it stays clickable (see .folderActions) */
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -203,14 +280,30 @@
 }
 
 .del:hover {
-  color: var(--danger);
+  color: var(--text);
   background: var(--hover);
 }
 
-/* The trash overlays the unread count on hover — hide the count so they don't
-   sit on top of each other. */
 .feedRow:hover .count {
   opacity: 0;
+}
+
+/* No hover (touch) or the mobile drawer layout (≤768px, matching useIsMobile): a
+   hover-revealed gear is unreachable, so show it permanently in the row's flow
+   (after the count, no overlap) with a bigger tap target. */
+@media (hover: none), (max-width: 768px) {
+  .del {
+    position: static;
+    transform: none;
+    flex: none;
+    opacity: 1;
+    padding: 8px;
+    margin-left: 2px;
+  }
+
+  .feedRow:hover .count {
+    opacity: 1;
+  }
 }
 
 .status {
@@ -233,4 +326,17 @@
 
 .empty:hover {
   color: var(--accent);
+}
+
+.fetching {
+  flex: none;
+  margin-left: auto;
+  color: var(--text-faint);
+  animation: spin 800ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }

@@ -30,6 +30,26 @@ async def test_folder_crud_roundtrip(api_client: httpx.AsyncClient, pat_user: Pa
     assert (await api_client.get(BASE, headers=h)).json() == []
 
 
+async def test_delete_folder_uncategorizes_its_feeds(
+    api_client: httpx.AsyncClient, pat_user: PatUser
+) -> None:
+    # Deleting a category is non-destructive: its feeds fall back to Uncategorized
+    # (folder_id → null), not blocked and not deleted.
+    h = pat_user.headers
+    fid = (await api_client.post(BASE, json={"name": "Tech"}, headers=h)).json()["id"]
+    await api_client.post(
+        "/api/v1/subscriptions",
+        json={"feed_url": "https://f.example/rss", "folder_id": fid},
+        headers=h,
+    )
+
+    assert (await api_client.delete(f"{BASE}/{fid}", headers=h)).status_code == 204
+    assert (await api_client.get(BASE, headers=h)).json() == []  # category gone
+
+    subs = (await api_client.get("/api/v1/subscriptions", headers=h)).json()
+    assert len(subs) == 1 and subs[0]["folder_id"] is None  # feed kept, now uncategorized
+
+
 async def test_create_folder_rejects_empty_name(
     api_client: httpx.AsyncClient, pat_user: PatUser
 ) -> None:

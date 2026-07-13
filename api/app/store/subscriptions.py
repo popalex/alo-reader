@@ -6,7 +6,7 @@ from sqlalchemy import Row, func, select
 from sqlalchemy import delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Entry, EntryState, Feed, Subscription
+from app.models import Entry, EntryState, Feed, Icon, Subscription
 
 
 async def create(
@@ -61,12 +61,14 @@ async def list_all(session: AsyncSession, user_id: int) -> list[Subscription]:
 
 async def list_with_feed(
     session: AsyncSession, user_id: int
-) -> Sequence[Row[tuple[Subscription, Feed]]]:
+) -> Sequence[Row[tuple[Subscription, Feed, str | None]]]:
     """Subscriptions joined to their (global) feed for metadata like ``last_error``
-    and ``last_fetched_at``. The HTTP shaping lives in WP-06."""
+    and ``last_fetched_at``, plus the icon's source URL (used to content-version the
+    icon URL so a changed icon busts the browser's immutable cache). Shaping in WP-06."""
     result = await session.execute(
-        select(Subscription, Feed)
+        select(Subscription, Feed, Icon.url)
         .join(Feed, Feed.id == Subscription.feed_id)
+        .outerjoin(Icon, Icon.id == Feed.icon_id)
         .where(Subscription.user_id == user_id)
         .order_by(Subscription.id)
     )

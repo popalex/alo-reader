@@ -67,5 +67,7 @@ async def update_folder(
 
 @router.delete("/{folder_id}", status_code=204)
 async def delete_folder(folder_id: int, user: CurrentUser, session: Session) -> None:
+    # Non-destructive: the subscriptions.folder_id FK is ON DELETE SET NULL, so a
+    # deleted category's feeds simply fall back to Uncategorized.
     if not await folders_store.delete(session, user.id, folder_id):
         raise ApiError(404, "not_found", "folder not found")

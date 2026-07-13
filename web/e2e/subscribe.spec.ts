@@ -23,6 +23,77 @@ test.describe("feed management (AUTH_MODE=none)", () => {
     await expect(page.getByLabel(/feed or site url/i)).toBeVisible();
   });
 
+  test("category: rename then delete (feeds fall back to Uncategorized)", async ({ page }) => {
+    await page.goto("/");
+    // The seeded "Tech" category holds Hacker News — hover its header, rename inline.
+    const tech = page.getByRole("link", { name: /^tech$/i });
+    await tech.hover();
+    await page.getByRole("button", { name: /rename tech/i }).click();
+    const input = page.getByRole("textbox", { name: /rename tech/i });
+    await input.fill("Reading");
+    await input.press("Enter");
+    await expect(page.getByRole("link", { name: /^reading$/i })).toBeVisible();
+
+    // Delete it → category gone, its feed stays (now uncategorized). The delete
+    // button must be clickable (regression: the opacity:0 count once swallowed it).
+    await page.getByRole("link", { name: /^reading$/i }).hover();
+    await page.getByRole("button", { name: /delete reading/i }).click();
+    await page.getByRole("button", { name: /^delete$/i }).click();
+    await expect(page.getByRole("link", { name: /^reading$/i })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /Hacker News/ })).toBeVisible();
+  });
+
+  test("mobile: the settings gear is visible without hover in the drawer", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 780 });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Open feeds" }).click();
+    const drawer = page.getByRole("dialog");
+    // No hover on touch → the gear must be visible on its own (before any test
+    // renames/deletes Hacker News).
+    await expect(
+      drawer.getByRole("button", { name: /settings for hacker news/i }),
+    ).toBeVisible();
+  });
+
+  test("mobile: add-feed dialog opens above the drawer and is interactable", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 780 });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Open feeds" }).click();
+    await page.getByRole("button", { name: "Subscribe", exact: true }).click();
+
+    await expect(page.getByRole("heading", { name: "Add a feed" })).toBeVisible();
+    // Filling would fail if the drawer/hamburger covered the dialog (regression).
+    const url = page.getByLabel(/feed or site url/i);
+    await url.fill("example.com");
+    await expect(url).toHaveValue("example.com");
+  });
+
+  test("mobile: feed settings dialog opens above the drawer", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 780 });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Open feeds" }).click();
+    await page.getByRole("button", { name: /settings for hacker news/i }).click();
+
+    await expect(page.getByRole("heading", { name: "Feed settings" })).toBeVisible();
+    const title = page.getByLabel(/^title$/i); // interactable → not covered by the drawer
+    await title.fill("HN Mobile");
+    await expect(title).toHaveValue("HN Mobile");
+  });
+
+  test("feed settings: rename a feed and see it update", async ({ page }) => {
+    await page.goto("/");
+    // Rename a feed the other tests don't touch (they use Hacker News).
+    const feed = page.getByRole("link", { name: /The Verge/ });
+    await feed.hover(); // reveal the hover-only gear (desktop)
+    await page.getByRole("button", { name: /settings for the verge/i }).click();
+
+    await expect(page.getByRole("heading", { name: "Feed settings" })).toBeVisible();
+    await page.getByLabel(/^title$/i).fill("Verge Renamed");
+    await page.getByRole("button", { name: /^save$/i }).click();
+
+    await expect(page.getByRole("link", { name: /Verge Renamed/ })).toBeVisible();
+  });
+
   test("deleting the feed you're viewing returns to All items", async ({ page }) => {
     await page.goto("/");
     // Open the feed's own stream (entries must load — guards the feed_id routing).
@@ -31,9 +102,10 @@ test.describe("feed management (AUTH_MODE=none)", () => {
     await expect(page.getByRole("heading", { name: "Hacker News", level: 1 })).toBeVisible();
 
     const feed = page.getByRole("link", { name: /Hacker News/ });
-    await feed.hover(); // reveal the hover-only trash button
-    await page.getByRole("button", { name: /delete hacker news/i }).click();
-    await page.getByRole("button", { name: /^delete$/i }).click();
+    await feed.hover(); // reveal the hover-only gear
+    await page.getByRole("button", { name: /settings for hacker news/i }).click();
+    await page.getByRole("button", { name: /delete feed/i }).click(); // inside the settings dialog
+    await page.getByRole("button", { name: /^delete$/i }).click(); // confirm dialog
 
     await expect(page.getByRole("link", { name: /Hacker News/ })).toHaveCount(0);
     await expect(page).toHaveURL(/\/$/); // bounced back to All items, not left on the dead feed

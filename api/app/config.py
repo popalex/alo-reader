@@ -73,7 +73,10 @@ class Settings(BaseSettings):
     # OPML / discovery / icons (WP-08) size caps.
     opml_max_bytes: int = 1 * 1024 * 1024  # reject larger OPML uploads
     discover_max_bytes: int = 2 * 1024 * 1024  # HTML page cap for feed discovery
-    favicon_max_bytes: int = 100 * 1024  # stored favicon cap
+    favicon_max_bytes: int = 100 * 1024  # stored site-favicon cap
+    # A feed's own artwork (podcast cover, channel image) is preferred over the
+    # favicon and is larger (square art), so it gets a roomier cap.
+    feed_image_max_bytes: int = 512 * 1024
 
     @property
     def user_agent(self) -> str:

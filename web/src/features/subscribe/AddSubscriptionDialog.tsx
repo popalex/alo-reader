@@ -90,14 +90,14 @@ export function AddSubscriptionDialog({
     }
   }
 
-  async function subscribe(feedUrl: string) {
+  async function subscribe(feedUrl: string, title?: string) {
     setError(null);
     try {
       let folder_id: number | null = null;
       if (folderId === NEW_FOLDER) {
         const name = newFolderName.trim();
         if (!name) {
-          setError("Enter a name for the new folder.");
+          setError("Enter a name for the new category.");
           return;
         }
         const folder = await createFolder(await getToken(), name);
@@ -107,7 +107,7 @@ export function AddSubscriptionDialog({
       } else if (folderId) {
         folder_id = Number(folderId);
       }
-      await create.mutateAsync({ feed_url: feedUrl, folder_id });
+      await create.mutateAsync({ feed_url: feedUrl, folder_id, title });
       handleOpenChange(false);
     } catch (err) {
       setError(messageOf(err, "Couldn't subscribe to that feed."));
@@ -157,19 +157,19 @@ export function AddSubscriptionDialog({
             </div>
 
             <label className={styles.folderRow}>
-              <span className={styles.folderLabel}>Folder</span>
+              <span className={styles.folderLabel}>Category</span>
               <select
                 className={styles.select}
                 value={folderId}
                 onChange={(e) => setFolderId(e.target.value)}
               >
-                <option value="">No folder</option>
+                <option value="">No category</option>
                 {folders.map((f) => (
                   <option key={f.id} value={String(f.id)}>
                     {f.name}
                   </option>
                 ))}
-                <option value={NEW_FOLDER}>+ New folder…</option>
+                <option value={NEW_FOLDER}>+ New category…</option>
               </select>
             </label>
 
@@ -177,10 +177,10 @@ export function AddSubscriptionDialog({
               <input
                 className={styles.input}
                 type="text"
-                placeholder="New folder name"
+                placeholder="New category name"
                 value={newFolderName}
                 onChange={(e) => setNewFolderName(e.target.value)}
-                aria-label="New folder name"
+                aria-label="New category name"
               />
             )}
 
@@ -196,7 +196,7 @@ export function AddSubscriptionDialog({
                       type="button"
                       className={styles.add}
                       disabled={create.isPending}
-                      onClick={() => void subscribe(c.feed_url)}
+                      onClick={() => void subscribe(c.feed_url, c.title)}
                     >
                       <Plus size={14} />
                       <span>Add</span>

@@ -38,6 +38,7 @@ const subscriptions: Subscription[] = [
     id: 11,
     feed_id: 101,
     title: "Hacker News",
+    feed_url: "https://news.ycombinator.com/rss",
     site_url: "https://news.ycombinator.com",
     folder_id: 1,
     icon_url: null,
@@ -48,6 +49,7 @@ const subscriptions: Subscription[] = [
     id: 12,
     feed_id: 102,
     title: "Reuters",
+    feed_url: "https://reuters.example/feed",
     site_url: null,
     folder_id: null, // uncategorised
     icon_url: null,

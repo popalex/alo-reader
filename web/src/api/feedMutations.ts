@@ -9,54 +9,85 @@ import { useTokenGetter } from "../app/auth";
 import { pushToast } from "../app/toast";
 import {
   createSubscription,
+  deleteFolder,
   deleteSubscription,
   importOpml,
+  updateFolder,
+  updateSubscription,
   type CreateSubscriptionInput,
   type ImportReport,
   type Subscription,
+  type UpdateSubscriptionInput,
 } from "./endpoints";
 import { queryKeys } from "./queries";
 
-/** Refreshers for feed-list changes. ``refresh`` invalidates the three list
- *  queries now; ``refreshAfterFetch`` also re-runs on a short delay (plus entries),
- *  because a just-added feed stays untitled/empty until the worker polls it a few
- *  seconds later — so its real title + first articles appear without a reload. */
-function useFeedListRefreshers(): { refresh: () => void; refreshAfterFetch: () => void } {
+/** Invalidate the feed-list queries after a change. A just-added feed's real title +
+ *  articles then keep filling in via usePendingFeedPolling (which polls while any feed
+ *  is unfetched), so no delayed refetch is needed here. */
+function useRefreshFeedLists(): () => void {
   const qc = useQueryClient();
-  const refresh = () => {
+  return () => {
     void qc.invalidateQueries({ queryKey: queryKeys.subscriptions });
     void qc.invalidateQueries({ queryKey: queryKeys.folders });
     void qc.invalidateQueries({ queryKey: queryKeys.counts });
   };
-  const refreshAfterFetch = () => {
-    refresh();
-    const later = () => {
-      refresh();
-      void qc.invalidateQueries({ queryKey: ["entries"] });
-    };
-    setTimeout(later, 3000);
-    setTimeout(later, 8000);
-  };
-  return { refresh, refreshAfterFetch };
 }
 
 export function useCreateSubscription() {
   const getToken = useTokenGetter();
-  const { refreshAfterFetch } = useFeedListRefreshers();
+  const refresh = useRefreshFeedLists();
   return useMutation({
     mutationFn: async (input: CreateSubscriptionInput): Promise<Subscription> =>
       createSubscription(await getToken(), input),
     onSuccess: (sub) => {
-      refreshAfterFetch();
+      refresh();
       pushToast(`Subscribed to ${sub.title || "the feed"}.`, "info");
     },
+  });
+}
+
+export function useUpdateFolder() {
+  const getToken = useTokenGetter();
+  const refresh = useRefreshFeedLists();
+  return useMutation({
+    mutationFn: async (vars: { id: number; name: string }) =>
+      updateFolder(await getToken(), vars.id, vars.name),
+    onSuccess: () => refresh(),
+    onError: () => pushToast("Couldn't rename the category.", "error"),
+  });
+}
+
+export function useDeleteFolder() {
+  const getToken = useTokenGetter();
+  const refresh = useRefreshFeedLists();
+  return useMutation({
+    mutationFn: async (id: number) => deleteFolder(await getToken(), id),
+    onSuccess: () => {
+      // refresh() re-fetches subscriptions too, so feeds now show under Uncategorized.
+      refresh();
+      pushToast("Category deleted.", "info");
+    },
+    onError: () => pushToast("Couldn't delete the category.", "error"),
+  });
+}
+
+export function useUpdateSubscription() {
+  const getToken = useTokenGetter();
+  const refresh = useRefreshFeedLists();
+  return useMutation({
+    mutationFn: async (vars: { id: number } & UpdateSubscriptionInput): Promise<Subscription> => {
+      const { id, ...input } = vars;
+      return updateSubscription(await getToken(), id, input);
+    },
+    onSuccess: () => refresh(),
+    onError: () => pushToast("Couldn't save the feed's settings.", "error"),
   });
 }
 
 export function useDeleteSubscription() {
   const getToken = useTokenGetter();
   const qc = useQueryClient();
-  const { refresh } = useFeedListRefreshers();
+  const refresh = useRefreshFeedLists();
   return useMutation({
     mutationFn: async (vars: { id: number; title?: string }): Promise<void> =>
       deleteSubscription(await getToken(), vars.id),
@@ -72,11 +103,11 @@ export function useDeleteSubscription() {
 
 export function useImportOpml() {
   const getToken = useTokenGetter();
-  const { refreshAfterFetch } = useFeedListRefreshers();
+  const refresh = useRefreshFeedLists();
   return useMutation({
     mutationFn: async (file: File): Promise<ImportReport> => importOpml(await getToken(), file),
     onSuccess: (report) => {
-      refreshAfterFetch();
+      refresh();
       const n = report.imported;
       pushToast(`Imported ${n} feed${n === 1 ? "" : "s"}.`, "info");
     },
