@@ -59,6 +59,11 @@ class Counters:
             self.errors += 1
 
 
+# Sweep out per-host bookkeeping for hosts idle at least this long. Without it the
+# gate's maps grow one entry per distinct host for the life of the worker.
+_HOST_GATE_PRUNE_INTERVAL_S = 300.0
+
+
 class HostGate:
     """Per-origin-host concurrency limit plus a minimum spacing between fetches."""
 
@@ -67,21 +72,48 @@ class HostGate:
         self._delay = delay_s
         self._sems: dict[str, asyncio.Semaphore] = {}
         self._next_allowed: dict[str, float] = {}
+        self._active: dict[str, int] = {}  # in-flight slot holders per host
+        self._last_prune = 0.0
 
     @asynccontextmanager
     async def slot(self, host: str) -> AsyncIterator[None]:
         sem = self._sems.setdefault(host, asyncio.Semaphore(self._concurrency))
-        async with sem:
-            loop = asyncio.get_running_loop()
-            if self._delay > 0:
-                wait = self._next_allowed.get(host, 0.0) - loop.time()
-                if wait > 0:
-                    await asyncio.sleep(wait)
-            try:
-                yield
-            finally:
+        self._active[host] = self._active.get(host, 0) + 1
+        try:
+            async with sem:
+                loop = asyncio.get_running_loop()
                 if self._delay > 0:
-                    self._next_allowed[host] = asyncio.get_running_loop().time() + self._delay
+                    wait = self._next_allowed.get(host, 0.0) - loop.time()
+                    if wait > 0:
+                        await asyncio.sleep(wait)
+                try:
+                    yield
+                finally:
+                    if self._delay > 0:
+                        self._next_allowed[host] = asyncio.get_running_loop().time() + self._delay
+        finally:
+            if (remaining := self._active[host] - 1) > 0:
+                self._active[host] = remaining
+            else:
+                del self._active[host]
+            self._prune()
+
+    def _prune(self) -> None:
+        """Drop bookkeeping for hosts with no in-flight fetch whose spacing window has
+        elapsed. Such a host recreates its state (a fresh full semaphore, no pending
+        delay) identically on next use, so pruning is behavior-preserving."""
+        now = asyncio.get_running_loop().time()
+        if now - self._last_prune < _HOST_GATE_PRUNE_INTERVAL_S:
+            return
+        self._last_prune = now
+        idle = [
+            h
+            for h in list(self._sems)
+            if h not in self._active and self._next_allowed.get(h, 0.0) <= now
+        ]
+        for h in idle:
+            self._sems.pop(h, None)
+            self._next_allowed.pop(h, None)
 
 
 def _host(feed_url: str) -> str:
