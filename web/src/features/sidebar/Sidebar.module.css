@@ -129,6 +129,10 @@
 .folderActions {
   position: absolute;
   right: 8px;
+  /* Above the unread count: on hover the count gets opacity:0, which makes it a
+     stacking context that would otherwise paint over (and swallow clicks on) the
+     delete button. */
+  z-index: 1;
   display: flex;
   gap: 1px;
   opacity: 0;
@@ -257,6 +261,7 @@
   right: 6px;
   top: 50%;
   transform: translateY(-50%);
+  z-index: 1; /* above the opacity:0 count so it stays clickable (see .folderActions) */
   display: inline-flex;
   align-items: center;
   justify-content: center;

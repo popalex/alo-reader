@@ -23,9 +23,9 @@ test.describe("feed management (AUTH_MODE=none)", () => {
     await expect(page.getByLabel(/feed or site url/i)).toBeVisible();
   });
 
-  test("category: rename from the sidebar", async ({ page }) => {
+  test("category: rename then delete (feeds fall back to Uncategorized)", async ({ page }) => {
     await page.goto("/");
-    // The seeded "Tech" category — hover its header, rename it inline.
+    // The seeded "Tech" category holds Hacker News — hover its header, rename inline.
     const tech = page.getByRole("link", { name: /^tech$/i });
     await tech.hover();
     await page.getByRole("button", { name: /rename tech/i }).click();
@@ -33,6 +33,14 @@ test.describe("feed management (AUTH_MODE=none)", () => {
     await input.fill("Reading");
     await input.press("Enter");
     await expect(page.getByRole("link", { name: /^reading$/i })).toBeVisible();
+
+    // Delete it → category gone, its feed stays (now uncategorized). The delete
+    // button must be clickable (regression: the opacity:0 count once swallowed it).
+    await page.getByRole("link", { name: /^reading$/i }).hover();
+    await page.getByRole("button", { name: /delete reading/i }).click();
+    await page.getByRole("button", { name: /^delete$/i }).click();
+    await expect(page.getByRole("link", { name: /^reading$/i })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /Hacker News/ })).toBeVisible();
   });
 
   test("mobile: the settings gear is visible without hover in the drawer", async ({ page }) => {
