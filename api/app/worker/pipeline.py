@@ -18,7 +18,7 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.config import Settings
-from app.ingest import compress_text, parse_feed, sanitize_and_cap
+from app.ingest import compress_text, parse_feed, sanitize_and_cap, summarize
 from app.ingest.parse import ParsedFeed
 from app.store import entries as entries_store
 from app.store import feeds as feeds_store
@@ -70,6 +70,9 @@ def _build_entries(body: bytes) -> tuple[ParsedFeed, list[NewEntry]]:
                 content_html=content_html,
                 content_raw=compress_text(e.content_html) if e.content_html else None,
                 content_truncated=truncated,
+                # Derived here in the worker thread (CPU-bound) so the read path serves
+                # a stored preview instead of re-stripping HTML on every listing.
+                summary=summarize(content_html),
                 published_at=e.published_at,
             )
         )

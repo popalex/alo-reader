@@ -1,9 +1,10 @@
 """Stream entry listing + bounded mark-read (DESIGN.md §5).
 
 A stream is ``all | feed/{id} | folder/{id} | starred`` — the single query
-abstraction. Listing is newest-first by id with an exclusive cursor (stable under
-concurrent inserts); ``status=unread`` honors ``since_entry_id`` and the per-user
-read flag. Search (``q=``) is not implemented yet and is rejected explicitly.
+abstraction. Listing is newest-first by recency with an exclusive cursor (stable
+under concurrent inserts); ``status=unread`` honors ``since_entry_id`` and the
+per-user read flag. A ``q=`` term switches the same endpoint into full-text search
+(chronological, page-capped) via ``search_stream_page`` (DESIGN.md §4.1).
 """
 
 from datetime import datetime
@@ -17,7 +18,6 @@ from app.auth.provider import AuthedUser
 from app.auth.runtime import current_user
 from app.db import get_session
 from app.errors import ApiError
-from app.ingest import summarize
 from app.store import entries as entries_store
 from app.store.entries import SEARCH_LIMIT, SearchRow, StreamRow
 from app.store.stream import parse_stream
@@ -78,7 +78,7 @@ def _list_item(row: StreamRow) -> EntryListItem:
         url=e.url,
         title=e.title,
         author=e.author,
-        summary=summarize(e.content_html),
+        summary=e.summary,
         published_at=e.published_at,
         created_at=e.created_at,
         is_read=row.is_read,

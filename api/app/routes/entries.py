@@ -16,7 +16,6 @@ from app.auth.provider import AuthedUser
 from app.auth.runtime import current_user
 from app.db import get_session
 from app.errors import ApiError
-from app.ingest import summarize
 from app.store import entries as entries_store
 from app.store import entry_states as states_store
 
@@ -67,7 +66,7 @@ async def get_entry(entry_id: int, user: CurrentUser, session: Session) -> Entry
         url=e.url,
         title=e.title,
         author=e.author,
-        summary=summarize(e.content_html),
+        summary=e.summary,
         content_html=e.content_html,
         published_at=e.published_at,
         created_at=e.created_at,
