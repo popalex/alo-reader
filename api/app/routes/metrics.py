@@ -7,20 +7,15 @@ lag, table/DB sizes) with the worker-recorded counters (fetch outcomes, per-host
 403/429).
 """
 
-from typing import Annotated
-
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from fastapi.responses import PlainTextResponse
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import httpmetrics
-from app.db import get_session
+from app.deps import Session
 from app.metrics import CONTENT_TYPE, Family, label_str, render
 from app.store import metrics as metrics_store
 
 router = APIRouter(tags=["ops"])
-
-Session = Annotated[AsyncSession, Depends(get_session)]
 
 
 @router.get("/metrics", include_in_schema=False)

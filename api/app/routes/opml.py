@@ -5,15 +5,12 @@ import asyncio
 from typing import Annotated
 from xml.etree import ElementTree
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.provider import AuthedUser
-from app.auth.runtime import current_user
 from app.config import get_settings
-from app.db import get_session
+from app.deps import CurrentUser, Session
 from app.errors import ApiError
 from app.opml import OpmlFeed, build_opml, parse_opml
 from app.routes.subscriptions import normalize_feed_url
@@ -24,9 +21,6 @@ from app.store import subscriptions as subs_store
 from app.store import users as users_store
 
 router = APIRouter(tags=["opml"])
-
-CurrentUser = Annotated[AuthedUser, Depends(current_user)]
-Session = Annotated[AsyncSession, Depends(get_session)]
 
 
 class ImportFailure(BaseModel):

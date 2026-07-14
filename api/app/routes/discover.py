@@ -8,26 +8,20 @@ offered as candidates (unverified — the subscribe path validates on first poll
 
 import asyncio
 from html.parser import HTMLParser
-from typing import Annotated
 from urllib.parse import urljoin, urlsplit
 
 import feedparser  # type: ignore[import-untyped]
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.provider import AuthedUser
 from app.auth.ratelimit import Cooldown
-from app.auth.runtime import current_user
 from app.config import get_settings
-from app.db import get_session
+from app.deps import CurrentUser, Session
 from app.errors import ApiError
 from app.worker.http import guarded_get
 
 router = APIRouter(tags=["discover"])
 
-CurrentUser = Annotated[AuthedUser, Depends(current_user)]
-Session = Annotated[AsyncSession, Depends(get_session)]
 
 _FEED_TYPES = ("application/rss+xml", "application/atom+xml", "application/feed+json")
 _FALLBACK_PATHS = ("/feed", "/rss", "/atom.xml", "/index.xml")
