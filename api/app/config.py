@@ -31,6 +31,17 @@ class Settings(BaseSettings):
     # Sourced from DATABASE_URL; required, no default (no hardcoded credentials).
     database_url: str
 
+    # Connection pool (per process). pool_size must be >= worker_max_concurrency
+    # (below) or the worker's concurrent per-feed transactions starve on the pool.
+    # pre_ping revives connections dropped by a DB restart / idle timeout; recycle
+    # bounds connection age. statement_timeout is a server-side ceiling on any single
+    # statement (bounds a pathological query); it must exceed the largest expected
+    # maintenance batch (the retention purge is bounded to retention_purge_batch_size).
+    db_pool_size: int = 20
+    db_max_overflow: int = 10
+    db_pool_recycle_s: int = 1800
+    db_statement_timeout_ms: int = 30_000
+
     # AUTH_MODE has deliberately no default: the server refuses to boot without
     # an explicit choice (DESIGN.md §0.1 — "none" must never be implicit).
     auth_mode: str | None = None
