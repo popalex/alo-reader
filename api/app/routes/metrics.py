@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import httpmetrics
 from app.db import get_session
 from app.metrics import CONTENT_TYPE, Family, label_str, render
 from app.store import metrics as metrics_store
@@ -52,5 +53,21 @@ async def metrics(session: Session) -> PlainTextResponse:
     db = Family("alo_db_bytes", "Total database size.", "gauge")
     db.add(await metrics_store.db_size_bytes(session))
     families.append(db)
+
+    # In-process HTTP RED counters (per replica).
+    reqs = Family("alo_http_requests_total", "HTTP requests by method and status.", "counter")
+    for method, status, count in httpmetrics.snapshot_requests():
+        reqs.add(count, label_str([("method", method), ("status", str(status))]))
+    families.append(reqs)
+
+    sum_s, count = httpmetrics.duration_totals()
+    dur_sum = Family("alo_http_request_duration_seconds_sum", "Total request duration.", "counter")
+    dur_sum.add(sum_s)
+    dur_count = Family(
+        "alo_http_request_duration_seconds_count", "Total requests timed.", "counter"
+    )
+    dur_count.add(count)
+    families.append(dur_sum)
+    families.append(dur_count)
 
     return PlainTextResponse(render(families), media_type=CONTENT_TYPE)

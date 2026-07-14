@@ -13,6 +13,7 @@ from app.auth import AuthMiddleware
 from app.auth import router as auth_router
 from app.config import validate_boot_config
 from app.errors import register_exception_handlers
+from app.httpmetrics import HttpMetricsMiddleware
 from app.log import RequestContextMiddleware
 from app.routes.counts import router as counts_router
 from app.routes.discover import router as discover_router
@@ -40,6 +41,9 @@ app.add_middleware(AuthMiddleware)
 # outer of that so its X-Request-ID is set before anything runs and echoed on every
 # response.
 app.add_middleware(SecurityHeadersMiddleware)
+# Times the full request (auth + handler). Outer of that is the request-context
+# middleware so its id is assigned first and echoed on every response.
+app.add_middleware(HttpMetricsMiddleware)
 app.add_middleware(RequestContextMiddleware)
 
 api_v1 = APIRouter(prefix="/api/v1")
