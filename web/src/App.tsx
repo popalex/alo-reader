@@ -20,10 +20,17 @@ function Booting() {
   );
 }
 
-function BootError({ message }: { message: string }) {
+function BootError({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <main style={{ display: "grid", placeItems: "center", minHeight: "100vh" }}>
-      <p role="alert">Could not start alo-reader — {message}</p>
+      <div style={{ display: "grid", placeItems: "center", gap: 12, textAlign: "center" }}>
+        <p role="alert">Could not start alo-reader — {message}</p>
+        {onRetry ? (
+          <button type="button" onClick={onRetry}>
+            Try again
+          </button>
+        ) : null}
+      </div>
     </main>
   );
 }
@@ -31,6 +38,7 @@ function BootError({ message }: { message: string }) {
 export function App() {
   const [config, setConfig] = useState<ApiConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,9 +54,16 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
-  if (error) return <BootError message={error} />;
+  // A failed /config fetch (transient network blip on first load) is otherwise a
+  // dead end — let the user retry without a full reload.
+  const retry = () => {
+    setError(null);
+    setAttempt((n) => n + 1);
+  };
+
+  if (error) return <BootError message={error} onRetry={retry} />;
   if (!config) return <Booting />;
 
   if (config.auth_mode === "clerk") {
