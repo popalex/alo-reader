@@ -27,6 +27,19 @@ def _is_public(path: str) -> bool:
     return path in PUBLIC_PATHS or path.startswith(PUBLIC_PREFIXES)
 
 
+def client_ip(request: Request) -> str:
+    """The real client IP for per-IP rate limiting.
+
+    Caddy (the edge) injects it as ``X-Real-IP`` (overwrite semantics), and the app is
+    only reachable through Caddy — 8000 is unpublished — so the header can't be spoofed.
+    Fall back to the socket peer when the header is absent (local dev / tests)."""
+    header = request.headers.get("x-real-ip")
+    if header:
+        return header.strip()
+    client = request.client
+    return client.host if client is not None else "unknown"
+
+
 class AuthMiddleware:
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
@@ -37,6 +50,16 @@ class AuthMiddleware:
             return
         request = Request(scope, receive)
         runtime = get_runtime(request.app)
+        # Per-IP gate BEFORE the provider chain: bounds the pre-auth cost (a DB lookup
+        # for an invalid PAT, a signature verify for a bogus JWT) that an unauthenticated
+        # client could otherwise force per request.
+        if not runtime.ip_limiter.allow(client_ip(request)):
+            response = JSONResponse(
+                status_code=429,
+                content=error_envelope("rate_limited", "too many requests"),
+            )
+            await response(scope, receive, send)
+            return
         user = await runtime.provider.authenticate(request)
         if user is not None:
             if not runtime.limiter.allow(user.id):

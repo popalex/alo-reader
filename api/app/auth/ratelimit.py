@@ -5,27 +5,29 @@ accounting (move to shared state only if that ever matters).
 """
 
 import time
+from collections.abc import Hashable
 
 # How often (seconds) either gate sweeps out idle keys. The maps are keyed by user
-# id / feed id, so without eviction a long-lived replica accumulates one entry per
-# distinct key ever seen. Pruning is behavior-preserving: a swept key is recreated
-# on its next use in exactly the state it would have decayed to (see below).
+# id / feed id / client IP, so without eviction a long-lived replica accumulates one
+# entry per distinct key ever seen. Pruning is behavior-preserving: a swept key is
+# recreated on its next use in exactly the state it would have decayed to (see below).
 _PRUNE_INTERVAL_S = 300.0
 
 
 class TokenBucket:
-    """Classic token bucket keyed by user id: `burst` capacity, `rate`/s refill."""
+    """Classic token bucket keyed by any hashable (user id or client IP): `burst`
+    capacity, `rate`/s refill."""
 
     def __init__(self, rate: float, burst: int) -> None:
         self._rate = rate
         self._burst = float(burst)
-        self._buckets: dict[int, tuple[float, float]] = {}  # key -> (tokens, last)
+        self._buckets: dict[Hashable, tuple[float, float]] = {}  # key -> (tokens, last)
         self._last_prune = time.monotonic()
         # A bucket untouched for this long has fully refilled to `burst`, so dropping
         # it is identical to keeping it (its next use recreates a full bucket).
         self._idle_ttl = burst / rate if rate > 0 else _PRUNE_INTERVAL_S
 
-    def allow(self, key: int) -> bool:
+    def allow(self, key: Hashable) -> bool:
         now = time.monotonic()
         self._maybe_prune(now)
         tokens, last = self._buckets.get(key, (self._burst, now))

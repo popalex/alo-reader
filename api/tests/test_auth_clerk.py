@@ -69,7 +69,11 @@ async def clerk_env(api_db: str, rsa_key: rsa.RSAPrivateKey) -> AsyncIterator[Cl
     http_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     settings = ClerkSettings(issuer=ISSUER, audience=AUDIENCE, publishable_key="pk_test_visible")
     provider = build_provider("clerk", clerk_settings=settings, clerk_http_client=http_client)
-    app.state.auth_runtime = AuthRuntime(provider=provider, limiter=TokenBucket(1000, 1000))
+    app.state.auth_runtime = AuthRuntime(
+        provider=provider,
+        limiter=TokenBucket(1000, 1000),
+        ip_limiter=TokenBucket(1000, 1000),
+    )
     yield env
     await http_client.aclose()
 

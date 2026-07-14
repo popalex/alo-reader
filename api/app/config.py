@@ -51,6 +51,14 @@ class Settings(BaseSettings):
     rate_limit_rps: float = 10.0
     rate_limit_burst: int = 30
 
+    # Per-IP token bucket applied BEFORE authentication (bounds the pre-auth cost of
+    # the provider chain — a DB lookup for an invalid PAT, a JWT signature verify for a
+    # bogus Clerk token). Deliberately looser than the per-user bucket so an
+    # authenticated user still hits the per-user limit first. Keyed on the real client
+    # IP that Caddy injects (X-Real-IP); see AuthMiddleware. Per API replica.
+    rate_limit_ip_rps: float = 50.0
+    rate_limit_ip_burst: int = 120
+
     # Minimum spacing between manual /subscriptions/{id}/refresh calls per feed
     # (per API replica), so a user can't hammer the poller.
     subscription_refresh_window_s: float = 300.0
