@@ -19,9 +19,8 @@ import {
   type Folder,
   type ImportReport,
 } from "../../api/endpoints";
+import { FolderSelect, NEW_FOLDER } from "./FolderSelect";
 import styles from "./AddSubscriptionDialog.module.css";
-
-const NEW_FOLDER = "__new__";
 
 function messageOf(err: unknown, fallback: string): string {
   return err instanceof ApiError ? err.message : fallback;
@@ -171,33 +170,13 @@ export function AddSubscriptionDialog({
               </button>
             </div>
 
-            <label className={styles.folderRow}>
-              <span className={styles.folderLabel}>Category</span>
-              <select
-                className={styles.select}
-                value={folderId}
-                onChange={(e) => setFolderId(e.target.value)}
-              >
-                <option value="">No category</option>
-                {folders.map((f) => (
-                  <option key={f.id} value={String(f.id)}>
-                    {f.name}
-                  </option>
-                ))}
-                <option value={NEW_FOLDER}>+ New category…</option>
-              </select>
-            </label>
-
-            {folderId === NEW_FOLDER && (
-              <input
-                className={styles.input}
-                type="text"
-                placeholder="New category name"
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                aria-label="New category name"
-              />
-            )}
+            <FolderSelect
+              folders={folders}
+              value={folderId}
+              onChange={setFolderId}
+              newName={newFolderName}
+              onNewNameChange={setNewFolderName}
+            />
 
             {candidates && candidates.length > 0 && (
               <ul className={styles.candidates}>
