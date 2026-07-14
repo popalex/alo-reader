@@ -175,6 +175,15 @@ def _apply_stream[S: Select[Any]](stmt: S, user_id: int, parsed: Stream, status:
 # date (matches what the UI shows). ``id`` breaks ties so the order is total and the
 # keyset cursor is stable. Paging uses a composite ``(recency, id)`` cursor rather than
 # a bare id so it stays gap-free under this ordering.
+#
+# Query-plan note (folder/all streams): because feed membership comes through the
+# ``subscriptions`` join, Postgres gathers the member feeds' entries and top-N sorts
+# by recency rather than merging per-feed recency indexes — idx_entries_feed_recency
+# only drives the single-feed stream, idx_entries_recency the global sort. Measured at
+# ~28 ms for a 6-feed folder over 40k entries (EXPLAIN, review 2026-07). Fine at
+# self-host scale; a new index does NOT change this plan. At much larger scale the
+# lever is a query rewrite (a per-feed MergeAppend, e.g. UNION ALL of per-feed
+# recency-LIMIT subqueries), deferred as premature until the data warrants it.
 _CURSOR_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
 
