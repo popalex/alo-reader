@@ -11,6 +11,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Protocol
 from urllib.parse import urlsplit
 
@@ -55,11 +56,23 @@ class FeedOutcome:
     error: str | None = None
 
 
-def _build_entries(body: bytes) -> tuple[ParsedFeed, list[NewEntry]]:
+# Sort sentinel for undated entries: they sink below any dated entry, so they're the
+# first dropped when a fetch exceeds the per-fetch cap.
+_OLDEST = datetime.min.replace(tzinfo=UTC)
+
+
+def _build_entries(body: bytes, *, max_entries: int) -> tuple[ParsedFeed, list[NewEntry]]:
     """Parse + sanitize a feed body into insertable rows. Pure/CPU — run in a thread."""
     parsed = parse_feed(body)
+    entries = parsed.entries
+    if len(entries) > max_entries:
+        # Only a pathological feed trips this; keep the newest N by publish date so one
+        # fetch can't build an unbounded transaction. Normal feeds are untouched.
+        entries = sorted(entries, key=lambda e: e.published_at or _OLDEST, reverse=True)[
+            :max_entries
+        ]
     rows: list[NewEntry] = []
-    for e in parsed.entries:
+    for e in entries:
         content_html, truncated = sanitize_and_cap(e.content_html)
         rows.append(
             NewEntry(
@@ -88,7 +101,9 @@ async def _apply_new_body(
 ) -> FeedOutcome:
     if result.body is None:  # defensive: new_body always carries a body
         return await _apply_error(session, feed, result, settings, "empty body")
-    parsed, rows = await asyncio.to_thread(_build_entries, result.body)
+    parsed, rows = await asyncio.to_thread(
+        _build_entries, result.body, max_entries=settings.worker_max_entries_per_fetch
+    )
     # A 200 that feedparser can't recognize as a feed (empty ``version``) and that
     # yields no items is almost always an HTML page — a wrong or removed feed URL.
     # Record it as an error so the UI shows a failing feed with a message, instead

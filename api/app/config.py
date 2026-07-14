@@ -107,6 +107,10 @@ class Settings(BaseSettings):
     # = ceil(50/20) × 30s = 90s, plus per-host spacing — 300s leaves comfortable margin.
     worker_lease_s: int = 300
     worker_max_concurrency: int = 20
+    # Cap entries persisted from a single fetch, so a pathological feed advertising
+    # thousands of items can't build one unbounded INSERT/transaction. The newest N by
+    # publish date are kept (undated last). Well above any sane feed's item count.
+    worker_max_entries_per_fetch: int = 2000
 
     # Politeness per origin host: at most this many concurrent fetches to one
     # host, and at least this long between successive fetches to it.
