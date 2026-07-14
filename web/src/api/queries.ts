@@ -91,21 +91,15 @@ export function useCounts() {
   });
 }
 
-export type StreamStatus = "unread" | "all";
-
-export function useStreamEntries(
-  stream: StreamDescriptor,
-  status: StreamStatus = "all",
-  q?: string,
-) {
+export function useStreamEntries(stream: StreamDescriptor, q?: string) {
   const getToken = useTokenGetter();
   const path = streamToPath(stream);
   return useInfiniteQuery({
     // q is part of the key so a query switches result sets (and mutations still
     // match the ["entries", …] prefix, so optimistic patches reach search rows too).
-    queryKey: ["entries", path, status, q ?? null],
+    queryKey: ["entries", path, q ?? null],
     queryFn: async ({ pageParam }) =>
-      getStreamEntries(await getToken(), path, { status, cursor: pageParam, q }),
+      getStreamEntries(await getToken(), path, { cursor: pageParam, q }),
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.next_cursor,
   });

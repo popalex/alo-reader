@@ -74,7 +74,7 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
     return m;
   }, [subs.data]);
 
-  const query = useStreamEntries(activeStream, "all", searching ? searchTerm : undefined);
+  const query = useStreamEntries(activeStream, searching ? searchTerm : undefined);
   const entries = useMemo(() => query.data?.pages.flatMap((p) => p.entries) ?? [], [query.data]);
 
   // State-backed ref so the virtualizer re-initializes once the scroll element

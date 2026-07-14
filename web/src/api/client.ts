@@ -7,13 +7,6 @@ export interface ApiConfig {
   clerk_publishable_key?: string;
 }
 
-export interface Me {
-  id: number;
-  email: string;
-  quotas: { subscriptions: number };
-  counts_summary: { total_unread: number };
-}
-
 /** The uniform backend error envelope, surfaced as a typed exception. */
 export class ApiError extends Error {
   constructor(
@@ -74,8 +67,4 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
 
 export function getConfig(): Promise<ApiConfig> {
   return apiFetch<ApiConfig>("/config");
-}
-
-export function getMe(token: string | null): Promise<Me> {
-  return apiFetch<Me>("/me", { token });
 }

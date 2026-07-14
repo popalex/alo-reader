@@ -89,7 +89,6 @@ export function getCounts(token: string | null): Promise<Counts> {
 }
 
 export interface StreamQuery {
-  status?: "unread" | "all";
   cursor?: string | null;
   limit?: number;
   q?: string;
@@ -100,8 +99,10 @@ export function getStreamEntries(
   streamPath: string,
   opts: StreamQuery = {},
 ): Promise<StreamPage> {
+  // status is always "all" — the app has no unread-only view (the API defaults to
+  // all, but send it explicitly to keep the contract obvious).
   const params = new URLSearchParams({
-    status: opts.status ?? "all",
+    status: "all",
     limit: String(opts.limit ?? 50),
   });
   if (opts.cursor) params.set("cursor", opts.cursor);
