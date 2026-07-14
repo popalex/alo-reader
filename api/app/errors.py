@@ -12,6 +12,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.log import log, request_id
+
 
 class ErrorBody(BaseModel):
     code: str
@@ -77,4 +79,19 @@ def register_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=exc.status_code,
             content=error_envelope(code, str(exc.detail)),
+        )
+
+    @app.exception_handler(Exception)
+    async def unhandled(request: Request, exc: Exception) -> JSONResponse:
+        # Anything not deliberately raised: keep the uniform envelope (never leak the
+        # exception text/traceback to the client) and log it with request context.
+        log.exception(
+            "unhandled_error method=%s path=%s request_id=%s",
+            request.method,
+            request.url.path,
+            request_id(request),
+        )
+        return JSONResponse(
+            status_code=500,
+            content=error_envelope("internal", "internal server error"),
         )
