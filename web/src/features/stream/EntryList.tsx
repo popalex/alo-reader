@@ -8,76 +8,31 @@
 // the `/` search box filters the stream (or all streams) via `q=`, replacing the
 // summary with a highlighted ts_headline snippet, still newest-first.
 
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import {
-  CheckCheck,
-  CircleAlert,
-  List as ListIcon,
-  Loader2,
-  Menu,
-  RefreshCw,
-  Rows3,
-  Search,
-  Star,
-  X,
-} from "lucide-react";
+import { CircleAlert, Loader2 } from "lucide-react";
 
+import type { EntryListItem } from "../../api/endpoints";
 import { useMarkStreamRead, useSetEntryState } from "../../api/mutations";
 import { usePrefetchEntry, useStreamEntries, useSubscriptions } from "../../api/queries";
 import { useOnline } from "../../app/offline/useOffline";
-import { ThemeToggle } from "../../app/ThemeToggle";
 import { useMobileNav } from "../layout/mobileNav";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
-import { Favicon } from "../../components/Favicon";
 import { KeyboardHelp } from "../../keyboard/KeyboardHelp";
 import { useKeyboard, type KeyboardActions } from "../../keyboard/useKeyboard";
-import { highlightSnippet } from "../../lib/highlight";
 import type { StreamDescriptor } from "../../lib/streams";
-import { formatDateTime, relativeTime } from "../../lib/time";
 import { useIsMobile } from "../../lib/useMediaQuery";
-import { useDensity, type Density } from "./density";
-
-// Mobile-only overflow menu — lazy so its Radix dropdown code (~18kB gz) never
-// ships to desktop, where the inline controls are used instead.
-const MobileActionsMenu = lazy(() =>
-  import("./MobileActionsMenu").then((m) => ({ default: m.MobileActionsMenu })),
-);
+import { useDensity } from "./density";
+import { EntryListHeader } from "./EntryListHeader";
+import { EntryRow } from "./EntryRow";
+import { SearchBar } from "./SearchBar";
+import { useStreamSearch } from "./useStreamSearch";
 import { useScrollReadMarker } from "./useScrollReadMarker";
 import { useSelection } from "./selection";
 import styles from "./EntryList.module.css";
-
-function DensityToggle({ value, onChange }: { value: Density; onChange: (d: Density) => void }) {
-  return (
-    <div className={styles.density} role="group" aria-label="List density">
-      <button
-        type="button"
-        className={styles.densityOpt}
-        data-active={value === "list"}
-        aria-pressed={value === "list"}
-        aria-label="Compact rows"
-        title="Compact rows"
-        onClick={() => onChange("list")}
-      >
-        <ListIcon size={15} />
-      </button>
-      <button
-        type="button"
-        className={styles.densityOpt}
-        data-active={value === "expanded"}
-        aria-pressed={value === "expanded"}
-        aria-label="Expanded rows"
-        title="Expanded rows"
-        onClick={() => onChange("expanded")}
-      >
-        <Rows3 size={15} />
-      </button>
-    </div>
-  );
-}
 
 function EmptyList({ starred }: { starred: boolean }) {
   return (
@@ -92,25 +47,11 @@ function EmptyList({ starred }: { starred: boolean }) {
   );
 }
 
-const ALL_STREAM: StreamDescriptor = { kind: "all" };
-
-function scopeLabel(stream: StreamDescriptor): string {
-  switch (stream.kind) {
-    case "feed":
-      return "This feed";
-    case "folder":
-      return "This category";
-    case "starred":
-      return "Starred";
-    case "all":
-      return "All";
-  }
-}
-
 export function EntryList({ stream, title }: { stream: StreamDescriptor; title: string }) {
   const [density, setDensity] = useDensity();
   const { cursorId, openId, setCursor, open, close } = useSelection();
   const setState = useSetEntryState();
+  const { mutate: mutateEntryState } = setState;
   const markStreamRead = useMarkStreamRead(stream);
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -121,23 +62,10 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
 
   const [helpOpen, setHelpOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const searchRef = useRef<HTMLInputElement>(null);
 
-  // Search (WP-13). The raw box value is debounced into the term that drives the
-  // query; scope switches between this stream and every subscription.
-  const [searchInput, setSearchInput] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [scopeAll, setScopeAll] = useState(false);
-  useEffect(() => {
-    const t = window.setTimeout(() => setSearchTerm(searchInput.trim()), 200);
-    return () => window.clearTimeout(t);
-  }, [searchInput]);
-  const searching = searchTerm.length > 0;
-  const clearSearch = () => {
-    setSearchInput("");
-    setSearchTerm("");
-  };
-  const activeStream = searching && scopeAll ? ALL_STREAM : stream;
+  // Search (WP-13) — state + debounce + active-stream derivation live in the hook.
+  const search = useStreamSearch(stream);
+  const { searching, searchTerm, scopeAll, activeStream, searchRef } = search;
 
   const subs = useSubscriptions();
   const iconByFeed = useMemo(() => {
@@ -146,7 +74,7 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
     return m;
   }, [subs.data]);
 
-  const query = useStreamEntries(activeStream, "all", searching ? searchTerm : undefined);
+  const query = useStreamEntries(activeStream, searching ? searchTerm : undefined);
   const entries = useMemo(() => query.data?.pages.flatMap((p) => p.entries) ?? [], [query.data]);
 
   // State-backed ref so the virtualizer re-initializes once the scroll element
@@ -175,7 +103,7 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
 
   // Scroll-past marks read (WP-11) — but not while searching: paging through search
   // hits shouldn't silently mark them read.
-  useScrollReadMarker(scrollEl, virtualizer, searching ? [] : entries);
+  useScrollReadMarker(scrollEl, virtualizer, searching ? [] : entries, searching);
 
   // Warm the top of the stream while online so those bodies are cached and open
   // offline without being read first (WP-14). Deferred + cancellable so the burst
@@ -188,11 +116,23 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
     return () => window.clearTimeout(t);
   }, [entries, online, prefetchEntry]);
 
-  // Open an entry and mark it read (mark-read-on-open, WP-11).
-  const openEntry = (entry: { id: number; is_read: boolean }) => {
-    open(entry.id);
-    if (!entry.is_read) setState.mutate({ ids: [entry.id], read: true });
-  };
+  // Open an entry and mark it read (mark-read-on-open, WP-11). Memoized (stable
+  // deps) so EntryRow's memo isn't defeated by a fresh handler each render.
+  const openEntry = useCallback(
+    (entry: { id: number; is_read: boolean }) => {
+      open(entry.id);
+      if (!entry.is_read) mutateEntryState({ ids: [entry.id], read: true });
+    },
+    [open, mutateEntryState],
+  );
+  // Row click / Enter: move the cursor here and open it.
+  const activateEntry = useCallback(
+    (entry: EntryListItem) => {
+      setCursor(entry.id);
+      openEntry(entry);
+    },
+    [setCursor, openEntry],
+  );
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["entries"] });
@@ -210,11 +150,16 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
   const cursorIndex = cursorId == null ? -1 : entries.findIndex((e) => e.id === cursorId);
 
   // Move the keyboard cursor, scroll it into view and take DOM focus (so the
-  // ring is real focus and screen readers announce the row).
+  // ring is real focus and screen readers announce the row). On a large jump the
+  // target row isn't virtualized in yet on the first frame, so retry a few frames.
   const focusRowSoon = (index: number) => {
-    requestAnimationFrame(() => {
-      scrollEl?.querySelector<HTMLElement>(`[data-index="${index}"]`)?.focus();
-    });
+    let tries = 0;
+    const attempt = () => {
+      const el = scrollEl?.querySelector<HTMLElement>(`[data-index="${index}"]`);
+      if (el) el.focus();
+      else if (tries++ < 3) requestAnimationFrame(attempt);
+    };
+    requestAnimationFrame(attempt);
   };
   const moveCursor = (index: number) => {
     const e = entries[index];
@@ -250,8 +195,9 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
       if (e) setState.mutate({ ids: [e.id], starred: !e.is_starred });
     },
     markAllRead: () => {
-      // Mark-all is stream-bounded by a live max id — it can't be queued offline.
-      if (online && entries.length > 0) setConfirmOpen(true);
+      // Mark-all marks the whole base stream, so it's ambiguous while a search
+      // filters the view — disabled then. It also can't be queued offline.
+      if (online && !searching && entries.length > 0) setConfirmOpen(true);
     },
     refresh,
     goAll: () => void navigate({ to: "/" }),
@@ -310,51 +256,19 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
           {items.map((vi) => {
             const e = entries[vi.index];
             return (
-              <div
+              <EntryRow
                 key={vi.key}
-                role="listitem"
-                tabIndex={-1}
-                data-index={vi.index}
-                ref={virtualizer.measureElement}
-                className={styles.row}
-                data-density={density}
-                data-read={e.is_read || undefined}
-                data-selected={openId === e.id || undefined}
-                data-cursor={cursorId === e.id || undefined}
-                aria-current={openId === e.id}
-                onClick={() => {
-                  setCursor(e.id);
-                  openEntry(e);
-                }}
-                style={{ transform: `translateY(${vi.start}px)` }}
-              >
-                <span className={styles.dot} aria-hidden="true" />
-                <span className={styles.fav}>
-                  <Favicon title={e.feed_title} iconUrl={iconByFeed.get(e.feed_id)} />
-                </span>
-                <span className={styles.feed}>{e.feed_title}</span>
-                <span className={styles.rowtitle}>{e.title}</span>
-                {searching && e.snippet ? (
-                  <span
-                    className={styles.summary}
-                    // Safe: highlightSnippet escapes all content, re-allows only <b>.
-                    dangerouslySetInnerHTML={{ __html: highlightSnippet(e.snippet) }}
-                  />
-                ) : (
-                  <span className={styles.summary}>{e.summary}</span>
-                )}
-                <time
-                  className={styles.time}
-                  dateTime={e.published_at ?? e.created_at}
-                  title={formatDateTime(e.published_at ?? e.created_at)}
-                >
-                  {e.is_starred ? <Star className={styles.star} size={12} /> : null}
-                  {/* The feed's own publish date; fall back to ingest time only when
-                      the feed provides none (so a backfilled feed doesn't show every
-                      entry as "just now"). */}
-                  {relativeTime(e.published_at ?? e.created_at)}
-                </time>
-              </div>
+                entry={e}
+                iconUrl={iconByFeed.get(e.feed_id)}
+                density={density}
+                isOpen={openId === e.id}
+                isCursor={cursorId === e.id}
+                searching={searching}
+                start={vi.start}
+                index={vi.index}
+                measureElement={virtualizer.measureElement}
+                onActivate={activateEntry}
+              />
             );
           })}
         </div>
@@ -365,117 +279,20 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
 
   return (
     <section className={styles.list} aria-label={title}>
-      <header className={styles.head}>
-        <button
-          type="button"
-          className={styles.menuBtn}
-          aria-label="Open feeds"
-          onClick={openSidebar}
-        >
-          <Menu size={19} />
-        </button>
-        <h1 className={styles.title}>{title}</h1>
-        <div className={styles.controls}>
-          {/* Desktop: inline controls. Mobile: collapsed into the overflow menu. */}
-          <div className={styles.desktopActions}>
-            <button
-              type="button"
-              className={styles.toolBtn}
-              title="Refresh"
-              aria-label="Refresh"
-              onClick={refresh}
-            >
-              <RefreshCw size={15} />
-            </button>
-            <button
-              type="button"
-              className={styles.toolBtn}
-              title={
-                markStreamRead.isPending
-                  ? "Marking all read…"
-                  : online
-                    ? "Mark all read"
-                    : "Mark all read (unavailable offline)"
-              }
-              aria-label="Mark all read"
-              aria-busy={markStreamRead.isPending || undefined}
-              onClick={() => setConfirmOpen(true)}
-              disabled={!online || markStreamRead.isPending || (entries.length === 0 && !searching)}
-            >
-              {markStreamRead.isPending ? (
-                <Loader2 size={15} className={styles.spin} />
-              ) : (
-                <CheckCheck size={15} />
-              )}
-            </button>
-            <span className={styles.sep} />
-            <DensityToggle value={density} onChange={setDensity} />
-            <ThemeToggle />
-          </div>
-          {isMobile && (
-            <Suspense fallback={null}>
-              <MobileActionsMenu
-                onRefresh={refresh}
-                onMarkAllRead={() => setConfirmOpen(true)}
-                canMarkAllRead={online && (entries.length > 0 || searching)}
-              />
-            </Suspense>
-          )}
-        </div>
-      </header>
-      <div className={styles.searchBar}>
-        <Search size={14} className={styles.searchIcon} aria-hidden="true" />
-        <input
-          ref={searchRef}
-          type="search"
-          className={styles.searchInput}
-          placeholder={`Search ${scopeAll ? "all articles" : title}`}
-          aria-label="Search articles"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              clearSearch();
-              e.currentTarget.blur();
-            }
-          }}
-        />
-        {searchInput ? (
-          <>
-            {stream.kind !== "all" ? (
-              <div className={styles.scope} role="group" aria-label="Search scope">
-                <button
-                  type="button"
-                  className={styles.scopeOpt}
-                  data-active={!scopeAll}
-                  aria-pressed={!scopeAll}
-                  onClick={() => setScopeAll(false)}
-                >
-                  {scopeLabel(stream)}
-                </button>
-                <button
-                  type="button"
-                  className={styles.scopeOpt}
-                  data-active={scopeAll}
-                  aria-pressed={scopeAll}
-                  onClick={() => setScopeAll(true)}
-                >
-                  All
-                </button>
-              </div>
-            ) : null}
-            <button
-              type="button"
-              className={styles.clear}
-              aria-label="Clear search"
-              title="Clear search (Esc)"
-              onClick={clearSearch}
-            >
-              <X size={14} />
-            </button>
-          </>
-        ) : null}
-      </div>
+      <EntryListHeader
+        title={title}
+        density={density}
+        setDensity={setDensity}
+        online={online}
+        searching={searching}
+        markPending={markStreamRead.isPending}
+        hasEntries={entries.length > 0}
+        isMobile={isMobile}
+        onOpenSidebar={openSidebar}
+        onRefresh={refresh}
+        onMarkAllRead={() => setConfirmOpen(true)}
+      />
+      <SearchBar stream={stream} title={title} search={search} />
       {feedError ? (
         <div className={styles.errorBanner} role="alert">
           <CircleAlert size={15} />

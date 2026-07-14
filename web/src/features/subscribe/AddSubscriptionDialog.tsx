@@ -4,7 +4,7 @@
 //   2. Upload an OPML file → POST /opml → show the per-feed import report.
 // Backend endpoints exist since WP-06/WP-08; this is the missing UI for them.
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import * as Dialog from "@radix-ui/react-dialog";
 import { FileUp, Loader2, Plus, Search } from "lucide-react";
@@ -19,9 +19,8 @@ import {
   type Folder,
   type ImportReport,
 } from "../../api/endpoints";
+import { FolderSelect, NEW_FOLDER } from "./FolderSelect";
 import styles from "./AddSubscriptionDialog.module.css";
-
-const NEW_FOLDER = "__new__";
 
 function messageOf(err: unknown, fallback: string): string {
   return err instanceof ApiError ? err.message : fallback;
@@ -48,6 +47,10 @@ export function AddSubscriptionDialog({
   const [discovering, setDiscovering] = useState(false);
   const [report, setReport] = useState<ImportReport | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Caches the in-flight (or resolved) folder creation for "+ New category…" by
+  // name, so adding a second candidate — even in a rapid double-click before the
+  // first resolves — reuses the same folder instead of POSTing a duplicate.
+  const createdFolder = useRef<{ name: string; id: Promise<number> } | null>(null);
 
   function reset() {
     setUrl("");
@@ -58,6 +61,7 @@ export function AddSubscriptionDialog({
     setDiscovering(false);
     setReport(null);
     setError(null);
+    createdFolder.current = null;
   }
 
   function handleOpenChange(next: boolean) {
@@ -100,10 +104,20 @@ export function AddSubscriptionDialog({
           setError("Enter a name for the new category.");
           return;
         }
-        const folder = await createFolder(await getToken(), name);
-        folder_id = folder.id;
-        // Reuse it if the user adds more than one candidate.
-        setFolderId(String(folder.id));
+        // Reuse the folder if one is already being (or has been) created for this
+        // name; otherwise start creating it. The ref is set synchronously (no await
+        // before it) so racing clicks serialize onto a single POST /folders.
+        if (createdFolder.current?.name !== name) {
+          const id = (async () => (await createFolder(await getToken(), name)).id)();
+          createdFolder.current = { name, id };
+        }
+        try {
+          folder_id = await createdFolder.current.id;
+        } catch (err) {
+          createdFolder.current = null; // let a retry re-attempt the create
+          throw err;
+        }
+        setFolderId(String(folder_id));
       } else if (folderId) {
         folder_id = Number(folderId);
       }
@@ -156,33 +170,13 @@ export function AddSubscriptionDialog({
               </button>
             </div>
 
-            <label className={styles.folderRow}>
-              <span className={styles.folderLabel}>Category</span>
-              <select
-                className={styles.select}
-                value={folderId}
-                onChange={(e) => setFolderId(e.target.value)}
-              >
-                <option value="">No category</option>
-                {folders.map((f) => (
-                  <option key={f.id} value={String(f.id)}>
-                    {f.name}
-                  </option>
-                ))}
-                <option value={NEW_FOLDER}>+ New category…</option>
-              </select>
-            </label>
-
-            {folderId === NEW_FOLDER && (
-              <input
-                className={styles.input}
-                type="text"
-                placeholder="New category name"
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                aria-label="New category name"
-              />
-            )}
+            <FolderSelect
+              folders={folders}
+              value={folderId}
+              onChange={setFolderId}
+              newName={newFolderName}
+              onNewNameChange={setNewFolderName}
+            />
 
             {candidates && candidates.length > 0 && (
               <ul className={styles.candidates}>

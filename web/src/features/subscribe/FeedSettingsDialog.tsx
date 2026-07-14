@@ -16,9 +16,8 @@ import {
 } from "../../api/endpoints";
 import { useUpdateSubscription } from "../../api/feedMutations";
 import { useTokenGetter } from "../../app/auth";
+import { FolderSelect, NEW_FOLDER } from "./FolderSelect";
 import styles from "./FeedSettingsDialog.module.css";
-
-const NEW_FOLDER = "__new__";
 
 export function FeedSettingsDialog({
   sub,
@@ -113,33 +112,15 @@ export function FeedSettingsDialog({
             </div>
           </div>
 
-          <label className={styles.field}>
-            <span className={styles.label}>Category</span>
-            <select
-              className={styles.select}
+          <div className={styles.field}>
+            <FolderSelect
+              folders={folders}
               value={folderId}
-              onChange={(e) => setFolderId(e.target.value)}
-            >
-              <option value="">No category</option>
-              {folders.map((f) => (
-                <option key={f.id} value={String(f.id)}>
-                  {f.name}
-                </option>
-              ))}
-              <option value={NEW_FOLDER}>+ New category…</option>
-            </select>
-          </label>
-
-          {folderId === NEW_FOLDER && (
-            <input
-              className={styles.input}
-              type="text"
-              placeholder="New category name"
-              value={newFolderName}
-              onChange={(e) => setNewFolderName(e.target.value)}
-              aria-label="New category name"
+              onChange={setFolderId}
+              newName={newFolderName}
+              onNewNameChange={setNewFolderName}
             />
-          )}
+          </div>
 
           {error && (
             <p className={styles.error} role="alert">

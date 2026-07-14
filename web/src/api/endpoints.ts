@@ -3,7 +3,7 @@
 // transport (auth header, error envelope). Every call takes the bearer token
 // from the auth seam — null in AUTH_MODE=none, a Clerk JWT otherwise.
 
-import { apiFetch } from "./client";
+import { apiFetch, apiFetchVoid } from "./client";
 import type { components } from "./schema";
 
 export type Folder = components["schemas"]["FolderResponse"];
@@ -36,7 +36,7 @@ export function updateFolder(token: string | null, id: number, name: string): Pr
 
 /** Delete a folder (category). 409 if it still has feeds. */
 export function deleteFolder(token: string | null, id: number): Promise<void> {
-  return apiFetch<void>(`/folders/${id}`, { token, method: "DELETE" });
+  return apiFetchVoid(`/folders/${id}`, { token, method: "DELETE" });
 }
 
 /** Probe a site or feed URL and return the feed candidates found there. */
@@ -81,7 +81,7 @@ export function updateSubscription(
 
 /** Unsubscribe (delete a subscription). Returns 204. */
 export function deleteSubscription(token: string | null, id: number): Promise<void> {
-  return apiFetch<void>(`/subscriptions/${id}`, { token, method: "DELETE" });
+  return apiFetchVoid(`/subscriptions/${id}`, { token, method: "DELETE" });
 }
 
 export function getCounts(token: string | null): Promise<Counts> {
@@ -89,7 +89,6 @@ export function getCounts(token: string | null): Promise<Counts> {
 }
 
 export interface StreamQuery {
-  status?: "unread" | "all";
   cursor?: string | null;
   limit?: number;
   q?: string;
@@ -100,8 +99,10 @@ export function getStreamEntries(
   streamPath: string,
   opts: StreamQuery = {},
 ): Promise<StreamPage> {
+  // status is always "all" — the app has no unread-only view (the API defaults to
+  // all, but send it explicitly to keep the contract obvious).
   const params = new URLSearchParams({
-    status: opts.status ?? "all",
+    status: "all",
     limit: String(opts.limit ?? 50),
   });
   if (opts.cursor) params.set("cursor", opts.cursor);

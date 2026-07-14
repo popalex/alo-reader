@@ -16,6 +16,33 @@
   display: flex;
 }
 
+/* Fallback shown by the error boundary when the routed view throws. */
+.crash {
+  margin: auto;
+  padding: 40px 32px;
+  max-width: 360px;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 13px;
+}
+
+.crashTitle {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.crashBtn {
+  margin-top: 14px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-fg, #fff);
+  font-size: 13px;
+  font-weight: 500;
+}
+
 /* Mobile: the sidebar is an off-canvas drawer (not rendered inline), so the shell
  * is a single full-width column and the content pane owns the whole screen. */
 @media (max-width: 768px) {
