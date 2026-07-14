@@ -101,7 +101,11 @@ class Settings(BaseSettings):
     # WORKER_LEASE_S lease, and fetches at most WORKER_MAX_CONCURRENCY at once.
     worker_poll_interval_s: float = 5.0
     worker_claim_batch: int = 50
-    worker_lease_s: int = 120
+    # Lease must outlast the worst-case time to drain one claimed batch, or a slow
+    # batch loses its lease mid-flight and another replica re-claims in-flight feeds
+    # (idempotent, but wasteful). Worst case ≈ ceil(batch/concurrency) × fetch_timeout
+    # = ceil(50/20) × 30s = 90s, plus per-host spacing — 300s leaves comfortable margin.
+    worker_lease_s: int = 300
     worker_max_concurrency: int = 20
 
     # Politeness per origin host: at most this many concurrent fetches to one
