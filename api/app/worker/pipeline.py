@@ -8,7 +8,6 @@ can drive the whole pipeline with an ``httpx.MockTransport`` and no real network
 """
 
 import asyncio
-import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -28,9 +27,8 @@ from app.store import metrics as metrics_store
 from app.store.entries import NewEntry
 from app.worker.fetch import FetchResult, FetchTarget, fetch_feed
 from app.worker.icons import fetch_favicon
+from app.worker.log import log
 from app.worker.schedule import adaptive_interval, error_delay
-
-log = logging.getLogger("worker")
 
 FetchFn = Callable[..., Awaitable[FetchResult]]
 

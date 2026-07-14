@@ -25,17 +25,11 @@ from app.db import get_sessionmaker
 from app.models import Feed
 from app.store import feeds as feeds_store
 from app.worker.fetch import fetch_feed
+from app.worker.log import emit as _log
 from app.worker.maintenance import maintenance_loop
 from app.worker.pipeline import FeedOutcome, FetchFn, process_feed
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-log = logging.getLogger("worker")
-
-
-def _log(event: str, **fields: object) -> None:
-    """Emit a structured ``key=value`` line to stdout."""
-    tail = " ".join(f"{k}={v}" for k, v in fields.items())
-    log.info("%s %s", event, tail)
 
 
 @dataclass

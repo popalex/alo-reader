@@ -13,7 +13,6 @@ loop or the other job.
 """
 
 import asyncio
-import logging
 import random
 from datetime import timedelta
 
@@ -22,15 +21,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.config import Settings
 from app.store import entries as entries_store
 from app.store import feeds as feeds_store
-
-log = logging.getLogger("worker")
+from app.worker.log import emit as _log
 
 _DEFAULT_RNG = random.Random()
-
-
-def _log(event: str, **fields: object) -> None:
-    tail = " ".join(f"{k}={v}" for k, v in fields.items())
-    log.info("%s %s", event, tail)
 
 
 def next_wait(settings: Settings, rng: random.Random | None = None) -> float:
