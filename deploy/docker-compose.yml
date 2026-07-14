@@ -6,6 +6,7 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.caddy
+    restart: unless-stopped
     ports:
       - "80:80"
     depends_on:
@@ -31,6 +32,7 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile.api
     command: ["api"]
+    restart: unless-stopped
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://alo:alo@postgres:5432/alo}
       # No default on purpose: the API refuses to boot without an explicit
@@ -53,6 +55,10 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile.api
     command: ["worker"]
+    # unless-stopped (not on-failure): the worker also exits non-zero on an
+    # unexpected crash (see worker/main.py), so this recovers a crashed poller
+    # while still respecting an operator's explicit `docker compose stop`.
+    restart: unless-stopped
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://alo:alo@postgres:5432/alo}
       # Hostnames exempt from the SSRF private-range block (trusted internal feeds).
