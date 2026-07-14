@@ -22,6 +22,10 @@ export function useScrollReadMarker(
   scrollEl: HTMLElement | null,
   virtualizer: RangeVirtualizer,
   entries: EntryListItem[],
+  // Changing this resets the "already marked" watermark — the caller passes the
+  // search state, so entering/leaving a search (which swaps the entries array
+  // under the same mount) doesn't skip or mis-mark rows.
+  resetKey?: unknown,
 ): void {
   const setState = useSetEntryState();
   // Everything the listener needs goes through refs so the effect depends only
@@ -34,8 +38,11 @@ export function useScrollReadMarker(
   const virtualizerRef = useRef(virtualizer);
   virtualizerRef.current = virtualizer;
   // Highest index already marked (exclusive). Persists across paging; resets
-  // when the list remounts per stream.
+  // when the list remounts per stream, or when resetKey changes.
   const markedUpTo = useRef(0);
+  useEffect(() => {
+    markedUpTo.current = 0;
+  }, [resetKey]);
 
   useEffect(() => {
     const el = scrollEl;

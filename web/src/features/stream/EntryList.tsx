@@ -8,74 +8,31 @@
 // the `/` search box filters the stream (or all streams) via `q=`, replacing the
 // summary with a highlighted ts_headline snippet, still newest-first.
 
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import {
-  CheckCheck,
-  CircleAlert,
-  List as ListIcon,
-  Loader2,
-  Menu,
-  RefreshCw,
-  Rows3,
-  Search,
-  X,
-} from "lucide-react";
+import { CircleAlert, Loader2 } from "lucide-react";
 
 import type { EntryListItem } from "../../api/endpoints";
 import { useMarkStreamRead, useSetEntryState } from "../../api/mutations";
 import { usePrefetchEntry, useStreamEntries, useSubscriptions } from "../../api/queries";
 import { useOnline } from "../../app/offline/useOffline";
-import { ThemeToggle } from "../../app/ThemeToggle";
 import { useMobileNav } from "../layout/mobileNav";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { KeyboardHelp } from "../../keyboard/KeyboardHelp";
 import { useKeyboard, type KeyboardActions } from "../../keyboard/useKeyboard";
 import type { StreamDescriptor } from "../../lib/streams";
 import { useIsMobile } from "../../lib/useMediaQuery";
-import { useDensity, type Density } from "./density";
+import { useDensity } from "./density";
+import { EntryListHeader } from "./EntryListHeader";
 import { EntryRow } from "./EntryRow";
-
-// Mobile-only overflow menu — lazy so its Radix dropdown code (~18kB gz) never
-// ships to desktop, where the inline controls are used instead.
-const MobileActionsMenu = lazy(() =>
-  import("./MobileActionsMenu").then((m) => ({ default: m.MobileActionsMenu })),
-);
+import { SearchBar } from "./SearchBar";
+import { useStreamSearch } from "./useStreamSearch";
 import { useScrollReadMarker } from "./useScrollReadMarker";
 import { useSelection } from "./selection";
 import styles from "./EntryList.module.css";
-
-function DensityToggle({ value, onChange }: { value: Density; onChange: (d: Density) => void }) {
-  return (
-    <div className={styles.density} role="group" aria-label="List density">
-      <button
-        type="button"
-        className={styles.densityOpt}
-        data-active={value === "list"}
-        aria-pressed={value === "list"}
-        aria-label="Compact rows"
-        title="Compact rows"
-        onClick={() => onChange("list")}
-      >
-        <ListIcon size={15} />
-      </button>
-      <button
-        type="button"
-        className={styles.densityOpt}
-        data-active={value === "expanded"}
-        aria-pressed={value === "expanded"}
-        aria-label="Expanded rows"
-        title="Expanded rows"
-        onClick={() => onChange("expanded")}
-      >
-        <Rows3 size={15} />
-      </button>
-    </div>
-  );
-}
 
 function EmptyList({ starred }: { starred: boolean }) {
   return (
@@ -88,21 +45,6 @@ function EmptyList({ starred }: { starred: boolean }) {
       </p>
     </div>
   );
-}
-
-const ALL_STREAM: StreamDescriptor = { kind: "all" };
-
-function scopeLabel(stream: StreamDescriptor): string {
-  switch (stream.kind) {
-    case "feed":
-      return "This feed";
-    case "folder":
-      return "This category";
-    case "starred":
-      return "Starred";
-    case "all":
-      return "All";
-  }
 }
 
 export function EntryList({ stream, title }: { stream: StreamDescriptor; title: string }) {
@@ -120,23 +62,10 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
 
   const [helpOpen, setHelpOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const searchRef = useRef<HTMLInputElement>(null);
 
-  // Search (WP-13). The raw box value is debounced into the term that drives the
-  // query; scope switches between this stream and every subscription.
-  const [searchInput, setSearchInput] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [scopeAll, setScopeAll] = useState(false);
-  useEffect(() => {
-    const t = window.setTimeout(() => setSearchTerm(searchInput.trim()), 200);
-    return () => window.clearTimeout(t);
-  }, [searchInput]);
-  const searching = searchTerm.length > 0;
-  const clearSearch = () => {
-    setSearchInput("");
-    setSearchTerm("");
-  };
-  const activeStream = searching && scopeAll ? ALL_STREAM : stream;
+  // Search (WP-13) — state + debounce + active-stream derivation live in the hook.
+  const search = useStreamSearch(stream);
+  const { searching, searchTerm, scopeAll, activeStream, searchRef } = search;
 
   const subs = useSubscriptions();
   const iconByFeed = useMemo(() => {
@@ -174,7 +103,7 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
 
   // Scroll-past marks read (WP-11) — but not while searching: paging through search
   // hits shouldn't silently mark them read.
-  useScrollReadMarker(scrollEl, virtualizer, searching ? [] : entries);
+  useScrollReadMarker(scrollEl, virtualizer, searching ? [] : entries, searching);
 
   // Warm the top of the stream while online so those bodies are cached and open
   // offline without being read first (WP-14). Deferred + cancellable so the burst
@@ -350,119 +279,20 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
 
   return (
     <section className={styles.list} aria-label={title}>
-      <header className={styles.head}>
-        <button
-          type="button"
-          className={styles.menuBtn}
-          aria-label="Open feeds"
-          onClick={openSidebar}
-        >
-          <Menu size={19} />
-        </button>
-        <h1 className={styles.title}>{title}</h1>
-        <div className={styles.controls}>
-          {/* Desktop: inline controls. Mobile: collapsed into the overflow menu. */}
-          <div className={styles.desktopActions}>
-            <button
-              type="button"
-              className={styles.toolBtn}
-              title="Refresh"
-              aria-label="Refresh"
-              onClick={refresh}
-            >
-              <RefreshCw size={15} />
-            </button>
-            <button
-              type="button"
-              className={styles.toolBtn}
-              title={
-                markStreamRead.isPending
-                  ? "Marking all read…"
-                  : searching
-                    ? "Mark all read (clear search first)"
-                    : online
-                      ? "Mark all read"
-                      : "Mark all read (unavailable offline)"
-              }
-              aria-label="Mark all read"
-              aria-busy={markStreamRead.isPending || undefined}
-              onClick={() => setConfirmOpen(true)}
-              disabled={!online || markStreamRead.isPending || searching || entries.length === 0}
-            >
-              {markStreamRead.isPending ? (
-                <Loader2 size={15} className={styles.spin} />
-              ) : (
-                <CheckCheck size={15} />
-              )}
-            </button>
-            <span className={styles.sep} />
-            <DensityToggle value={density} onChange={setDensity} />
-            <ThemeToggle />
-          </div>
-          {isMobile && (
-            <Suspense fallback={null}>
-              <MobileActionsMenu
-                onRefresh={refresh}
-                onMarkAllRead={() => setConfirmOpen(true)}
-                canMarkAllRead={online && !searching && entries.length > 0}
-              />
-            </Suspense>
-          )}
-        </div>
-      </header>
-      <div className={styles.searchBar}>
-        <Search size={14} className={styles.searchIcon} aria-hidden="true" />
-        <input
-          ref={searchRef}
-          type="search"
-          className={styles.searchInput}
-          placeholder={`Search ${scopeAll ? "all articles" : title}`}
-          aria-label="Search articles"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              clearSearch();
-              e.currentTarget.blur();
-            }
-          }}
-        />
-        {searchInput ? (
-          <>
-            {stream.kind !== "all" ? (
-              <div className={styles.scope} role="group" aria-label="Search scope">
-                <button
-                  type="button"
-                  className={styles.scopeOpt}
-                  data-active={!scopeAll}
-                  aria-pressed={!scopeAll}
-                  onClick={() => setScopeAll(false)}
-                >
-                  {scopeLabel(stream)}
-                </button>
-                <button
-                  type="button"
-                  className={styles.scopeOpt}
-                  data-active={scopeAll}
-                  aria-pressed={scopeAll}
-                  onClick={() => setScopeAll(true)}
-                >
-                  All
-                </button>
-              </div>
-            ) : null}
-            <button
-              type="button"
-              className={styles.clear}
-              aria-label="Clear search"
-              title="Clear search (Esc)"
-              onClick={clearSearch}
-            >
-              <X size={14} />
-            </button>
-          </>
-        ) : null}
-      </div>
+      <EntryListHeader
+        title={title}
+        density={density}
+        setDensity={setDensity}
+        online={online}
+        searching={searching}
+        markPending={markStreamRead.isPending}
+        hasEntries={entries.length > 0}
+        isMobile={isMobile}
+        onOpenSidebar={openSidebar}
+        onRefresh={refresh}
+        onMarkAllRead={() => setConfirmOpen(true)}
+      />
+      <SearchBar stream={stream} title={title} search={search} />
       {feedError ? (
         <div className={styles.errorBanner} role="alert">
           <CircleAlert size={15} />
