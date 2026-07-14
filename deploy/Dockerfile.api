@@ -18,6 +18,11 @@ COPY api/migrations ./migrations
 COPY deploy/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
+# Drop root: the app writes nothing under /app at runtime (logs go to stdout,
+# PYTHONDONTWRITEBYTECODE is set), so a read-only non-root user suffices.
+RUN useradd --create-home --uid 10001 app
+USER app
+
 EXPOSE 8000
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["api"]
