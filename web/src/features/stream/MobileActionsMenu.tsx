@@ -3,16 +3,11 @@
 // Desktop keeps the inline controls; this trigger is CSS-hidden there.
 
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Check, CheckCheck, Monitor, MoreVertical, Moon, RefreshCw, Sun } from "lucide-react";
+import { Check, CheckCheck, MoreVertical, RefreshCw } from "lucide-react";
 
 import { useTheme, type ThemeChoice } from "../../app/theme";
+import { THEME_OPTIONS } from "../../app/themeOptions";
 import styles from "./MobileActionsMenu.module.css";
-
-const THEMES: ReadonlyArray<{ value: ThemeChoice; Icon: typeof Sun; label: string }> = [
-  { value: "light", Icon: Sun, label: "Light" },
-  { value: "dark", Icon: Moon, label: "Dark" },
-  { value: "system", Icon: Monitor, label: "System" },
-];
 
 export function MobileActionsMenu({
   onRefresh,
@@ -49,7 +44,7 @@ export function MobileActionsMenu({
             value={theme}
             onValueChange={(v) => setTheme(v as ThemeChoice)}
           >
-            {THEMES.map(({ value, Icon, label }) => (
+            {THEME_OPTIONS.map(({ value, Icon, label }) => (
               <DropdownMenu.RadioItem key={value} className={styles.item} value={value}>
                 <Icon size={15} /> {label}
                 <DropdownMenu.ItemIndicator className={styles.indicator}>
