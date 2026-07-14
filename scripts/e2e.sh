@@ -44,6 +44,15 @@ log "Seeding the dataset (20 feeds / ~5k entries) inside the api container"
 "${COMPOSE[@]}" exec -T api python - < scripts/seed_dev.py
 
 log "Running Playwright against the SPA"
-pnpm -C web exec playwright test "$@"
+# Capture Playwright's status explicitly (rather than relying on set -e to abort
+# here) so the exit code can't be masked by anything added after this point, and
+# so success/failure gets a symmetric banner. The EXIT trap still tears down.
+status=0
+pnpm -C web exec playwright test "$@" || status=$?
 
-printf '\n\033[32mPASS: entry list + reading pane e2e green.\033[0m\n'
+if [[ $status -eq 0 ]]; then
+  printf '\n\033[32mPASS: entry list + reading pane e2e green.\033[0m\n'
+else
+  printf '\n\033[31mFAIL: Playwright reported failures (exit %d).\033[0m\n' "$status" >&2
+fi
+exit "$status"
