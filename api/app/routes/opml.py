@@ -1,6 +1,7 @@
 """OPML export + import (DESIGN.md §5). Import is synchronous and quota-capped, so
 it's bounded; it returns a per-feed report and never merges feeds silently."""
 
+import asyncio
 from typing import Annotated
 from xml.etree import ElementTree
 
@@ -79,7 +80,8 @@ async def import_opml(
     if b"<!ENTITY" in data.upper():
         raise ApiError(400, "invalid_request", "OPML with entity declarations is not allowed")
     try:
-        parsed = parse_opml(data)
+        # ElementTree parse of up to opml_max_bytes is CPU-bound; keep it off the loop.
+        parsed = await asyncio.to_thread(parse_opml, data)
     except ElementTree.ParseError:
         raise ApiError(400, "invalid_request", "malformed OPML") from None
 

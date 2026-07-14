@@ -6,6 +6,7 @@ a feed it's returned directly; if the page declares none, common fallback paths 
 offered as candidates (unverified — the subscribe path validates on first poll).
 """
 
+import asyncio
 from html.parser import HTMLParser
 from typing import Annotated
 from urllib.parse import urljoin, urlsplit
@@ -127,4 +128,6 @@ async def discover(
     )
     if not result.ok or result.body is None:
         return []  # unreachable/blocked page → nothing to discover
-    return _discover(result.body, result.final_url or body.url.strip())
+    # feedparser + the HTML parse are CPU-bound over up to discover_max_bytes; run
+    # them off the event loop so a big page can't stall concurrent requests.
+    return await asyncio.to_thread(_discover, result.body, result.final_url or body.url.strip())
