@@ -25,7 +25,9 @@ interface RequestOptions {
   body?: unknown;
 }
 
-export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
+/** Shared transport: builds the request, throws ApiError on a non-ok envelope,
+ *  and returns the raw Response for the caller to read (or ignore). */
+async function request(path: string, options: RequestOptions): Promise<Response> {
   const headers: Record<string, string> = {};
   if (options.token) {
     headers["Authorization"] = `Bearer ${options.token}`;
@@ -59,10 +61,19 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     }
     throw new ApiError(response.status, code, message);
   }
-  if (response.status === 204) {
-    return undefined as T;
-  }
+  return response;
+}
+
+/** Call a JSON endpoint and parse its body as T. */
+export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const response = await request(path, options);
   return (await response.json()) as T;
+}
+
+/** Call an endpoint whose success is 204 No Content (the DELETEs) — no body read,
+ *  so there's no `undefined as T` cast. */
+export async function apiFetchVoid(path: string, options: RequestOptions = {}): Promise<void> {
+  await request(path, options);
 }
 
 export function getConfig(): Promise<ApiConfig> {
