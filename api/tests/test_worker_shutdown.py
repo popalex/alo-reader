@@ -32,6 +32,25 @@ async def test_run_loops_and_stops_on_event(api_db: str) -> None:
     assert counters.polls == 0  # no feeds were due
 
 
+async def test_run_exits_nonzero_when_a_loop_crashes(
+    api_db: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An unexpected loop crash must exit non-zero (so a restart policy recovers it),
+    not return cleanly like a SIGTERM stop."""
+    sf = app_db.get_sessionmaker()
+    stop = asyncio.Event()
+    settings = wutil.worker_settings(worker_poll_interval_s=0.02)
+
+    async def boom(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("kaboom")
+
+    monkeypatch.setattr("app.worker.main.maintenance_loop", boom)
+
+    with pytest.raises(SystemExit) as exc_info:
+        await asyncio.wait_for(run(settings=settings, session_factory=sf, stop=stop), timeout=2.0)
+    assert exc_info.value.code == 1
+
+
 async def test_poll_once_leaves_no_pending_tasks(api_db: str) -> None:
     sf = app_db.get_sessionmaker()
     for i in range(5):

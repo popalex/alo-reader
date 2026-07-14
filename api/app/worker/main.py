@@ -201,12 +201,18 @@ async def run(
             except TimeoutError:
                 pass
 
+    crashed = False
+
     async def _supervise(name: str, coro: Awaitable[None]) -> None:
         """Run a loop; if it dies, log it and set ``stop`` so its sibling also drains
-        rather than being left running as an orphan (graceful shutdown preserved)."""
+        rather than being left running as an orphan (graceful shutdown preserved). A
+        crash flips ``crashed`` so the process can exit non-zero — an unexpected loop
+        failure must not look like a clean SIGTERM shutdown to an orchestrator."""
+        nonlocal crashed
         try:
             await coro
         except Exception as exc:  # noqa: BLE001 — a crashing loop must not strand the other
+            crashed = True
             _log(f"{name}_crashed", error=repr(exc))
         finally:
             stop.set()
@@ -226,7 +232,12 @@ async def run(
         not_modified=counters.not_modified,
         errors=counters.errors,
         entries=counters.entries_inserted,
+        crashed=crashed,
     )
+    # Exit non-zero on a crash so `restart: unless-stopped`/on-failure recovers it and
+    # the failure is visible; a clean stop (SIGTERM) still returns normally.
+    if crashed:
+        raise SystemExit(1)
     return counters
 
 
