@@ -11,12 +11,13 @@ import secrets
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.requests import Request
 
 from app.models import ApiToken, User
 from app.store import rowcount
+from app.store import users as users_store
 
 from .provider import AuthedUser, authed, bearer_token
 
@@ -57,10 +58,9 @@ async def count_for_user(session: AsyncSession, user_id: int) -> int:
 
 
 async def lock_for_create(session: AsyncSession, user_id: int) -> None:
-    """Take a transaction-scoped lock on the user's row so concurrent token creation
-    serializes: without it, two simultaneous creates can both pass the count-based
-    quota check (TOCTOU) and overshoot the cap. Released automatically at commit."""
-    await session.execute(text("SELECT 1 FROM users WHERE id = :uid FOR UPDATE"), {"uid": user_id})
+    """Serialize concurrent token creation against the per-user cap (TOCTOU). Thin
+    alias over the shared ``users.lock_row`` — the subscription quota uses the same."""
+    await users_store.lock_row(session, user_id)
 
 
 async def list_for_user(session: AsyncSession, user_id: int) -> list[ApiToken]:

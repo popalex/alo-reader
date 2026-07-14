@@ -21,6 +21,7 @@ from app.store import entries as entries_store
 from app.store import feeds as feeds_store
 from app.store import folders as folders_store
 from app.store import subscriptions as subs_store
+from app.store import users as users_store
 
 router = APIRouter(tags=["opml"])
 
@@ -85,6 +86,8 @@ async def import_opml(
     except ElementTree.ParseError:
         raise ApiError(400, "invalid_request", "malformed OPML") from None
 
+    # Serialize the running quota count against concurrent imports/creates (TOCTOU).
+    await users_store.lock_row(session, user.id)
     known_folders = {f.name: f for f in await folders_store.list_all(session, user.id)}
     count = await subs_store.count_for_user(session, user.id)
     imported = 0
