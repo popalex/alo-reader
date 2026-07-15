@@ -31,6 +31,17 @@ class Settings(BaseSettings):
     # Sourced from DATABASE_URL; required, no default (no hardcoded credentials).
     database_url: str
 
+    # Connection pool (per process). pool_size must be >= worker_max_concurrency
+    # (below) or the worker's concurrent per-feed transactions starve on the pool.
+    # pre_ping revives connections dropped by a DB restart / idle timeout; recycle
+    # bounds connection age. statement_timeout is a server-side ceiling on any single
+    # statement (bounds a pathological query); it must exceed the largest expected
+    # maintenance batch (the retention purge is bounded to retention_purge_batch_size).
+    db_pool_size: int = 20
+    db_max_overflow: int = 10
+    db_pool_recycle_s: int = 1800
+    db_statement_timeout_ms: int = 30_000
+
     # AUTH_MODE has deliberately no default: the server refuses to boot without
     # an explicit choice (DESIGN.md §0.1 — "none" must never be implicit).
     auth_mode: str | None = None
@@ -39,6 +50,14 @@ class Settings(BaseSettings):
     # capacity, per API replica.
     rate_limit_rps: float = 10.0
     rate_limit_burst: int = 30
+
+    # Per-IP token bucket applied BEFORE authentication (bounds the pre-auth cost of
+    # the provider chain — a DB lookup for an invalid PAT, a JWT signature verify for a
+    # bogus Clerk token). Deliberately looser than the per-user bucket so an
+    # authenticated user still hits the per-user limit first. Keyed on the real client
+    # IP that Caddy injects (X-Real-IP); see AuthMiddleware. Per API replica.
+    rate_limit_ip_rps: float = 50.0
+    rate_limit_ip_burst: int = 120
 
     # Minimum spacing between manual /subscriptions/{id}/refresh calls per feed
     # (per API replica), so a user can't hammer the poller.
@@ -90,8 +109,16 @@ class Settings(BaseSettings):
     # WORKER_LEASE_S lease, and fetches at most WORKER_MAX_CONCURRENCY at once.
     worker_poll_interval_s: float = 5.0
     worker_claim_batch: int = 50
-    worker_lease_s: int = 120
+    # Lease must outlast the worst-case time to drain one claimed batch, or a slow
+    # batch loses its lease mid-flight and another replica re-claims in-flight feeds
+    # (idempotent, but wasteful). Worst case ≈ ceil(batch/concurrency) × fetch_timeout
+    # = ceil(50/20) × 30s = 90s, plus per-host spacing — 300s leaves comfortable margin.
+    worker_lease_s: int = 300
     worker_max_concurrency: int = 20
+    # Cap entries persisted from a single fetch, so a pathological feed advertising
+    # thousands of items can't build one unbounded INSERT/transaction. The newest N by
+    # publish date are kept (undated last). Well above any sane feed's item count.
+    worker_max_entries_per_fetch: int = 2000
 
     # Politeness per origin host: at most this many concurrent fetches to one
     # host, and at least this long between successive fetches to it.

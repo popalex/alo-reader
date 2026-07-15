@@ -5,28 +5,21 @@ Clerk-aware — nothing outside this package may reference Clerk.
 """
 
 from datetime import datetime
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
 from svix.webhooks import Webhook, WebhookVerificationError
 
 from app.config import get_settings
-from app.db import get_session
+from app.deps import CurrentUser, Session
 from app.errors import ApiError
 from app.store import users as users_store
 from app.store.counts import unread_counts
 
 from . import pat
 from .clerk import ClerkSettings
-from .provider import AuthedUser
-from .runtime import current_user
 
 router = APIRouter()
-
-CurrentUser = Annotated[AuthedUser, Depends(current_user)]
-Session = Annotated[AsyncSession, Depends(get_session)]
 
 
 class ConfigResponse(BaseModel):

@@ -6,27 +6,22 @@ a feed it's returned directly; if the page declares none, common fallback paths 
 offered as candidates (unverified — the subscribe path validates on first poll).
 """
 
+import asyncio
 from html.parser import HTMLParser
-from typing import Annotated
 from urllib.parse import urljoin, urlsplit
 
 import feedparser  # type: ignore[import-untyped]
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.provider import AuthedUser
 from app.auth.ratelimit import Cooldown
-from app.auth.runtime import current_user
 from app.config import get_settings
-from app.db import get_session
+from app.deps import CurrentUser, Session
 from app.errors import ApiError
 from app.worker.http import guarded_get
 
 router = APIRouter(tags=["discover"])
 
-CurrentUser = Annotated[AuthedUser, Depends(current_user)]
-Session = Annotated[AsyncSession, Depends(get_session)]
 
 _FEED_TYPES = ("application/rss+xml", "application/atom+xml", "application/feed+json")
 _FALLBACK_PATHS = ("/feed", "/rss", "/atom.xml", "/index.xml")
@@ -127,4 +122,6 @@ async def discover(
     )
     if not result.ok or result.body is None:
         return []  # unreachable/blocked page → nothing to discover
-    return _discover(result.body, result.final_url or body.url.strip())
+    # feedparser + the HTML parse are CPU-bound over up to discover_max_bytes; run
+    # them off the event loop so a big page can't stall concurrent requests.
+    return await asyncio.to_thread(_discover, result.body, result.final_url or body.url.strip())

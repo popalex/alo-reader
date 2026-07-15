@@ -5,26 +5,33 @@ user can see (in a subscribed feed); another tenant's id reads as 404.
 ``POST /entries/state`` is the idempotent, offline-replayable state writer.
 """
 
-from datetime import UTC, datetime
-from typing import Annotated
+from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.provider import AuthedUser
-from app.auth.runtime import current_user
-from app.db import get_session
+from app.deps import CurrentUser, Session
 from app.errors import ApiError
 from app.store import entries as entries_store
 from app.store import entry_states as states_store
 
 router = APIRouter(tags=["entries"])
 
-CurrentUser = Annotated[AuthedUser, Depends(current_user)]
-Session = Annotated[AsyncSession, Depends(get_session)]
 
 MAX_STATE_IDS = 1000
+
+# The client supplies changed_at (the offline-replay LWW key). Tolerate a little clock
+# skew, but clamp it: an unclamped far-future timestamp would pin a state and block
+# every later legitimate write. Naive timestamps are read as UTC.
+_MAX_CLOCK_SKEW = timedelta(minutes=5)
+
+
+def _clamp_changed_at(value: datetime | None, *, now: datetime) -> datetime:
+    if value is None:
+        return now
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return min(value, now + _MAX_CLOCK_SKEW)
 
 
 class EntryDetail(BaseModel):
@@ -79,7 +86,7 @@ async def get_entry(entry_id: int, user: CurrentUser, session: Session) -> Entry
 async def set_state(body: StateRequest, user: CurrentUser, session: Session) -> UpdatedResponse:
     if body.read is None and body.starred is None:
         raise ApiError(422, "validation_error", "at least one of read/starred is required")
-    changed_at = body.changed_at or datetime.now(UTC)
+    changed_at = _clamp_changed_at(body.changed_at, now=datetime.now(UTC))
     updated = await states_store.apply_state_batch(
         session,
         user.id,

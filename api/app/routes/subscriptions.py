@@ -9,30 +9,25 @@ tenant-scoped: another user's id reads as 404, never 403.
 
 import hashlib
 from datetime import datetime
-from typing import Annotated
 from urllib.parse import urlsplit, urlunsplit
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.provider import AuthedUser
 from app.auth.ratelimit import Cooldown
-from app.auth.runtime import current_user
 from app.config import get_settings
-from app.db import get_session
+from app.deps import CurrentUser, Session
 from app.errors import ApiError
 from app.models import Feed, Subscription
 from app.store import entries as entries_store
 from app.store import feeds as feeds_store
 from app.store import folders as folders_store
 from app.store import subscriptions as subs_store
+from app.store import users as users_store
 
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
-
-CurrentUser = Annotated[AuthedUser, Depends(current_user)]
-Session = Annotated[AsyncSession, Depends(get_session)]
 
 
 class SubscriptionResponse(BaseModel):
@@ -121,6 +116,10 @@ async def list_subscriptions(user: CurrentUser, session: Session) -> list[Subscr
 async def create_subscription(
     body: CreateSubscriptionRequest, user: CurrentUser, session: Session
 ) -> SubscriptionResponse:
+    # Serialize the count-based quota check against concurrent creates (TOCTOU), the
+    # same guard the API-token cap uses — otherwise two simultaneous subscribes to
+    # different feeds can both pass and overshoot quota_subs.
+    await users_store.lock_row(session, user.id)
     if await subs_store.count_for_user(session, user.id) >= user.quota_subs:
         raise ApiError(422, "quota_exceeded", f"subscription limit ({user.quota_subs}) reached")
 

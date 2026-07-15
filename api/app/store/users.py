@@ -5,11 +5,18 @@ rather than scoped by ``user_id`` (there is nothing above a user to scope to).
 """
 
 from sqlalchemy import delete as sql_delete
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import User
 from app.store import rowcount
+
+
+async def lock_row(session: AsyncSession, user_id: int) -> None:
+    """Take a transaction-scoped ``FOR UPDATE`` lock on the user's row so concurrent
+    per-user quota checks serialize: without it two simultaneous creates can both pass
+    a count-based cap check (TOCTOU) and overshoot. Released automatically at commit."""
+    await session.execute(text("SELECT 1 FROM users WHERE id = :uid FOR UPDATE"), {"uid": user_id})
 
 
 async def create(

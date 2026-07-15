@@ -25,7 +25,8 @@ from .ratelimit import TokenBucket
 @dataclass
 class AuthRuntime:
     provider: AuthProvider
-    limiter: TokenBucket
+    limiter: TokenBucket  # per-user, post-auth
+    ip_limiter: TokenBucket  # per-IP, pre-auth
 
 
 def build_provider(
@@ -58,6 +59,7 @@ def get_runtime(app: FastAPI) -> AuthRuntime:
         runtime = AuthRuntime(
             provider=build_provider(settings.auth_mode),
             limiter=TokenBucket(settings.rate_limit_rps, settings.rate_limit_burst),
+            ip_limiter=TokenBucket(settings.rate_limit_ip_rps, settings.rate_limit_ip_burst),
         )
         app.state.auth_runtime = runtime
     return runtime  # type: ignore[no-any-return]

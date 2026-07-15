@@ -6,10 +6,14 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.caddy
+    restart: unless-stopped
     ports:
       - "80:80"
     depends_on:
-      - api
+      # Wait until the API reports healthy before proxying, so a cold start never
+      # serves 502s from Caddy while uvicorn is still booting.
+      api:
+        condition: service_healthy
 
   # One-shot: applies Alembic migrations to head, then exits. api/worker wait for
   # it to finish (service_completed_successfully), so schema is always current
@@ -31,6 +35,7 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile.api
     command: ["api"]
+    restart: unless-stopped
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://alo:alo@postgres:5432/alo}
       # No default on purpose: the API refuses to boot without an explicit
@@ -42,6 +47,18 @@ services:
       CLERK_WEBHOOK_SECRET: ${CLERK_WEBHOOK_SECRET:-}
       RATE_LIMIT_RPS: ${RATE_LIMIT_RPS:-10}
       RATE_LIMIT_BURST: ${RATE_LIMIT_BURST:-30}
+    # /healthz needs neither DB nor auth; probe with the in-image Python (slim has
+    # no curl). start_period covers first boot / migration wait.
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/healthz')
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
     depends_on:
       postgres:
         condition: service_healthy
@@ -53,6 +70,10 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile.api
     command: ["worker"]
+    # unless-stopped (not on-failure): the worker also exits non-zero on an
+    # unexpected crash (see worker/main.py), so this recovers a crashed poller
+    # while still respecting an operator's explicit `docker compose stop`.
+    restart: unless-stopped
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://alo:alo@postgres:5432/alo}
       # Hostnames exempt from the SSRF private-range block (trusted internal feeds).

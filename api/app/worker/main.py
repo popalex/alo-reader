@@ -25,17 +25,11 @@ from app.db import get_sessionmaker
 from app.models import Feed
 from app.store import feeds as feeds_store
 from app.worker.fetch import fetch_feed
+from app.worker.log import emit as _log
 from app.worker.maintenance import maintenance_loop
 from app.worker.pipeline import FeedOutcome, FetchFn, process_feed
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-log = logging.getLogger("worker")
-
-
-def _log(event: str, **fields: object) -> None:
-    """Emit a structured ``key=value`` line to stdout."""
-    tail = " ".join(f"{k}={v}" for k, v in fields.items())
-    log.info("%s %s", event, tail)
 
 
 @dataclass
@@ -201,12 +195,18 @@ async def run(
             except TimeoutError:
                 pass
 
+    crashed = False
+
     async def _supervise(name: str, coro: Awaitable[None]) -> None:
         """Run a loop; if it dies, log it and set ``stop`` so its sibling also drains
-        rather than being left running as an orphan (graceful shutdown preserved)."""
+        rather than being left running as an orphan (graceful shutdown preserved). A
+        crash flips ``crashed`` so the process can exit non-zero — an unexpected loop
+        failure must not look like a clean SIGTERM shutdown to an orchestrator."""
+        nonlocal crashed
         try:
             await coro
         except Exception as exc:  # noqa: BLE001 — a crashing loop must not strand the other
+            crashed = True
             _log(f"{name}_crashed", error=repr(exc))
         finally:
             stop.set()
@@ -226,7 +226,12 @@ async def run(
         not_modified=counters.not_modified,
         errors=counters.errors,
         entries=counters.entries_inserted,
+        crashed=crashed,
     )
+    # Exit non-zero on a crash so `restart: unless-stopped`/on-failure recovers it and
+    # the failure is visible; a clean stop (SIGTERM) still returns normally.
+    if crashed:
+        raise SystemExit(1)
     return counters
 
 

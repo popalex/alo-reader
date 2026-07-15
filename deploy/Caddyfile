@@ -10,12 +10,21 @@
 	handle @metrics {
 		@external not remote_ip private_ranges
 		respond @external "metrics are internal-only" 403
-		reverse_proxy api:8000
+		reverse_proxy api:8000 {
+			header_up X-Real-IP {http.request.client_ip}
+		}
 	}
 
+	# Pass the real client IP to the API for its per-IP pre-auth rate limit. Caddy is
+	# the edge, so {client_ip} is the direct peer and header_up overwrites any value a
+	# client tried to send. If you later put a CDN/LB in front of Caddy, add a global
+	# `servers { trusted_proxies static <cidrs> }` so {client_ip} resolves the true
+	# client through X-Forwarded-For.
 	@api path /api/*
 	handle @api {
-		reverse_proxy api:8000
+		reverse_proxy api:8000 {
+			header_up X-Real-IP {http.request.client_ip}
+		}
 	}
 
 	handle {

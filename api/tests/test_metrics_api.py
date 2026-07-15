@@ -50,6 +50,17 @@ async def test_metrics_needs_no_auth_and_is_text(api_client: httpx.AsyncClient) 
     assert 'alo_table_rows{table="feeds"}' in body
 
 
+async def test_http_red_metrics_surface(api_client: httpx.AsyncClient) -> None:
+    from app import httpmetrics
+
+    httpmetrics.reset()
+    assert (await api_client.get("/api/v1/healthz")).status_code == 200
+
+    body = (await api_client.get(METRICS)).text  # the scrape itself isn't counted
+    assert 'alo_http_requests_total{method="GET",status="200"} 1' in body
+    assert "alo_http_request_duration_seconds_count 1" in body
+
+
 async def test_worker_lag_reflects_due_feed(api_client: httpx.AsyncClient) -> None:
     sf = app_db.get_sessionmaker()
     async with sf() as s, s.begin():

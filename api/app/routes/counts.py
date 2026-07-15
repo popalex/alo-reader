@@ -1,20 +1,12 @@
 """Exact unread counts (DESIGN.md §5, §4). Index-backed, no counters."""
 
-from typing import Annotated
-
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.provider import AuthedUser
-from app.auth.runtime import current_user
-from app.db import get_session
+from app.deps import CurrentUser, Session
 from app.store.counts import unread_counts
 
 router = APIRouter(tags=["counts"])
-
-CurrentUser = Annotated[AuthedUser, Depends(current_user)]
-Session = Annotated[AsyncSession, Depends(get_session)]
 
 
 class SubscriptionUnread(BaseModel):

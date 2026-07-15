@@ -61,11 +61,32 @@ def test_pipeline_flags_oversized_entry() -> None:
         b"<description>tiny</description></item>"
         b"</channel></rss>"
     )
-    _, rows = _build_entries(body)
+    _, rows = _build_entries(body, max_entries=2000)
     by_title = {r["title"]: r for r in rows}
     assert by_title["Huge"]["content_truncated"] is True
     assert len(by_title["Huge"]["content_html"].encode("utf-8")) <= MAX_CONTENT_BYTES
     assert by_title["Small"]["content_truncated"] is False
+
+
+def test_entries_per_fetch_cap_keeps_newest() -> None:
+    """A feed with more items than the cap keeps only the newest N by publish date."""
+    # Items dated Jan 1..10 2024 (i → day i+1).
+    items = "".join(
+        f"<item><guid>g{i}</guid><title>T{i}</title>"
+        f"<pubDate>{i + 1:02d} Jan 2024 00:00:00 GMT</pubDate></item>"
+        for i in range(10)
+    )
+    body = (
+        b'<?xml version="1.0"?><rss version="2.0"><channel><title>F</title>'
+        + items.encode()
+        + b"</channel></rss>"
+    )
+    _, rows = _build_entries(body, max_entries=3)
+    assert len(rows) == 3  # capped
+    kept_days = sorted(
+        (r["published_at"].day for r in rows if r["published_at"] is not None), reverse=True
+    )
+    assert kept_days == [10, 9, 8]  # the newest three by publish date
 
 
 async def test_truncated_flag_persists_to_db(api_db: str) -> None:

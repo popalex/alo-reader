@@ -10,13 +10,10 @@ per-user read flag. A ``q=`` term switches the same endpoint into full-text sear
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Query
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.provider import AuthedUser
-from app.auth.runtime import current_user
-from app.db import get_session
+from app.deps import CurrentUser, Session
 from app.errors import ApiError
 from app.store import entries as entries_store
 from app.store.entries import SEARCH_LIMIT, SearchRow, StreamRow
@@ -24,8 +21,6 @@ from app.store.stream import parse_stream
 
 router = APIRouter(prefix="/streams", tags=["streams"])
 
-CurrentUser = Annotated[AuthedUser, Depends(current_user)]
-Session = Annotated[AsyncSession, Depends(get_session)]
 
 MAX_LIMIT = 200
 

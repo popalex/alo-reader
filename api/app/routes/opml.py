@@ -1,18 +1,16 @@
 """OPML export + import (DESIGN.md §5). Import is synchronous and quota-capped, so
 it's bounded; it returns a per-feed report and never merges feeds silently."""
 
+import asyncio
 from typing import Annotated
 from xml.etree import ElementTree
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.provider import AuthedUser
-from app.auth.runtime import current_user
 from app.config import get_settings
-from app.db import get_session
+from app.deps import CurrentUser, Session
 from app.errors import ApiError
 from app.opml import OpmlFeed, build_opml, parse_opml
 from app.routes.subscriptions import normalize_feed_url
@@ -20,11 +18,9 @@ from app.store import entries as entries_store
 from app.store import feeds as feeds_store
 from app.store import folders as folders_store
 from app.store import subscriptions as subs_store
+from app.store import users as users_store
 
 router = APIRouter(tags=["opml"])
-
-CurrentUser = Annotated[AuthedUser, Depends(current_user)]
-Session = Annotated[AsyncSession, Depends(get_session)]
 
 
 class ImportFailure(BaseModel):
@@ -79,10 +75,13 @@ async def import_opml(
     if b"<!ENTITY" in data.upper():
         raise ApiError(400, "invalid_request", "OPML with entity declarations is not allowed")
     try:
-        parsed = parse_opml(data)
+        # ElementTree parse of up to opml_max_bytes is CPU-bound; keep it off the loop.
+        parsed = await asyncio.to_thread(parse_opml, data)
     except ElementTree.ParseError:
         raise ApiError(400, "invalid_request", "malformed OPML") from None
 
+    # Serialize the running quota count against concurrent imports/creates (TOCTOU).
+    await users_store.lock_row(session, user.id)
     known_folders = {f.name: f for f in await folders_store.list_all(session, user.id)}
     count = await subs_store.count_for_user(session, user.id)
     imported = 0

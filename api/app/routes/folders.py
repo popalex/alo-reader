@@ -1,23 +1,15 @@
 """Folder CRUD (DESIGN.md §5). All endpoints are tenant-scoped: another user's
 folder id is indistinguishable from a missing one (404, never 403)."""
 
-from typing import Annotated
-
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.provider import AuthedUser
-from app.auth.runtime import current_user
-from app.db import get_session
+from app.deps import CurrentUser, Session
 from app.errors import ApiError
 from app.models import Folder
 from app.store import folders as folders_store
 
 router = APIRouter(prefix="/folders", tags=["folders"])
-
-CurrentUser = Annotated[AuthedUser, Depends(current_user)]
-Session = Annotated[AsyncSession, Depends(get_session)]
 
 
 class FolderResponse(BaseModel):

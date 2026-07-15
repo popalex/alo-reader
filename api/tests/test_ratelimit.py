@@ -21,10 +21,12 @@ def test_token_bucket_refills() -> None:
 
 
 async def test_per_user_rate_limit(api_client: httpx.AsyncClient, pat_user: PatUser) -> None:
-    # No refill: exactly `burst` requests per user, then 429.
+    # No refill: exactly `burst` requests per user, then 429. Generous IP limiter so the
+    # per-user bucket is what trips.
     app.state.auth_runtime = AuthRuntime(
         provider=PatProvider(app_db.get_sessionmaker),
         limiter=TokenBucket(rate=0.0, burst=3),
+        ip_limiter=TokenBucket(rate=1000.0, burst=1000),
     )
     for _ in range(3):
         response = await api_client.get("/api/v1/me", headers=pat_user.headers)
@@ -42,3 +44,25 @@ async def test_per_user_rate_limit(api_client: httpx.AsyncClient, pat_user: PatU
     # Public endpoints are not per-user limited.
     config = await api_client.get("/api/v1/config")
     assert config.status_code == 200
+
+
+async def test_per_ip_pre_auth_limit(api_client: httpx.AsyncClient, api_db: str) -> None:
+    # Tight IP bucket, generous per-user: the pre-auth per-IP gate is what trips, and it
+    # applies even to unauthenticated requests (which otherwise 401).
+    app.state.auth_runtime = AuthRuntime(
+        provider=PatProvider(app_db.get_sessionmaker),
+        limiter=TokenBucket(rate=1000.0, burst=1000),
+        ip_limiter=TokenBucket(rate=0.0, burst=2),
+    )
+    ip_a = {"X-Real-IP": "1.1.1.1"}
+    for _ in range(2):  # pass the IP gate, then fail auth
+        assert (await api_client.get("/api/v1/me", headers=ip_a)).status_code == 401
+    limited = await api_client.get("/api/v1/me", headers=ip_a)
+    assert limited.status_code == 429
+    assert limited.json()["error"]["code"] == "rate_limited"
+
+    # A different client IP has its own bucket (Caddy injects the real one).
+    assert (await api_client.get("/api/v1/me", headers={"X-Real-IP": "2.2.2.2"})).status_code == 401
+
+    # Public paths skip the IP gate entirely.
+    assert (await api_client.get("/api/v1/config")).status_code == 200
