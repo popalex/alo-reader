@@ -44,7 +44,15 @@ export function App() {
     let cancelled = false;
     getConfig()
       .then((c) => {
-        if (!cancelled) setConfig(c);
+        if (cancelled) return;
+        // Turn on browser tracing before the app renders so document-load + the first
+        // API calls are captured (lazy-loads the OTel SDK; no-op when disabled).
+        if (c.otel_enabled && c.otel_traces_url) {
+          void import("./app/telemetry").then((t) =>
+            t.initBrowserTelemetry({ serviceName: "alo-web", exportUrl: c.otel_traces_url! }),
+          );
+        }
+        setConfig(c);
       })
       .catch((err: unknown) => {
         if (!cancelled) {

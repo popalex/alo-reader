@@ -70,6 +70,16 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        // Name the entry chunk `app-*.js` so the size-limit budget measures only the
+        // initial bundle. Lazy chunks keep `[name]-*.js` (some vendored package index
+        // modules chunk as `index-*.js`), which must not be summed into the budget.
+        entryFileNames: "assets/app-[hash].js",
+      },
+    },
+  },
   server: {
     host: true,
     port: 5173,
