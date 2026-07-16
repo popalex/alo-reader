@@ -1,0 +1,71 @@
+# OpenTelemetry overlay: adds the collector (Grafana Alloy) + the all-in-one Grafana
+# LGTM stack (Loki/Grafana/Tempo/Prometheus), and turns telemetry on for api + worker.
+#
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.otel.yml up --build -d
+#   (or `make otel-up`)
+#
+# The browser SPA learns OTEL is on from /api/v1/config and posts its spans to the
+# same-origin /otlp path, which the base Caddyfile proxies to the collector.
+
+services:
+  api:
+    build:
+      args:
+        # Pull the OpenTelemetry SDK + instrumentation into the image.
+        PIP_INSTALL_SPEC: ".[otel]"
+    environment:
+      OTEL_ENABLED: "true"
+      OTEL_SERVICE_NAME: alo-api
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
+      OTEL_EXPORTER_OTLP_PROTOCOL: ${OTEL_EXPORTER_OTLP_PROTOCOL:-grpc}
+      OTEL_RESOURCE_ATTRIBUTES: ${OTEL_RESOURCE_ATTRIBUTES:-deployment.environment.name=dev}
+      OTEL_TRACES_SAMPLER: ${OTEL_TRACES_SAMPLER:-parentbased_always_on}
+      OTEL_METRICS_EXEMPLAR_FILTER: ${OTEL_METRICS_EXEMPLAR_FILTER:-trace_based}
+    depends_on:
+      otel-collector:
+        condition: service_started
+
+  worker:
+    build:
+      args:
+        PIP_INSTALL_SPEC: ".[otel]"
+    environment:
+      OTEL_ENABLED: "true"
+      OTEL_SERVICE_NAME: alo-worker
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
+      OTEL_EXPORTER_OTLP_PROTOCOL: ${OTEL_EXPORTER_OTLP_PROTOCOL:-grpc}
+      OTEL_RESOURCE_ATTRIBUTES: ${OTEL_RESOURCE_ATTRIBUTES:-deployment.environment.name=dev}
+      OTEL_TRACES_SAMPLER: ${OTEL_TRACES_SAMPLER:-parentbased_always_on}
+      OTEL_METRICS_EXEMPLAR_FILTER: ${OTEL_METRICS_EXEMPLAR_FILTER:-trace_based}
+    depends_on:
+      otel-collector:
+        condition: service_started
+
+  otel-collector:
+    image: grafana/alloy:v1.17.0
+    restart: unless-stopped
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - /etc/alloy/config.alloy
+    depends_on:
+      otel-lgtm:
+        condition: service_started
+    volumes:
+      - ./observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
+
+  otel-lgtm:
+    image: grafana/otel-lgtm:0.11.0
+    restart: unless-stopped
+    ports:
+      # Grafana UI (internal ops surface — bind to loopback in real prod).
+      - "${GRAFANA_PORT:-3001}:3000"
+    volumes:
+      - otel-lgtm-data:/data
+      # Dropping a *.json into observability/dashboards/ auto-provisions it into an
+      # "alo-reader" Grafana folder (whole dir mounted read-only).
+      - ./observability/dashboards:/otel-lgtm/grafana/dashboards/alo-reader:ro
+      - ./observability/provisioning.yml:/otel-lgtm/grafana/conf/provisioning/dashboards/alo-reader.yml:ro
+
+volumes:
+  otel-lgtm-data:
