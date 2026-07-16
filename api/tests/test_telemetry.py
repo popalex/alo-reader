@@ -69,3 +69,23 @@ def test_set_gauges_updates_cache() -> None:
     assert rt.gauges.db_bytes == 1000
     assert rt.gauges.table_bytes == {"entries": 900}
     assert rt.gauges.table_rows == {"entries": 12}
+
+
+def test_db_span_name_parses_op_and_table() -> None:
+    from app.telemetry import _db_span_name
+
+    assert _db_span_name("SELECT feeds.id FROM feeds WHERE id = 1") == "SELECT feeds"
+    assert _db_span_name('INSERT INTO "entries" (id) VALUES (1)') == "INSERT entries"
+    assert _db_span_name("UPDATE feeds SET title='x' WHERE id=1") == "UPDATE feeds"
+    assert _db_span_name("DELETE FROM subscriptions WHERE id=1") == "DELETE subscriptions"
+    assert _db_span_name("BEGIN") is None
+    # A FROM inside a function expression (EXTRACT(... FROM ...)) must not be mistaken
+    # for the table — the real "FROM feeds" wins.
+    assert (
+        _db_span_name(
+            "SELECT COALESCE(EXTRACT(EPOCH FROM now() - min(next_check_at)), 0) "
+            "FROM feeds WHERE next_check_at <= now()"
+        )
+        == "SELECT feeds"
+    )
+    assert _db_span_name("SELECT pg_database_size(current_database())") is None

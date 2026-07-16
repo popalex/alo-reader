@@ -11,12 +11,33 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any
 
 logger = logging.getLogger("alo.telemetry")
+
+# Parse the operation + table from a SQL statement so DB spans read "SELECT feeds"
+# instead of a bare "SELECT" (the SQLAlchemy instrumentation names by operation only).
+# The \b(?!\s*\() after the table name skips a "FROM func(" match, so the FROM inside
+# an expression like EXTRACT(EPOCH FROM now()) is ignored and the real table FROM wins.
+_DB_NAME_RES = (
+    re.compile(r"(?is)^\s*(select)\b.*?\bfrom\s+\"?(\w+)\b(?!\s*\()"),
+    re.compile(r"(?is)^\s*(insert)\s+into\s+\"?(\w+)"),
+    re.compile(r"(?is)^\s*(update)\s+\"?(\w+)"),
+    re.compile(r"(?is)^\s*(delete)\b.*?\bfrom\s+\"?(\w+)\b(?!\s*\()"),
+)
+
+
+def _db_span_name(statement: str) -> str | None:
+    for pattern in _DB_NAME_RES:
+        m = pattern.match(statement)
+        if m:
+            return f"{m.group(1).upper()} {m.group(2)}"
+    return None
+
 
 # Loggers whose records we ship to Loki via OTLP. uvicorn's loggers set
 # propagate=False, so the handler must be attached to them directly.
@@ -183,6 +204,31 @@ def configure_telemetry(
             tracer_provider=tracer_provider,
             meter_provider=meter_provider,
         )
+        # Rename DB spans "<op> <table>" (e.g. SELECT feeds). Registered after the
+        # instrumentation's own before_cursor_execute, which stashes the span it just
+        # created on the execution context (context._otel_span) — the span is NOT the
+        # current one (it's attached only inside a `with use_span` block), so we reach
+        # it through the context and retitle it before it's exported.
+        from sqlalchemy import event as sa_event
+
+        def _rename_db_span(
+            conn: Any,
+            cursor: Any,
+            statement: str,
+            parameters: Any,
+            context: Any,
+            executemany: bool,
+        ) -> None:
+            try:
+                span = getattr(context, "_otel_span", None)
+                if span is not None and span.is_recording():
+                    name = _db_span_name(statement)
+                    if name:
+                        span.update_name(name)
+            except Exception:  # noqa: BLE001 — a naming hook must never break a query
+                pass
+
+        sa_event.listen(engine.sync_engine, "before_cursor_execute", _rename_db_span)
 
     # Route the app + uvicorn logger tree to Loki, trace-id stamped.
     LoggingInstrumentor().instrument(tracer_provider=tracer_provider, inject_trace_context=True)
