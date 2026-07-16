@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app import telemetry
 from app.config import Settings
 from app.ingest import compress_text, parse_feed, sanitize_and_cap, summarize
 from app.ingest.parse import ParsedFeed
@@ -199,8 +200,11 @@ async def process_feed(
     transport: httpx.AsyncBaseTransport | None = None,
 ) -> FeedOutcome:
     """Fetch and persist one feed, returning what happened."""
-    result = await fetch(feed, transport=transport, settings=settings)
-    outcome = await _persist(session_factory, feed, result, settings=settings, transport=transport)
+    with telemetry.start_span("process_feed", attributes={"alo.feed.id": feed.id}):
+        result = await fetch(feed, transport=transport, settings=settings)
+        outcome = await _persist(
+            session_factory, feed, result, settings=settings, transport=transport
+        )
     # Metrics are recorded in their own short transaction, decoupled from the ingest
     # commit above: a hot-row contention or failure on the shared counter rows must
     # never roll back the entries we just stored, and the counter lock is held only

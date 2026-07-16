@@ -18,6 +18,7 @@ from datetime import timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app import telemetry
 from app.config import Settings
 from app.store import entries as entries_store
 from app.store import feeds as feeds_store
@@ -37,6 +38,13 @@ async def run_maintenance(
     session_factory: async_sessionmaker[AsyncSession], *, settings: Settings
 ) -> tuple[int, int]:
     """Run one GC + purge sweep. Returns ``(feeds_gc'd, entries_purged)``."""
+    with telemetry.start_span("run_maintenance"):
+        return await _run_maintenance(session_factory, settings=settings)
+
+
+async def _run_maintenance(
+    session_factory: async_sessionmaker[AsyncSession], *, settings: Settings
+) -> tuple[int, int]:
     gc = 0
     purged = 0
     try:
