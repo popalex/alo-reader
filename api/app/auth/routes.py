@@ -65,15 +65,15 @@ async def get_config() -> ConfigResponse:
     """Public: tells the SPA which auth mode to boot in and whether to enable tracing."""
     settings = get_settings()
     mode = settings.auth_mode or "unset"
-    otel = {
-        "otel_enabled": settings.otel_enabled,
-        "otel_traces_url": settings.otel_traces_url if settings.otel_enabled else None,
-    }
-    if mode == "clerk":
-        return ConfigResponse(
-            auth_mode=mode, clerk_publishable_key=ClerkSettings().publishable_key, **otel
-        )
-    return ConfigResponse(auth_mode=mode, **otel)
+    otel_enabled = settings.otel_enabled
+    otel_traces_url = settings.otel_traces_url if otel_enabled else None
+    clerk_key = ClerkSettings().publishable_key if mode == "clerk" else None
+    return ConfigResponse(
+        auth_mode=mode,
+        clerk_publishable_key=clerk_key,
+        otel_enabled=otel_enabled,
+        otel_traces_url=otel_traces_url,
+    )
 
 
 @router.get("/me", response_model=MeResponse)

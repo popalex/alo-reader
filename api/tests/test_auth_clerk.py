@@ -179,4 +179,5 @@ async def test_config_exposes_publishable_key(
     assert response.json() == {
         "auth_mode": "clerk",
         "clerk_publishable_key": "pk_test_visible",
+        "otel_enabled": False,
     }
