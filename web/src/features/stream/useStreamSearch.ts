@@ -4,6 +4,7 @@
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 
+import { markUiEvent } from "../../app/traceUiAction";
 import type { StreamDescriptor } from "../../lib/streams";
 
 export const ALL_STREAM: StreamDescriptor = { kind: "all" };
@@ -43,7 +44,11 @@ export function useStreamSearch(stream: StreamDescriptor): StreamSearch {
   const [scopeAll, setScopeAll] = useState(false);
 
   useEffect(() => {
-    const t = window.setTimeout(() => setSearchTerm(searchInput.trim()), 200);
+    const t = window.setTimeout(() => {
+      const term = searchInput.trim();
+      setSearchTerm(term);
+      if (term) markUiEvent("ui.search", { "alo.query.length": term.length });
+    }, 200);
     return () => window.clearTimeout(t);
   }, [searchInput]);
 

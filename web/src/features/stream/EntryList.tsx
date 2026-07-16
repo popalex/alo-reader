@@ -24,6 +24,7 @@ import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { KeyboardHelp } from "../../keyboard/KeyboardHelp";
 import { useKeyboard, type KeyboardActions } from "../../keyboard/useKeyboard";
 import type { StreamDescriptor } from "../../lib/streams";
+import { markUiEvent } from "../../app/traceUiAction";
 import { useIsMobile } from "../../lib/useMediaQuery";
 import { useDensity } from "./density";
 import { EntryListHeader } from "./EntryListHeader";
@@ -120,6 +121,7 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
   // deps) so EntryRow's memo isn't defeated by a fresh handler each render.
   const openEntry = useCallback(
     (entry: { id: number; is_read: boolean }) => {
+      markUiEvent("ui.open_article", { "alo.entry.id": entry.id });
       open(entry.id);
       if (!entry.is_read) mutateEntryState({ ids: [entry.id], read: true });
     },

@@ -10,6 +10,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { FileUp, Loader2, Plus, Search } from "lucide-react";
 
 import { useTokenGetter } from "../../app/auth";
+import { traceUiAction } from "../../app/traceUiAction";
 import { ApiError } from "../../api/client";
 import { useCreateSubscription, useImportOpml } from "../../api/feedMutations";
 import {
@@ -121,7 +122,9 @@ export function AddSubscriptionDialog({
       } else if (folderId) {
         folder_id = Number(folderId);
       }
-      await create.mutateAsync({ feed_url: feedUrl, folder_id, title });
+      await traceUiAction("ui.subscribe", { "alo.feed.url": feedUrl }, () =>
+        create.mutateAsync({ feed_url: feedUrl, folder_id, title }),
+      );
       handleOpenChange(false);
     } catch (err) {
       setError(messageOf(err, "Couldn't subscribe to that feed."));
