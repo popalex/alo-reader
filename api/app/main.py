@@ -4,14 +4,18 @@ Serves the API under the ``/api/v1`` prefix. Caddy reverse-proxies ``/api/*`` to
 this app without stripping the prefix, so the app owns the full path.
 """
 
+import asyncio
+import logging
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import APIRouter, FastAPI
 
+from app import telemetry
 from app.auth import AuthMiddleware
 from app.auth import router as auth_router
-from app.config import validate_boot_config
+from app.config import get_settings, validate_boot_config
+from app.db import get_engine, get_sessionmaker
 from app.errors import register_exception_handlers
 from app.httpmetrics import HttpMetricsMiddleware
 from app.log import RequestContextMiddleware
@@ -26,11 +30,52 @@ from app.routes.streams import router as streams_router
 from app.routes.subscriptions import router as subscriptions_router
 from app.security import SecurityHeadersMiddleware
 
+log = logging.getLogger("alo.api")
+
+# How often the SQL-derived gauges (worker lag, table/db sizes) are refreshed into
+# the telemetry cache the OTel ObservableGauge callbacks read.
+_GAUGE_REFRESH_S = 15.0
+
+
+async def _gauge_refresh_loop() -> None:
+    """Periodically read the DB-derived gauges and push them into the telemetry cache."""
+    from app.store import metrics as metrics_store
+
+    while True:
+        try:
+            async with get_sessionmaker()() as session:
+                lag = await metrics_store.worker_lag_seconds(session)
+                sizes = await metrics_store.table_sizes(session)
+                db_bytes = await metrics_store.db_size_bytes(session)
+            telemetry.set_gauges(
+                lag_seconds=lag,
+                db_bytes=db_bytes,
+                table_bytes={t.table: t.bytes for t in sizes},
+                table_rows={t.table: t.rows for t in sizes},
+            )
+        except Exception:  # noqa: BLE001 — a gauge blip must not kill the loop
+            log.exception("gauge_refresh_failed")
+        await asyncio.sleep(_GAUGE_REFRESH_S)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     validate_boot_config()
-    yield
+    telemetry.configure_telemetry(
+        service_name=get_settings().otel_service_name,
+        version=app.version,
+        app=app,
+        engine=get_engine(),
+    )
+    refresher = asyncio.create_task(_gauge_refresh_loop()) if telemetry.is_enabled() else None
+    try:
+        yield
+    finally:
+        if refresher is not None:
+            refresher.cancel()
+            with suppress(asyncio.CancelledError):
+                await refresher
+        telemetry.shutdown()
 
 
 app = FastAPI(title="alo-reader", version="0.0.0", lifespan=lifespan)
