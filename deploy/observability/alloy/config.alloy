@@ -1,0 +1,37 @@
+// Grafana Alloy as the OTLP collector: receive traces + metrics + logs from the api
+// and worker (gRPC 4317) and the browser SPA (HTTP 4318, via Caddy /otlp), batch, and
+// forward to the all-in-one otel-lgtm stack.
+
+otelcol.receiver.otlp "applications" {
+  grpc {
+    endpoint = "0.0.0.0:4317"
+  }
+
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+
+  output {
+    traces  = [otelcol.processor.batch.applications.input]
+    metrics = [otelcol.processor.batch.applications.input]
+    logs    = [otelcol.processor.batch.applications.input]
+  }
+}
+
+otelcol.processor.batch "applications" {
+  output {
+    traces  = [otelcol.exporter.otlp.lgtm.input]
+    metrics = [otelcol.exporter.otlp.lgtm.input]
+    logs    = [otelcol.exporter.otlp.lgtm.input]
+  }
+}
+
+otelcol.exporter.otlp "lgtm" {
+  client {
+    endpoint = "otel-lgtm:4317"
+
+    tls {
+      insecure = true
+    }
+  }
+}
