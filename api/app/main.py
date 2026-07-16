@@ -6,6 +6,7 @@ this app without stripping the prefix, so the app owns the full path.
 
 import asyncio
 import logging
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 
@@ -59,12 +60,10 @@ async def _gauge_refresh_loop() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     validate_boot_config()
-    telemetry.configure_telemetry(
-        service_name=get_settings().otel_service_name,
-        version=app.version,
-        app=app,
-        engine=get_engine(),
-    )
+    # Telemetry is configured at import (below), not here: instrumenting in the lifespan
+    # is too late — Starlette builds the middleware stack on the first ASGI call, so the
+    # FastAPI server-span middleware would never be installed and browser traces couldn't
+    # continue into the backend. Here we only start the gauge refresher + flush on exit.
     refresher = asyncio.create_task(_gauge_refresh_loop()) if telemetry.is_enabled() else None
     try:
         yield
@@ -86,6 +85,18 @@ app.add_middleware(AuthMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 # Outermost: assign the X-Request-ID before anything runs, echo it on every response.
 app.add_middleware(RequestContextMiddleware)
+
+# Configure telemetry at import — before the ASGI/middleware stack is built on the first
+# request — so FastAPIInstrumentor's server span exists and continues the browser's
+# traceparent. Gated on the raw env var (not Settings, which needs DATABASE_URL) so
+# importing the app for tests / the openapi dump never constructs settings or the engine.
+if os.getenv("OTEL_ENABLED", "").strip().lower() in ("1", "true", "yes", "on"):
+    telemetry.configure_telemetry(
+        service_name=get_settings().otel_service_name,
+        version=app.version,
+        app=app,
+        engine=get_engine(),
+    )
 
 api_v1 = APIRouter(prefix="/api/v1")
 

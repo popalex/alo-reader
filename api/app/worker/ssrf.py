@@ -63,7 +63,13 @@ async def resolve(host: str, port: int) -> list[str]:
     Split out as the DNS seam so tests can substitute a mock resolver.
     """
     loop = asyncio.get_running_loop()
-    infos = await loop.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    try:
+        infos = await loop.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except socket.gaierror:
+        # Host doesn't resolve (NXDOMAIN / no address): treat as "no candidates" so the
+        # caller raises a clean SSRFError("dns") rather than a 500. (Feed discovery of an
+        # unreachable host returns [] instead of erroring.)
+        return []
     # Preserve order, drop duplicates.
     seen: dict[str, None] = {}
     for info in infos:
