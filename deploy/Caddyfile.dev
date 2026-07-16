@@ -15,6 +15,12 @@
 		}
 	}
 
+	# Browser OTLP export (only with the OTel overlay / make dev-otel). Strips /otlp so
+	# /otlp/v1/traces reaches the collector as /v1/traces. Harmless without the overlay.
+	handle_path /otlp/* {
+		reverse_proxy otel-collector:4318
+	}
+
 	handle {
 		reverse_proxy web:5173
 	}
