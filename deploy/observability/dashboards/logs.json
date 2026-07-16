@@ -9,9 +9,20 @@
       {
         "name": "service",
         "type": "custom",
-        "query": ".*,alo-api,alo-worker",
-        "current": { "text": ".*", "value": ".*" },
-        "includeAll": false
+        "query": "alo-api,alo-worker",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": true,
+        "current": { "text": "All", "value": "$__all" }
+      },
+      {
+        "name": "level",
+        "type": "custom",
+        "query": "error,warn,info,debug",
+        "includeAll": true,
+        "allValue": ".+",
+        "multi": true,
+        "current": { "text": "All", "value": "$__all" }
       }
     ]
   },
@@ -19,7 +30,7 @@
     {
       "id": 1,
       "type": "logs",
-      "title": "Application logs (filter by trace_id to correlate with a trace)",
+      "title": "Application logs — filter by service + level; click a line for its trace_id",
       "datasource": { "type": "loki", "uid": "loki" },
       "gridPos": { "h": 20, "w": 24, "x": 0, "y": 0 },
       "options": {
@@ -32,7 +43,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "{service_name=~\"$service\"}",
+          "expr": "{service_name=~\"$service\"} | detected_level=~\"$level\"",
           "queryType": "range",
           "refId": "A"
         }

@@ -14,6 +14,10 @@ services:
         # Pull the OpenTelemetry SDK + instrumentation into the image.
         PIP_INSTALL_SPEC: ".[otel]"
     environment:
+      # Default to none for the local telemetry demo (override with an explicit
+      # AUTH_MODE), same as the dev overlay — otherwise api SystemExits and caddy,
+      # which waits for api to be healthy, never starts.
+      AUTH_MODE: ${AUTH_MODE:-none}
       OTEL_ENABLED: "true"
       OTEL_SERVICE_NAME: alo-api
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
