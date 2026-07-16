@@ -19,31 +19,40 @@ export function initBrowserTelemetry({ serviceName, exportUrl }: BrowserTelemetr
     import("@opentelemetry/context-zone"),
     import("@opentelemetry/exporter-trace-otlp-http"),
     import("@opentelemetry/instrumentation"),
-    import("@opentelemetry/instrumentation-document-load"),
     import("@opentelemetry/instrumentation-fetch"),
     import("@opentelemetry/resources"),
     import("@opentelemetry/sdk-trace-web"),
+    import("@opentelemetry/core"),
   ])
     .then(
       ([
         { ZoneContextManager },
         { OTLPTraceExporter },
         { registerInstrumentations },
-        { DocumentLoadInstrumentation },
         { FetchInstrumentation },
         { resourceFromAttributes },
         { BatchSpanProcessor, WebTracerProvider },
+        { W3CTraceContextPropagator },
       ]) => {
         const provider = new WebTracerProvider({
           resource: resourceFromAttributes({ "service.name": serviceName }),
           spanProcessors: [new BatchSpanProcessor(new OTLPTraceExporter({ url: exportUrl }))],
         });
         // ZoneContextManager keeps the active span across async boundaries, so a ui.*
-        // span stays the parent of the fetch it triggers.
-        provider.register({ contextManager: new ZoneContextManager() });
+        // span stays the parent of the fetch it triggers. The propagator MUST be set
+        // explicitly: in a browser bundle register() can't build it from env vars, so
+        // without this no `traceparent` is injected into /api calls and the backend
+        // starts a separate trace (no end-to-end linkage).
+        provider.register({
+          contextManager: new ZoneContextManager(),
+          propagator: new W3CTraceContextPropagator(),
+        });
+        // Only fetch instrumentation: each browser API call becomes a clean
+        // "METHOD /path" span that propagates into the backend. Document-load is
+        // omitted on purpose — its documentFetch/resourceFetch spans (every JS/CSS/
+        // image) are page-load noise, not the request traces we care about.
         registerInstrumentations({
           instrumentations: [
-            new DocumentLoadInstrumentation(),
             new FetchInstrumentation({
               ignoreUrls: [/\/otlp\//],
               propagateTraceHeaderCorsUrls: [/\/api\//],
