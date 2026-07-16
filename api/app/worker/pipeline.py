@@ -8,6 +8,7 @@ can drive the whole pipeline with an ``httpx.MockTransport`` and no real network
 """
 
 import asyncio
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -24,7 +25,6 @@ from app.ingest.parse import ParsedFeed
 from app.store import entries as entries_store
 from app.store import feeds as feeds_store
 from app.store import icons as icons_store
-from app.store import metrics as metrics_store
 from app.store.entries import NewEntry
 from app.worker.fetch import FetchResult, FetchTarget, fetch_feed
 from app.worker.icons import fetch_favicon
@@ -200,16 +200,21 @@ async def process_feed(
     transport: httpx.AsyncBaseTransport | None = None,
 ) -> FeedOutcome:
     """Fetch and persist one feed, returning what happened."""
+    started = time.perf_counter()
     with telemetry.start_span("process_feed", attributes={"alo.feed.id": feed.id}):
         result = await fetch(feed, transport=transport, settings=settings)
         outcome = await _persist(
             session_factory, feed, result, settings=settings, transport=transport
         )
-    # Metrics are recorded in their own short transaction, decoupled from the ingest
-    # commit above: a hot-row contention or failure on the shared counter rows must
-    # never roll back the entries we just stored, and the counter lock is held only
-    # for this tiny write rather than across the whole parse/insert transaction.
-    await _record(session_factory, feed, result, outcome)
+    # Telemetry only (no DB write): OTel metrics are in-memory and exported out of band,
+    # so recording the outcome can't contend with or roll back the ingest above.
+    telemetry.record_fetch(
+        outcome=outcome.status,
+        http_status=result.http_status,
+        host=urlsplit(feed.feed_url).hostname or "",
+        duration_ms=(time.perf_counter() - started) * 1000,
+    )
+    telemetry.record_entries_inserted(outcome.new_entries)
     return outcome
 
 
@@ -243,23 +248,3 @@ async def _persist(
         # http_error / network_error / blocked
         message = result.error or f"HTTP {result.http_status}"
         return await _apply_error(session, feed, result, settings, message)
-
-
-async def _record(
-    session_factory: async_sessionmaker[AsyncSession],
-    feed: FeedRow,
-    result: FetchResult,
-    outcome: FeedOutcome,
-) -> None:
-    """Record the fetch outcome + per-host 4xx into the /metrics counters (WP-15).
-
-    Best-effort and isolated: runs in its own transaction so it can't roll back the
-    ingested entries, and swallows failures (a metrics blip must not fail a feed)."""
-    host = urlsplit(feed.feed_url).hostname or ""
-    try:
-        async with session_factory() as session, session.begin():
-            await metrics_store.record_fetch(
-                session, host=host, outcome=outcome.status, http_status=result.http_status
-            )
-    except Exception as exc:  # noqa: BLE001 — metrics are non-critical telemetry
-        log.warning("metrics_record_failed feed_id=%s error=%r", feed.id, exc)

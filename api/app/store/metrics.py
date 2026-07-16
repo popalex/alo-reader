@@ -1,17 +1,15 @@
-"""Store functions backing /metrics (WP-15, DESIGN.md §1.4).
+"""SQL-derived gauges for observability (worker lag, table/db sizes).
 
-Two kinds of data: cumulative counters the worker increments in ``metric_counters``
-(read back verbatim), and live gauges computed by SQL at scrape time (worker lag,
-table sizes/rows, DB size). None are user-scoped — these are instance-wide ops
-signals, not user data.
+Fetch/outcome counters moved to OpenTelemetry (see app.telemetry); what remains here
+are the live gauges computed by SQL at refresh time. None are user-scoped — these are
+instance-wide ops signals. The API's gauge-refresh loop reads these and pushes them
+into the OTel ObservableGauge cache.
 """
 
 from dataclasses import dataclass
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.metrics import label_str
 
 # Tables surfaced as size/row gauges (the ones whose growth we watch, DESIGN.md §2 r6).
 _SIZE_TABLES = (
@@ -24,47 +22,6 @@ _SIZE_TABLES = (
     "api_tokens",
     "folders",
 )
-
-_INCR_SQL = text("""
-    INSERT INTO metric_counters (name, label, value) VALUES (:name, :label, :by)
-    ON CONFLICT (name, label) DO UPDATE SET value = metric_counters.value + :by
-""")
-
-
-async def incr(session: AsyncSession, name: str, *, label: str = "", by: int = 1) -> None:
-    await session.execute(_INCR_SQL, {"name": name, "label": label, "by": by})
-
-
-# Metric names (shared by the recorder and the /metrics renderer).
-FETCH_OUTCOMES = "alo_fetch_outcomes_total"
-FETCH_HOST_RESPONSES = "alo_fetch_host_responses_total"
-
-
-async def record_fetch(
-    session: AsyncSession, *, host: str, outcome: str, http_status: int | None
-) -> None:
-    """Count one feed fetch by outcome class, plus per-host 403/429 (DESIGN.md §2 r5)."""
-    await incr(session, FETCH_OUTCOMES, label=label_str([("class", outcome)]))
-    if http_status in (403, 429):
-        await incr(
-            session,
-            FETCH_HOST_RESPONSES,
-            label=label_str([("host", host or "?"), ("code", str(http_status))]),
-        )
-
-
-@dataclass(frozen=True)
-class Counter:
-    name: str
-    label: str
-    value: int
-
-
-async def all_counters(session: AsyncSession) -> list[Counter]:
-    rows = await session.execute(
-        text("SELECT name, label, value FROM metric_counters ORDER BY name, label")
-    )
-    return [Counter(name=r.name, label=r.label, value=r.value) for r in rows]
 
 
 async def worker_lag_seconds(session: AsyncSession) -> float:
