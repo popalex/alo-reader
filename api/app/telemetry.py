@@ -278,14 +278,44 @@ def set_gauges(
     g.table_rows = table_rows
 
 
+def current_traceparent() -> str | None:
+    """The active span's W3C traceparent, or None. Stored when a request queues async
+    work so the worker can continue the same trace on the resulting poll."""
+    if not _runtime.enabled:
+        return None
+    from opentelemetry.propagate import inject
+
+    carrier: dict[str, str] = {}
+    inject(carrier)
+    return carrier.get("traceparent")
+
+
+def _context_from_traceparent(traceparent: str | None) -> Any:
+    if not traceparent:
+        return None
+    from opentelemetry.propagate import extract
+
+    return extract({"traceparent": traceparent})
+
+
 @contextmanager
-def start_span(name: str, *, attributes: dict[str, Any] | None = None) -> Iterator[Any | None]:
-    """Start a manual span (no-op contextmanager when telemetry is disabled)."""
+def start_span(
+    name: str,
+    *,
+    attributes: dict[str, Any] | None = None,
+    parent_traceparent: str | None = None,
+) -> Iterator[Any | None]:
+    """Start a manual span (no-op when disabled). ``parent_traceparent`` continues a
+    trace propagated from another process (e.g. the request that queued this work)."""
     if not _runtime.enabled:
         yield None
         return
     attrs = {k: v for k, v in (attributes or {}).items() if v is not None}
     with _runtime.tracer.start_as_current_span(
-        name, attributes=attrs, record_exception=True, set_status_on_exception=True
+        name,
+        context=_context_from_traceparent(parent_traceparent),
+        attributes=attrs,
+        record_exception=True,
+        set_status_on_exception=True,
     ) as span:
         yield span

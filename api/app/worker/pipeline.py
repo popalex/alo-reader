@@ -43,6 +43,7 @@ class FeedRow(FetchTarget, Protocol):
     check_interval_s: int
     error_count: int
     icon_id: int | None
+    trace_ctx: str | None
 
 
 # Outcome status: new_body | not_modified | http_error | network_error | blocked
@@ -201,7 +202,13 @@ async def process_feed(
 ) -> FeedOutcome:
     """Fetch and persist one feed, returning what happened."""
     started = time.perf_counter()
-    with telemetry.start_span("process_feed", attributes={"alo.feed.id": feed.id}):
+    # If the feed was queued by a subscribe/refresh request, continue that request's
+    # trace so the browser → API → worker → fetch → DB chain is one end-to-end trace.
+    with telemetry.start_span(
+        "process_feed",
+        attributes={"alo.feed.id": feed.id},
+        parent_traceparent=feed.trace_ctx,
+    ):
         result = await fetch(feed, transport=transport, settings=settings)
         outcome = await _persist(
             session_factory, feed, result, settings=settings, transport=transport

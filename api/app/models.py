@@ -84,6 +84,9 @@ class Feed(Base):
     last_error: Mapped[str | None] = mapped_column(Text)
     last_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     icon_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("icons.id"))
+    # W3C traceparent of the request that queued an immediate poll (subscribe / manual
+    # refresh); the worker continues that trace on the next poll, then clears it.
+    trace_ctx: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
