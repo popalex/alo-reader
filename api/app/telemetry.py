@@ -230,12 +230,14 @@ def configure_telemetry(
 
         sa_event.listen(engine.sync_engine, "before_cursor_execute", _rename_db_span)
 
-    # Route the app + uvicorn logger tree to Loki, trace-id stamped.
+    # Prepare the Loki log handler (trace-id stamped) but DON'T attach it here. Under
+    # uvicorn, configure_telemetry runs at import; uvicorn then applies its own dictConfig
+    # to the uvicorn.* loggers, which replaces their handlers and would drop one added now.
+    # enable_log_export() (from the API lifespan + the worker) attaches it once logging has
+    # settled, so the api's access/app logs actually reach Loki.
     LoggingInstrumentor().instrument(tracer_provider=tracer_provider, inject_trace_context=True)
     log_handler = LoggingHandler(level=logging.INFO, logger_provider=logger_provider)
     log_handler.addFilter(_HealthLogFilter())
-    for name in _LOG_EXPORT_LOGGERS:
-        logging.getLogger(name).addHandler(log_handler)
 
     meter = meter_provider.get_meter(service_name)
     gauges = _Gauges()
@@ -264,6 +266,23 @@ def configure_telemetry(
     )
     logger.info("OpenTelemetry enabled: service=%s protocol=%s", service_name, protocol)
     return _runtime
+
+
+def enable_log_export() -> None:
+    """Attach the OTLP log handler to the app + uvicorn logger tree (exports to Loki).
+
+    Split out of configure_telemetry and called from the API lifespan startup + the
+    worker's run() — i.e. after uvicorn has installed its own logging config — so the
+    handler survives uvicorn's dictConfig on the uvicorn.* loggers. Idempotent, and a
+    no-op when telemetry is disabled.
+    """
+    handler = _runtime._log_handler
+    if handler is None:
+        return
+    for name in _LOG_EXPORT_LOGGERS:
+        log = logging.getLogger(name)
+        if handler not in log.handlers:
+            log.addHandler(handler)
 
 
 def _register_observable_gauges(meter: Any, gauges: _Gauges) -> None:

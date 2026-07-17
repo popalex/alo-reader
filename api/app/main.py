@@ -64,6 +64,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # is too late — Starlette builds the middleware stack on the first ASGI call, so the
     # FastAPI server-span middleware would never be installed and browser traces couldn't
     # continue into the backend. Here we only start the gauge refresher + flush on exit.
+    # Attach the OTLP log handler now, not at import: uvicorn has finished installing its
+    # own logging config by the time the lifespan runs, so the handler survives on the
+    # uvicorn.* loggers and the api's logs actually reach Loki.
+    if telemetry.is_enabled():
+        telemetry.enable_log_export()
     refresher = asyncio.create_task(_gauge_refresh_loop()) if telemetry.is_enabled() else None
     try:
         yield

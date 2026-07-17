@@ -177,6 +177,9 @@ async def run(
     session_factory = session_factory or get_sessionmaker()
     if production:
         telemetry.configure_telemetry(service_name="alo-worker", engine=get_engine())
+        # Log-handler attachment is split out of configure_telemetry (see its docstring);
+        # attach it so the worker's logs reach Loki.
+        telemetry.enable_log_export()
     gate = HostGate(settings.worker_per_host_concurrency, settings.worker_per_host_delay_s)
     counters = Counters()
 
