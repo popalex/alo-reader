@@ -30,7 +30,7 @@
     {
       "id": 1,
       "type": "logs",
-      "title": "Application logs — filter by service + level; click a line for its trace_id",
+      "title": "Application logs — each line prefixed with its service; filter by service + level; click a line for its trace_id",
       "datasource": { "type": "loki", "uid": "loki" },
       "gridPos": { "h": 20, "w": 24, "x": 0, "y": 0 },
       "options": {
@@ -43,7 +43,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "{service_name=~\"$service\"} | detected_level=~\"$level\"",
+          "expr": "{service_name=~\"$service\"} | detected_level=~\"$level\" | line_format \"{{ printf \\\"%-7s\\\" (trimPrefix \\\"alo-\\\" .service_name) }}| {{ __line__ }}\"",
           "queryType": "range",
           "refId": "A"
         }
