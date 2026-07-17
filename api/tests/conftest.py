@@ -56,7 +56,16 @@ def database_url() -> Iterator[str]:
     Uses the project's Postgres image (postgres:18 + the rum extension migration
     0003 needs); override with ALO_TEST_PG_IMAGE. Build it with `make pg-image`."""
     image = os.getenv("ALO_TEST_PG_IMAGE", "alo-reader-postgres:local")
-    with PostgresContainer(image, driver="asyncpg") as pg:
+    # The image declares VOLUME /var/lib/postgresql. Without a mount there, every run
+    # leaks an anonymous hex-named volume — Ryuk reaps the container but not its unlabeled
+    # volume — so they pile up over time. A tmpfs at that path means no volume is ever
+    # created (data lives in RAM, which also speeds the DB tests up), so nothing leaks even
+    # on an ungraceful exit. delete_volume=True (testcontainers' clean-stop default) covers
+    # the graceful case. Mirrors ~/src/phonies.
+    container = PostgresContainer(image, driver="asyncpg").with_kwargs(
+        tmpfs={"/var/lib/postgresql": ""}
+    )
+    with container as pg:
         url = pg.get_connection_url()
         os.environ["DATABASE_URL"] = url
         get_settings.cache_clear()
