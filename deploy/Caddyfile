@@ -23,6 +23,14 @@
 		}
 	}
 
+	# Grafana (OTel overlay only), served under /grafana over the internal network — the
+	# host port is loopback-only, so this is the only way in from outside. The prefix is
+	# passed through (Grafana runs with serve_from_sub_path) and Grafana's own login guards
+	# it (anonymous access is off). Harmless without the overlay: upstream resolved per-request.
+	handle /grafana* {
+		reverse_proxy otel-lgtm:3000
+	}
+
 	handle {
 		# Security headers for the SPA (WP-15, DESIGN.md §1.6). The CSP is the second
 		# XSS wall after ingest sanitization; it allows 'self' plus what Clerk and

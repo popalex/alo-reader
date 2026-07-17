@@ -61,9 +61,22 @@ services:
   otel-lgtm:
     image: grafana/otel-lgtm:0.28.0
     restart: unless-stopped
+    environment:
+      # otel-lgtm ships Grafana with anonymous Admin access for convenience. Since Grafana
+      # is reachable through Caddy's public /grafana route, it must guard itself: disable
+      # anonymous access and require a login. Override the credentials for real use.
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      # Served under /grafana behind Caddy, so Grafana must know its sub-path or assets and
+      # redirects break. ROOT_URL defaults to the dev origin (Caddy on :3000); point it at
+      # your external URL in prod (e.g. https://example.com/grafana/).
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3000/grafana/}
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
     ports:
-      # Grafana UI (internal ops surface — bind to loopback in real prod).
-      - "${GRAFANA_PORT:-3001}:3000"
+      # Loopback only — reachable from the host (localhost:3001) or an SSH tunnel, never a
+      # public interface. Public access goes through Caddy's /grafana route instead.
+      - "127.0.0.1:${GRAFANA_PORT:-3001}:3000"
     volumes:
       - otel-lgtm-data:/data
       # Dropping a *.json into observability/dashboards/ auto-provisions it into an

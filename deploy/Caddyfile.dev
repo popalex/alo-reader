@@ -21,6 +21,14 @@
 		reverse_proxy otel-collector:4318
 	}
 
+	# Grafana (OTel overlay only), served under /grafana over the internal network — the
+	# host port is loopback-only. The prefix is passed through (Grafana runs with
+	# serve_from_sub_path), and Grafana's own login guards it (anonymous access is off).
+	# Harmless without the overlay: the upstream is resolved per-request.
+	handle /grafana* {
+		reverse_proxy otel-lgtm:3000
+	}
+
 	handle {
 		reverse_proxy web:5173
 	}
