@@ -27,6 +27,18 @@ Local development (hot-reload both sides on http://localhost:3000):
 make dev
 ```
 
+Observability — OpenTelemetry → Grafana LGTM (traces, metrics, logs). Off by
+default; these overlays turn it on and add the collector + Grafana stack:
+
+```sh
+make otel-up      # prod-topology stack + telemetry; Grafana on http://localhost:3001
+make dev-otel     # hot-reload dev stack + telemetry (app :3000, Grafana :3001)
+make otel-down    # stop the OTel stack
+```
+
+See [`deploy/observability/README.md`](deploy/observability/README.md) for the
+topology, what's exported, and the dashboards.
+
 Backend tooling (creates `.venv`):
 
 ```sh

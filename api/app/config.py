@@ -42,6 +42,15 @@ class Settings(BaseSettings):
     db_pool_recycle_s: int = 1800
     db_statement_timeout_ms: int = 30_000
 
+    # OpenTelemetry (traces + metrics + logs), off by default. When true, the process
+    # must be installed with the ``otel`` extra and OTEL_EXPORTER_OTLP_* are read from
+    # the environment by the SDK. The browser SPA turns its own telemetry on from
+    # /config (otel_enabled + otel_traces_url). Enabled by the OTel compose overlay.
+    otel_enabled: bool = False
+    otel_service_name: str = "alo-api"
+    # Same-origin path the browser posts spans to (Caddy proxies /otlp → collector).
+    otel_traces_url: str = "/otlp/v1/traces"
+
     # AUTH_MODE has deliberately no default: the server refuses to boot without
     # an explicit choice (DESIGN.md §0.1 — "none" must never be implicit).
     auth_mode: str | None = None

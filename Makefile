@@ -6,6 +6,8 @@ PY := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
 COMPOSE := docker compose -f deploy/docker-compose.yml
 COMPOSE_DEV := docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml
+COMPOSE_OTEL := docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.otel.yml
+COMPOSE_DEV_OTEL := docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml -f deploy/docker-compose.otel.yml
 
 # Host-run alembic/pytest talk to the dockerized Postgres over its localhost port
 # (see `make db`). Postgres itself is never installed on the host.
@@ -71,6 +73,17 @@ size:
 ## For local hacking, `make dev` defaults AUTH_MODE=none and adds hot-reload.
 up:
 	$(COMPOSE) up --build -d
+
+## Full stack + OpenTelemetry → Grafana LGTM (collector + otel-lgtm). Grafana on :3001.
+otel-up:
+	$(COMPOSE_OTEL) up --build -d
+
+otel-down:
+	$(COMPOSE_OTEL) down
+
+## Hot-reload dev stack + OpenTelemetry (app on :3000, Grafana on :3001).
+dev-otel:
+	$(COMPOSE_DEV_OTEL) up --build
 
 ## Seed a large, realistic dataset (20 feeds in folders, ~5k mixed read/starred
 ## entries) into the running stack — no host Python needed. Idempotent: it resets

@@ -167,3 +167,20 @@ async def test_backend_blocks_before_dialing_on_rebind(monkeypatch: pytest.Monke
     with pytest.raises(ssrf.SSRFError):
         await backend.connect_tcp("rebind.example", 443)
     assert inner.dialed is None  # never opened a socket
+
+
+async def test_resolve_returns_empty_on_nxdomain(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A non-resolving host yields [] (→ caller raises SSRFError("dns")) instead of
+    letting socket.gaierror escape as a 500 (regression: discover of a wrong URL)."""
+    import socket
+
+    async def boom(*args: object, **kwargs: object) -> list[object]:
+        raise socket.gaierror(-2, "Name or service not known")
+
+    monkeypatch.setattr("app.worker.ssrf.asyncio.get_running_loop", lambda: _Loop(boom))
+    assert await ssrf.resolve("nope.invalid", 80) == []
+
+
+class _Loop:
+    def __init__(self, getaddrinfo: object) -> None:
+        self.getaddrinfo = getaddrinfo

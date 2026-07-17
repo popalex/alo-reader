@@ -3,16 +3,12 @@
 :80 {
 	encode gzip
 
-	# /metrics is an internal-only ops surface (WP-15, DESIGN.md §1.4): reachable
-	# from private networks (Prometheus on the same VPS/overlay), 403 from the
-	# public internet. Must precede the general /api/* handler.
-	@metrics path /api/v1/metrics
-	handle @metrics {
-		@external not remote_ip private_ranges
-		respond @external "metrics are internal-only" 403
-		reverse_proxy api:8000 {
-			header_up X-Real-IP {http.request.client_ip}
-		}
+	# Same-origin OTLP/HTTP endpoint for browser tracing (only used when the OTel
+	# overlay runs and /config reports otel_enabled). handle_path strips /otlp so
+	# /otlp/v1/traces reaches the collector as /v1/traces. Harmless without the
+	# overlay — nothing posts here and the upstream is resolved per-request.
+	handle_path /otlp/* {
+		reverse_proxy otel-collector:4318
 	}
 
 	# Pass the real client IP to the API for its per-IP pre-auth rate limit. Caddy is
@@ -25,6 +21,14 @@
 		reverse_proxy api:8000 {
 			header_up X-Real-IP {http.request.client_ip}
 		}
+	}
+
+	# Grafana (OTel overlay only), served under /grafana over the internal network — the
+	# host port is loopback-only, so this is the only way in from outside. The prefix is
+	# passed through (Grafana runs with serve_from_sub_path) and Grafana's own login guards
+	# it (anonymous access is off). Harmless without the overlay: upstream resolved per-request.
+	handle /grafana* {
+		reverse_proxy otel-lgtm:3000
 	}
 
 	handle {

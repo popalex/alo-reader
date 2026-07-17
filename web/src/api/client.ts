@@ -5,6 +5,8 @@
 export interface ApiConfig {
   auth_mode: string;
   clerk_publishable_key?: string;
+  otel_enabled?: boolean;
+  otel_traces_url?: string;
 }
 
 /** The uniform backend error envelope, surfaced as a typed exception. */

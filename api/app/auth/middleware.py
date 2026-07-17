@@ -13,12 +13,9 @@ from app.errors import error_envelope
 
 from .runtime import get_runtime
 
-# Paths that never need an identity: skipped entirely (healthz must not touch
-# the DB, /config is the SPA's pre-auth boot call, the webhook is svix-signed, and
-# /metrics is an ops surface gated to the internal network by Caddy, not by a user).
-PUBLIC_PATHS = frozenset(
-    {"/api/v1/healthz", "/api/v1/config", "/api/v1/webhooks/clerk", "/api/v1/metrics"}
-)
+# Paths that never need an identity: skipped entirely (healthz must not touch the DB,
+# /config is the SPA's pre-auth boot call, and the webhook is svix-signed).
+PUBLIC_PATHS = frozenset({"/api/v1/healthz", "/api/v1/config", "/api/v1/webhooks/clerk"})
 # Served favicons are global, immutable bytes referenced from <img> tags — public.
 PUBLIC_PREFIXES = ("/api/v1/icons/",)
 

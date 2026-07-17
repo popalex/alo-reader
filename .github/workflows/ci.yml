@@ -32,7 +32,9 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - run: python -m pip install -e "./api[dev]"
+      # [otel] too so mypy resolves the OpenTelemetry imports in app/telemetry.py
+      # (the module imports them lazily at runtime, but typecheck follows them).
+      - run: python -m pip install -e "./api[dev,otel]"
       - run: mypy api
       - uses: actions/setup-node@v6
         with:

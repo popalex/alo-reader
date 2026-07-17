@@ -10,8 +10,8 @@ import pytest
 from sqlalchemy import text, update
 
 from app import db as app_db
+from app import telemetry
 from app.models import Feed
-from app.store import metrics as metrics_store
 from app.worker.main import Counters, poll_once
 from tests import wutil
 
@@ -44,18 +44,20 @@ async def test_new_body_then_304_inserts_exactly_once(api_db: str) -> None:
     assert feed.etag == '"v1"'
 
 
-async def test_fetch_outcome_recorded_to_metrics(api_db: str) -> None:
-    # The pipeline records the fetch outcome into the /metrics counters in its own
-    # transaction, decoupled from the ingest commit — the happy path must still count.
+async def test_fetch_outcome_recorded_to_telemetry(
+    api_db: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The pipeline records the fetch outcome via OpenTelemetry (no DB write). Spy on the
+    # helper to confirm the happy path reports the outcome + entry count.
+    calls: list[dict[str, object]] = []
+    monkeypatch.setattr(telemetry, "record_fetch", lambda **kw: calls.append(kw))
     sf = app_db.get_sessionmaker()
     await wutil.seed_feed(sf, "https://feed.example/rss")
     transport = wutil.serve(wutil.rss(_ITEMS))
 
     await poll_once(sf, settings=wutil.worker_settings(), transport=transport)
 
-    async with sf() as s:
-        counters = {(c.name, c.label): c.value for c in await metrics_store.all_counters(s)}
-    assert counters[(metrics_store.FETCH_OUTCOMES, 'class="new_body"')] == 1
+    assert any(c["outcome"] == "new_body" and c["http_status"] == 200 for c in calls)
 
 
 async def test_dedup_when_server_ignores_conditional(api_db: str) -> None:

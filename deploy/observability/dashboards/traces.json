@@ -1,0 +1,52 @@
+{
+  "title": "alo-reader · traces",
+  "uid": "alo-traces",
+  "editable": true,
+  "schemaVersion": 39,
+  "time": { "from": "now-15m", "to": "now" },
+  "refresh": "10s",
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "",
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "mode": "markdown",
+        "content": "**End-to-end traces** start in the browser (`alo-web`) and flow through the API, worker, and DB. Click any row to open the full span waterfall. The first table is browser-initiated journeys (frontend → backend → worker → db); the second is every trace, including background worker polls."
+      }
+    },
+    {
+      "id": 2,
+      "type": "table",
+      "title": "Root (browser-initiated) end-to-end traces — alo-web → api → worker → db",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 3 },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "traceql",
+          "query": "{ resource.service.name = \"alo-web\" }",
+          "tableType": "traces",
+          "limit": 30
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "table",
+      "title": "All traces (any service, incl. scheduled worker polls)",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 13 },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "traceql",
+          "query": "{ resource.service.name =~ \"alo-.*\" }",
+          "tableType": "traces",
+          "limit": 50
+        }
+      ]
+    }
+  ]
+}

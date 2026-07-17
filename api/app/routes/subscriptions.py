@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import telemetry
 from app.auth.ratelimit import Cooldown
 from app.config import get_settings
 from app.deps import CurrentUser, Session
@@ -128,7 +129,10 @@ async def create_subscription(
         await _require_own_folder(session, user.id, body.folder_id)
 
     feed = await feeds_store.upsert_by_url(
-        session, feed_url=feed_url, title=(body.title or "").strip()
+        session,
+        feed_url=feed_url,
+        title=(body.title or "").strip(),
+        trace_ctx=telemetry.current_traceparent(),
     )
     if await subs_store.get_by_feed(session, user.id, feed.id) is not None:
         raise ApiError(409, "conflict", "already subscribed to this feed")
@@ -182,5 +186,7 @@ async def refresh_subscription(sub_id: int, user: CurrentUser, session: Session)
     window = get_settings().subscription_refresh_window_s
     if not _refresh_cooldown.allow(sub.feed_id, window):
         raise ApiError(429, "rate_limited", "feed was refreshed too recently")
-    await feeds_store.request_immediate_check(session, sub.feed_id)
+    await feeds_store.request_immediate_check(
+        session, sub.feed_id, trace_ctx=telemetry.current_traceparent()
+    )
     return RefreshResponse(status="queued")

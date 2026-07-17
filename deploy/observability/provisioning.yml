@@ -1,0 +1,17 @@
+# Provisions the alo-reader dashboards into an "alo-reader" folder in Grafana on
+# startup. Mounted into the otel-lgtm container's Grafana provisioning dir by the OTel
+# compose overlay. The dashboards dir itself is mounted at options.path, so dropping a
+# new *.json there is drop-in.
+apiVersion: 1
+
+providers:
+  - name: alo-reader
+    orgId: 1
+    folder: alo-reader
+    type: file
+    disableDeletion: false
+    allowUiUpdates: true
+    updateIntervalSeconds: 10
+    options:
+      path: /otel-lgtm/grafana/dashboards/alo-reader
+      foldersFromFilesStructure: false

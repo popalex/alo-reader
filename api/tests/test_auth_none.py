@@ -36,7 +36,8 @@ async def test_none_mode_config_endpoint(
     set_auth_mode("none")
     response = await api_client.get("/api/v1/config")
     assert response.status_code == 200
-    assert response.json() == {"auth_mode": "none"}  # no publishable key leaked
+    # No publishable key leaked; otel off by default (traces_url omitted when disabled).
+    assert response.json() == {"auth_mode": "none", "otel_enabled": False}
 
 
 async def test_none_mode_tokens_work(

@@ -20,8 +20,9 @@ from urllib.parse import urlsplit
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app import telemetry
 from app.config import Settings, get_settings
-from app.db import get_sessionmaker
+from app.db import get_engine, get_sessionmaker
 from app.models import Feed
 from app.store import feeds as feeds_store
 from app.worker.fetch import fetch_feed
@@ -151,9 +152,10 @@ async def poll_once(
             counters.errors += 1
             _log("feed_failed", feed_id=feed.id, error=repr(exc))
 
-    async with asyncio.TaskGroup() as tg:
-        for feed in feeds:
-            tg.create_task(_run_one(feed))
+    with telemetry.start_span("poll_once", attributes={"alo.batch.size": len(feeds)}):
+        async with asyncio.TaskGroup() as tg:
+            for feed in feeds:
+                tg.create_task(_run_one(feed))
     return len(feeds)
 
 
@@ -168,8 +170,16 @@ async def run(
     Production passes nothing and gets SIGTERM/SIGINT-driven shutdown; tests inject
     ``settings``/``session_factory``/``stop`` and drive the ``stop`` event directly.
     """
+    # Configure telemetry only on the production path (no injected session factory) so
+    # tests never touch the module engine or the real OTLP exporter.
+    production = session_factory is None
     settings = settings or get_settings()
     session_factory = session_factory or get_sessionmaker()
+    if production:
+        telemetry.configure_telemetry(service_name="alo-worker", engine=get_engine())
+        # Log-handler attachment is split out of configure_telemetry (see its docstring);
+        # attach it so the worker's logs reach Loki.
+        telemetry.enable_log_export()
     gate = HostGate(settings.worker_per_host_concurrency, settings.worker_per_host_delay_s)
     counters = Counters()
 
@@ -228,6 +238,8 @@ async def run(
         entries=counters.entries_inserted,
         crashed=crashed,
     )
+    if production:
+        telemetry.shutdown()  # flush pending spans/metrics/logs
     # Exit non-zero on a crash so `restart: unless-stopped`/on-failure recovers it and
     # the failure is visible; a clean stop (SIGTERM) still returns normally.
     if crashed:

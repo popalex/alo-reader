@@ -8,7 +8,10 @@ WORKDIR /app
 
 COPY api/pyproject.toml ./pyproject.toml
 COPY api/app ./app
-RUN pip install --no-cache-dir .
+# Default build is the lean image; the OTel compose overlay builds with
+# PIP_INSTALL_SPEC=".[otel]" to pull the OpenTelemetry SDK + instrumentation.
+ARG PIP_INSTALL_SPEC="."
+RUN pip install --no-cache-dir "${PIP_INSTALL_SPEC}"
 
 # Alembic config + migration scripts: needed by the `migrate` command so the
 # image can bring a database up to head on its own.

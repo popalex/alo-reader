@@ -8,6 +8,7 @@ from datetime import timedelta
 
 from sqlalchemy import delete as sql_delete
 from sqlalchemy import func, select, text, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -48,23 +49,45 @@ async def upsert_by_url(
     feed_url: str,
     site_url: str | None = None,
     title: str = "",
+    trace_ctx: str | None = None,
 ) -> Feed:
-    """Return the existing feed for ``feed_url`` or create one queued for an
-    immediate poll (``next_check_at = now()``)."""
+    """Return the existing feed for ``feed_url`` or create one queued for an immediate
+    poll (``next_check_at = now()``). ``trace_ctx`` (the caller's traceparent) is stored
+    on a newly-created feed so the worker's first poll continues that trace."""
     existing = await get_by_url(session, feed_url)
     if existing is not None:
         return existing
-    feed = Feed(feed_url=feed_url, site_url=site_url, title=title, next_check_at=func.now())
-    session.add(feed)
-    await session.flush()
-    return feed
+    # Race-safe create: two concurrent subscribes to the same new URL would both pass the
+    # check above and the second would violate feeds_feed_url_key. ON CONFLICT DO NOTHING
+    # makes the loser a no-op; it then re-selects the winner's row.
+    stmt = (
+        pg_insert(Feed)
+        .values(
+            feed_url=feed_url,
+            site_url=site_url,
+            title=title,
+            next_check_at=func.now(),
+            trace_ctx=trace_ctx,
+        )
+        .on_conflict_do_nothing(index_elements=["feed_url"])
+        .returning(Feed)
+    )
+    created = (await session.scalars(stmt)).first()
+    if created is not None:
+        return created
+    winner = await get_by_url(session, feed_url)
+    assert winner is not None  # the conflicting row must exist
+    return winner
 
 
-async def request_immediate_check(session: AsyncSession, feed_id: int) -> bool:
+async def request_immediate_check(
+    session: AsyncSession, feed_id: int, *, trace_ctx: str | None = None
+) -> bool:
     """Queue a feed for the next poll cycle (``next_check_at = now()``). Used by the
-    manual /subscriptions/{id}/refresh path. Returns False if the feed is gone."""
+    manual /subscriptions/{id}/refresh path; ``trace_ctx`` links the resulting poll to
+    the refresh request's trace. Returns False if the feed is gone."""
     result = await session.execute(
-        update(Feed).where(Feed.id == feed_id).values(next_check_at=func.now())
+        update(Feed).where(Feed.id == feed_id).values(next_check_at=func.now(), trace_ctx=trace_ctx)
     )
     return rowcount(result) > 0
 
@@ -119,6 +142,7 @@ async def record_success(
             last_error=None,
             last_fetched_at=func.now(),
             claimed_until=_RELEASED,
+            trace_ctx=None,  # consume the triggering trace; scheduled polls are their own trace
         )
     )
 
@@ -135,6 +159,7 @@ async def record_not_modified(session: AsyncSession, feed_id: int, *, interval_s
             last_error=None,
             last_fetched_at=func.now(),
             claimed_until=_RELEASED,
+            trace_ctx=None,  # consume the triggering trace; scheduled polls are their own trace
         )
     )
 
@@ -150,6 +175,7 @@ async def record_error(session: AsyncSession, feed_id: int, *, delay_s: int, mes
             last_error=message[:_MAX_ERROR_LEN],
             next_check_at=func.now() + timedelta(seconds=delay_s),
             claimed_until=_RELEASED,
+            trace_ctx=None,  # consume the triggering trace; scheduled polls are their own trace
         )
     )
 

@@ -25,6 +25,9 @@ router = APIRouter()
 class ConfigResponse(BaseModel):
     auth_mode: str
     clerk_publishable_key: str | None = None
+    # When true, the SPA lazy-loads the browser OTel SDK and posts spans to otel_traces_url.
+    otel_enabled: bool = False
+    otel_traces_url: str | None = None
 
 
 class MeQuotas(BaseModel):
@@ -59,11 +62,18 @@ class CreateTokenResponse(BaseModel):
 
 @router.get("/config", response_model=ConfigResponse, response_model_exclude_none=True)
 async def get_config() -> ConfigResponse:
-    """Public: tells the SPA which auth mode to boot in."""
-    mode = get_settings().auth_mode or "unset"
-    if mode == "clerk":
-        return ConfigResponse(auth_mode=mode, clerk_publishable_key=ClerkSettings().publishable_key)
-    return ConfigResponse(auth_mode=mode)
+    """Public: tells the SPA which auth mode to boot in and whether to enable tracing."""
+    settings = get_settings()
+    mode = settings.auth_mode or "unset"
+    otel_enabled = settings.otel_enabled
+    otel_traces_url = settings.otel_traces_url if otel_enabled else None
+    clerk_key = ClerkSettings().publishable_key if mode == "clerk" else None
+    return ConfigResponse(
+        auth_mode=mode,
+        clerk_publishable_key=clerk_key,
+        otel_enabled=otel_enabled,
+        otel_traces_url=otel_traces_url,
+    )
 
 
 @router.get("/me", response_model=MeResponse)

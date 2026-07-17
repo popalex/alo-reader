@@ -13,7 +13,7 @@ export interface paths {
         };
         /**
          * Get Config
-         * @description Public: tells the SPA which auth mode to boot in.
+         * @description Public: tells the SPA which auth mode to boot in and whether to enable tracing.
          */
         get: operations["get_config_api_v1_config_get"];
         put?: never;
@@ -354,6 +354,13 @@ export interface components {
             auth_mode: string;
             /** Clerk Publishable Key */
             clerk_publishable_key?: string | null;
+            /**
+             * Otel Enabled
+             * @default false
+             */
+            otel_enabled: boolean;
+            /** Otel Traces Url */
+            otel_traces_url?: string | null;
         };
         /** CountsResponse */
         CountsResponse: {
