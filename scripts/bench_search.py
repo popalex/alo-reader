@@ -22,6 +22,7 @@ import random
 import statistics
 import sys
 import time
+from collections.abc import Iterator
 
 import asyncpg
 
@@ -70,15 +71,35 @@ async def cleanup(conn: asyncpg.Connection) -> None:
     await conn.execute("DELETE FROM feeds WHERE feed_url = $1", BENCH_FEED_URL)
 
 
-def make_rows(feed_id: int, n: int) -> list[tuple]:
+def make_rows(feed_id: int, n: int) -> Iterator[tuple[int, bytes, str, str]]:
+    # Streamed, not materialized: the nightly profile's 5M rows are several GB as a
+    # list, and COPY consumes them one at a time anyway.
     rng = random.Random(1234)
-    rows = []
     for i in range(n):
         words = rng.sample(VOCAB, WORDS_PER_DOC)
         title = " ".join(words[:6])
         body = f"<p>{' '.join(words)}</p>"
-        rows.append((feed_id, i.to_bytes(8, "big"), title, body))
-    return rows
+        yield (feed_id, i.to_bytes(8, "big"), title, body)
+
+
+async def entry_indexes(conn: asyncpg.Connection) -> list[tuple[str, str]]:
+    """(name, CREATE INDEX …) for every non-constraint index on entries.
+
+    Read back from the catalog rather than hardcoded, so the rebuilt indexes are
+    exactly what the migrations created — including the rum opclass and its WITH
+    options — however those evolve.
+    """
+    rows = await conn.fetch(
+        """
+        SELECT c.relname AS name, pg_get_indexdef(x.indexrelid) AS ddl
+        FROM pg_index x
+        JOIN pg_class c ON c.oid = x.indexrelid
+        WHERE x.indrelid = 'entries'::regclass
+          AND NOT x.indisprimary
+          AND NOT x.indisunique
+        """
+    )
+    return [(r["name"], r["ddl"]) for r in rows]
 
 
 async def seed(conn: asyncpg.Connection) -> tuple[int, int]:
@@ -98,12 +119,29 @@ async def seed(conn: asyncpg.Connection) -> tuple[int, int]:
     )
     print(f"seeding {N:,} entries…", flush=True)
     t0 = time.perf_counter()
-    # COPY the base columns; search_tsv (generated STORED) computes per row.
-    await conn.copy_records_to_table(
-        "entries",
-        columns=["feed_id", "guid_hash", "title", "content_html"],
-        records=make_rows(feed_id, N),
-    )
+    # Maintaining the rum index row-by-row across the COPY dominates the seed (~28
+    # min at 5M, which blew the nightly job's timeout). Drop the secondary indexes,
+    # load, then build them once from the definitions captured above — the standard
+    # bulk-load order, and several times cheaper.
+    indexes = await entry_indexes(conn)
+    await conn.execute("SET maintenance_work_mem = '1GB'")  # index builds, not the COPY
+    try:
+        for name, _ in indexes:
+            await conn.execute(f'DROP INDEX "{name}"')
+        # COPY the base columns; search_tsv (generated STORED) computes per row.
+        await conn.copy_records_to_table(
+            "entries",
+            columns=["feed_id", "guid_hash", "title", "content_html"],
+            records=make_rows(feed_id, N),
+        )
+        print(f"  copied in {time.perf_counter() - t0:.1f}s", flush=True)
+    finally:
+        # Rebuild even if the COPY failed, so a crashed run doesn't leave the table
+        # unindexed for whatever else uses this database.
+        t1 = time.perf_counter()
+        for _, ddl in indexes:
+            await conn.execute(ddl)
+        print(f"  indexed in {time.perf_counter() - t1:.1f}s", flush=True)
     await conn.execute("ANALYZE entries")
     print(f"  seeded in {time.perf_counter() - t0:.1f}s", flush=True)
     return user_id, feed_id

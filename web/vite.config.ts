@@ -57,11 +57,19 @@ export default defineConfig({
           {
             // Small app-shell data (config/sidebar/counts) so the app actually
             // boots offline with last-known state instead of the /config error.
+            //
+            // Deliberately no networkTimeoutSeconds: this is the data the user
+            // *mutates* (rename a feed, move it, mark read), and the refetch that
+            // follows a mutation must not be answered from the cache. A timeout
+            // here silently served the pre-mutation list whenever the API took
+            // longer than it to answer, leaving the sidebar wrong until something
+            // else happened to refetch. Offline boot is unaffected — a fetch with
+            // no network rejects immediately and falls back to the cache; the
+            // timeout only ever mattered for a connected-but-hanging network.
             urlPattern: /\/api\/v1\/(config|me|folders|subscriptions|counts)\b/,
             handler: "NetworkFirst",
             options: {
               cacheName: "alo-app",
-              networkTimeoutSeconds: 3,
               expiration: { maxEntries: 40, maxAgeSeconds: 60 * 60 * 24 * 7 },
               cacheableResponse: { statuses: [200] },
             },

@@ -82,10 +82,13 @@ test.describe("feed management (AUTH_MODE=none)", () => {
 
   test("feed settings: rename a feed and see it update", async ({ page }) => {
     await page.goto("/");
-    // Rename a feed the other tests don't touch (they use Hacker News).
-    const feed = page.getByRole("link", { name: /The Verge/ });
+    // Renames a feed the other tests don't touch (they use Hacker News). Retries
+    // share the one seeded stack, so match either name and re-save the same title:
+    // a failed attempt may already have renamed the feed, and if the locator only
+    // knew the seeded name the retry could never find the row again.
+    const feed = page.getByRole("link", { name: /The Verge|Verge Renamed/ });
     await feed.hover(); // reveal the hover-only gear (desktop)
-    await page.getByRole("button", { name: /settings for the verge/i }).click();
+    await page.getByRole("button", { name: /settings for (the verge|verge renamed)/i }).click();
 
     await expect(page.getByRole("heading", { name: "Feed settings" })).toBeVisible();
     await page.getByLabel(/^title$/i).fill("Verge Renamed");

@@ -29,6 +29,16 @@ jobs:
         run: pnpm -C web exec playwright install --with-deps chromium
       - name: make e2e
         run: make e2e
+      - name: Upload Playwright traces
+        # trace: "on-first-retry" — without this the only record of a nightly
+        # flake dies with the runner.
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: web/test-results/
+          retention-days: 14
+          if-no-files-found: ignore
 
   lighthouse:
     # make lighthouse: serve the build via Caddy and gate performance >= 90.
@@ -50,8 +60,11 @@ jobs:
   bench-search:
     # Search p95 budget (< 100 ms) at full 5M-entry scale (DESIGN §4.1.6). Too slow
     # to seed per-PR; the 100k profile gates PRs in ci.yml.
+    #
+    # Seeding dominates the wall clock (the measured run is ~20s), so the timeout
+    # is sized for the seed, not the benchmark.
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       DATABASE_URL: postgresql+asyncpg://alo:alo@localhost:5432/alo
     steps:
