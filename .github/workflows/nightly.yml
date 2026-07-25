@@ -29,6 +29,16 @@ jobs:
         run: pnpm -C web exec playwright install --with-deps chromium
       - name: make e2e
         run: make e2e
+      - name: Upload Playwright traces
+        # trace: "on-first-retry" — without this the only record of a nightly
+        # flake dies with the runner.
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: web/test-results/
+          retention-days: 14
+          if-no-files-found: ignore
 
   lighthouse:
     # make lighthouse: serve the build via Caddy and gate performance >= 90.
