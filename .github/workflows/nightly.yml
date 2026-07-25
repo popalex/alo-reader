@@ -50,8 +50,11 @@ jobs:
   bench-search:
     # Search p95 budget (< 100 ms) at full 5M-entry scale (DESIGN §4.1.6). Too slow
     # to seed per-PR; the 100k profile gates PRs in ci.yml.
+    #
+    # Seeding dominates the wall clock (the measured run is ~20s), so the timeout
+    # is sized for the seed, not the benchmark.
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       DATABASE_URL: postgresql+asyncpg://alo:alo@localhost:5432/alo
     steps:
