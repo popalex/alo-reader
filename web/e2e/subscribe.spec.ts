@@ -7,11 +7,16 @@ import { expect, test } from "@playwright/test";
 // whole flow — dialog → multipart upload → report → sidebar refresh — is
 // exercised end to end here.
 
-const OPML = `<?xml version="1.0" encoding="UTF-8"?>
+/** An OPML naming two feeds nobody has subscribed to yet. The importer counts an
+ *  already-subscribed feed as skipped, so a fixed document could only ever report
+ *  "imported 2" on the first attempt — a retry against the shared seeded stack would
+ *  get "imported 0 · skipped 2" and fail every time. The tag keeps each attempt's
+ *  URLs and titles distinct, so the strong assertion stays strong on a retry. */
+const opmlFor = (tag: string) => `<?xml version="1.0" encoding="UTF-8"?>
 <opml version="1.0">
   <body>
-    <outline text="E2E Feed One" type="rss" xmlUrl="https://e2e-one.example/feed.xml"/>
-    <outline text="E2E Feed Two" type="rss" xmlUrl="https://e2e-two.example/feed.xml"/>
+    <outline text="E2E Feed One ${tag}" type="rss" xmlUrl="https://e2e-one.example/${tag}.xml"/>
+    <outline text="E2E Feed Two ${tag}" type="rss" xmlUrl="https://e2e-two.example/${tag}.xml"/>
   </body>
 </opml>`;
 
@@ -26,10 +31,16 @@ test.describe("feed management (AUTH_MODE=none)", () => {
   test("category: rename then delete (feeds fall back to Uncategorized)", async ({ page }) => {
     await page.goto("/");
     // The seeded "Tech" category holds Hacker News — hover its header, rename inline.
-    const tech = page.getByRole("link", { name: /^tech$/i });
-    await tech.hover();
-    await page.getByRole("button", { name: /rename tech/i }).click();
-    const input = page.getByRole("textbox", { name: /rename tech/i });
+    // Retries share the one seeded stack, so match either name: a failed attempt may
+    // already have renamed the category, and a locator that only knew the seeded name
+    // would block here for the whole test timeout instead of re-running the rename.
+    const category = page.getByRole("link", { name: /^(tech|reading)$/i });
+    // Assert before hovering: if an attempt ever got as far as deleting the category,
+    // hover() would sit here for the whole 30s timeout and report nothing useful.
+    await expect(category).toBeVisible();
+    await category.hover();
+    await page.getByRole("button", { name: /rename (tech|reading)/i }).click();
+    const input = page.getByRole("textbox", { name: /rename (tech|reading)/i });
     await input.fill("Reading");
     await input.press("Enter");
     await expect(page.getByRole("link", { name: /^reading$/i })).toBeVisible();
@@ -114,21 +125,24 @@ test.describe("feed management (AUTH_MODE=none)", () => {
     await expect(page).toHaveURL(/\/$/); // bounced back to All items, not left on the dead feed
   });
 
-  test("imports an OPML file and the new feeds appear in the sidebar", async ({ page }) => {
+  test("imports an OPML file and the new feeds appear in the sidebar", async ({
+    page,
+  }, testInfo) => {
+    const tag = `A${testInfo.retry}`;
     await page.goto("/");
     await page.getByRole("button", { name: "Subscribe", exact: true }).click();
 
     await page.locator('input[type="file"]').setInputFiles({
       name: "feeds.opml",
       mimeType: "text/xml",
-      buffer: Buffer.from(OPML),
+      buffer: Buffer.from(opmlFor(tag)),
     });
 
     // The import report renders (2 imported), and the sidebar refreshes to list
     // the newly-created subscriptions (titles seeded from the OPML).
     await expect(page.getByText(/imported 2 · skipped 0/i)).toBeVisible();
     await page.getByRole("button", { name: /^done$/i }).click();
-    await expect(page.getByRole("link", { name: /E2E Feed One/ })).toBeVisible();
-    await expect(page.getByRole("link", { name: /E2E Feed Two/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: `E2E Feed One ${tag}` })).toBeVisible();
+    await expect(page.getByRole("link", { name: `E2E Feed Two ${tag}` })).toBeVisible();
   });
 });
