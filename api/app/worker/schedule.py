@@ -26,9 +26,11 @@ def backoff_interval(error_count: int, *, base_s: int, cap_s: int) -> int:
     """
     if error_count <= 0:
         return base_s
-    # Cap the shift so 2**n can't overflow into a huge int before the min().
+    # Cap the shift so the doubling can't overflow into a huge int before the min().
+    # Shift rather than ``base_s * 2**shift``: identical for a non-negative shift, and
+    # typed int, where ``int ** int`` is Any to mypy (a negative exponent gives float).
     shift = min(error_count - 1, 32)
-    return min(cap_s, base_s * (2**shift))
+    return min(cap_s, base_s << shift)
 
 
 def error_delay(error_count: int, retry_after_s: float | None, *, base_s: int, cap_s: int) -> int:

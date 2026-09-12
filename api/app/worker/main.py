@@ -141,7 +141,7 @@ async def poll_once(
             async with global_sem, gate.slot(_host(feed.feed_url)):
                 outcome = await process_feed(
                     session_factory,
-                    feed,  # type: ignore[arg-type]  # Feed satisfies FeedRow structurally
+                    feed,  # Feed satisfies FeedRow structurally
                     settings=settings,
                     fetch=fetch,
                     transport=transport,  # type: ignore[arg-type]

@@ -3,6 +3,7 @@ instruments. The real ``configure_telemetry`` wiring (which instruments httpx/lo
 globally) is exercised out of band, not here, to keep the suite isolated.
 """
 
+from collections.abc import Iterator
 from unittest.mock import MagicMock
 
 import pytest
@@ -12,7 +13,7 @@ from app.telemetry import TelemetryRuntime, _Gauges
 
 
 @pytest.fixture(autouse=True)
-def _reset_runtime():
+def _reset_runtime() -> Iterator[None]:
     """Isolate the module-global runtime around each test."""
     saved = telemetry._runtime
     telemetry._runtime = TelemetryRuntime()

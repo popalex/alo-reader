@@ -6,6 +6,7 @@ its nearest named ancestor outline. Untrusted uploads are guarded by the caller
 """
 
 from dataclasses import dataclass
+from typing import cast
 from xml.etree import ElementTree
 
 
@@ -33,7 +34,8 @@ def build_opml(title: str, groups: list[tuple[str | None, list[OpmlFeed]]]) -> b
             if f.html_url:
                 attrs["htmlUrl"] = f.html_url
             ElementTree.SubElement(parent, "outline", attrs)
-    return ElementTree.tostring(opml, encoding="utf-8", xml_declaration=True)
+    # typeshed types this overload as Any; it is bytes for any encoding but "unicode".
+    return cast(bytes, ElementTree.tostring(opml, encoding="utf-8", xml_declaration=True))
 
 
 def parse_opml(data: bytes) -> list[OpmlFeed]:
