@@ -12,7 +12,7 @@ services:
     build:
       args:
         # Pull the OpenTelemetry SDK + instrumentation into the image.
-        PIP_INSTALL_SPEC: ".[otel]"
+        PIP_REQUIREMENTS: "-r requirements.txt -r requirements-otel.txt"
     environment:
       # Default to none for the local telemetry demo (override with an explicit
       # AUTH_MODE), same as the dev overlay — otherwise api SystemExits and caddy,
@@ -32,7 +32,7 @@ services:
   worker:
     build:
       args:
-        PIP_INSTALL_SPEC: ".[otel]"
+        PIP_REQUIREMENTS: "-r requirements.txt -r requirements-otel.txt"
     environment:
       OTEL_ENABLED: "true"
       OTEL_SERVICE_NAME: alo-worker

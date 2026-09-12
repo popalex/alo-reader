@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - run: python -m pip install -e "./api[dev]"
+      - run: python -m pip install -r api/requirements-dev.txt && python -m pip install -e ./api --no-deps
       - run: ruff check api
       - run: ruff format --check api
 
@@ -34,7 +34,7 @@ jobs:
           python-version: "3.12"
       # [otel] too so mypy resolves the OpenTelemetry imports in app/telemetry.py
       # (the module imports them lazily at runtime, but typecheck follows them).
-      - run: python -m pip install -e "./api[dev,otel]"
+      - run: python -m pip install -r api/requirements-dev.txt -r api/requirements-otel.txt && python -m pip install -e ./api --no-deps
       - run: mypy api
       - uses: actions/setup-node@v6
         with:
@@ -57,7 +57,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - run: python -m pip install -e "./api[dev]"
+      - run: python -m pip install -r api/requirements-dev.txt && python -m pip install -e ./api --no-deps
       # Migration 0003 needs the rum extension, so the Testcontainers Postgres
       # is our postgres:18+rum image (conftest defaults to alo-reader-postgres:local).
       - name: Build Postgres image (rum)
@@ -99,7 +99,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - run: python -m pip install -e "./api[dev]"
+      - run: python -m pip install -r api/requirements-dev.txt && python -m pip install -e ./api --no-deps
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
@@ -125,7 +125,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - run: python -m pip install -e "./api[dev]"
+      - run: python -m pip install -r api/requirements-dev.txt && python -m pip install -e ./api --no-deps
       - name: Build + start Postgres (rum)
         run: |
           docker build -f deploy/Dockerfile.postgres -t alo-reader-postgres:local deploy
@@ -148,7 +148,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - run: python -m pip install -e "./api[dev]" pip-audit
+      - run: python -m pip install -r api/requirements-dev.txt pip-audit && python -m pip install -e ./api --no-deps
       - name: pip-audit (Python deps)
         run: pip-audit --skip-editable
       - uses: actions/setup-node@v6
