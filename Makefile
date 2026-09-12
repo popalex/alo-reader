@@ -13,13 +13,25 @@ COMPOSE_DEV_OTEL := docker compose -f deploy/docker-compose.yml -f deploy/docker
 # (see `make db`). Postgres itself is never installed on the host.
 TEST_DATABASE_URL ?= postgresql+asyncpg://alo:alo@localhost:5432/alo
 
-.PHONY: venv lint typecheck test-api test-web e2e lighthouse size up seed dev down db db-down migrate generate-client bench-search loadtest pg-image
+.PHONY: venv lock lint typecheck test-api test-web e2e lighthouse size up seed dev down db db-down migrate generate-client bench-search loadtest pg-image
 
-## Create the virtualenv and install the api project (editable, with dev tools).
+## Create the virtualenv and install the api project from the lockfile.
+## --no-deps on the editable install: the pins in requirements-dev.txt are the
+## resolution, and pip must not re-resolve them from pyproject's ranges.
 venv:
 	python3 -m venv $(VENV)
 	$(PIP) install --upgrade pip
-	$(PIP) install -e "./api[dev]"
+	$(PIP) install -r api/requirements-dev.txt
+	$(PIP) install -e ./api --no-deps
+
+## Recompile the Python lockfiles from api/pyproject.toml. Run after changing a
+## dependency range, and commit the result — CI installs from these, not from the
+## ranges, so an upstream release can never land in CI unannounced.
+lock:
+	$(PIP) install --quiet pip-tools
+	$(VENV)/bin/pip-compile --quiet --strip-extras -o api/requirements.txt api/pyproject.toml
+	$(VENV)/bin/pip-compile --quiet --strip-extras --extra dev -o api/requirements-dev.txt api/pyproject.toml
+	$(VENV)/bin/pip-compile --quiet --strip-extras --extra otel -o api/requirements-otel.txt api/pyproject.toml
 
 lint:
 	$(VENV)/bin/ruff check api
