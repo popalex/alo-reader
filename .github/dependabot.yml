@@ -1,0 +1,52 @@
+# Dependency update PRs. The point is a red PR instead of a red main: an upstream
+# release arrives as a reviewable change, not as whatever CI happens to resolve.
+# svix 2.0 landed exactly that way and broke the Clerk webhook on main.
+#
+# Grouping keeps the volume sane. Patch and minor bumps ride together per ecosystem
+# (one PR to skim, one CI run); majors stay on their own, because those are the ones
+# that change behaviour and deserve to be read.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /api
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      python-minor-and-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: build(api)
+
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      web-minor-and-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: build(web)
+
+  # The Jul 13 nightly died on a pnpm/action-setup outage, not on our code. Pinned
+  # actions that get bumped deliberately beat floating ones that break overnight.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci
+
+  - package-ecosystem: docker
+    directory: /deploy
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: build(deploy)
