@@ -26,10 +26,16 @@ test.describe("feed management (AUTH_MODE=none)", () => {
   test("category: rename then delete (feeds fall back to Uncategorized)", async ({ page }) => {
     await page.goto("/");
     // The seeded "Tech" category holds Hacker News — hover its header, rename inline.
-    const tech = page.getByRole("link", { name: /^tech$/i });
-    await tech.hover();
-    await page.getByRole("button", { name: /rename tech/i }).click();
-    const input = page.getByRole("textbox", { name: /rename tech/i });
+    // Retries share the one seeded stack, so match either name: a failed attempt may
+    // already have renamed the category, and a locator that only knew the seeded name
+    // would block here for the whole test timeout instead of re-running the rename.
+    const category = page.getByRole("link", { name: /^(tech|reading)$/i });
+    // Assert before hovering: if an attempt ever got as far as deleting the category,
+    // hover() would sit here for the whole 30s timeout and report nothing useful.
+    await expect(category).toBeVisible();
+    await category.hover();
+    await page.getByRole("button", { name: /rename (tech|reading)/i }).click();
+    const input = page.getByRole("textbox", { name: /rename (tech|reading)/i });
     await input.fill("Reading");
     await input.press("Enter");
     await expect(page.getByRole("link", { name: /^reading$/i })).toBeVisible();
