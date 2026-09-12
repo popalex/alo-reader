@@ -101,5 +101,8 @@ jobs:
           for i in $(seq 1 30); do docker exec pg pg_isready -U alo -d alo && break; sleep 2; done
       - name: Migrate
         run: cd api && alembic upgrade head
+      # BENCH_KEEP=1 skips the teardown. The script's exit path deletes the bench
+      # user and feed, which cascades all 5M entries — several minutes of work on a
+      # database this job throws away seconds later. The container is the cleanup.
       - name: Benchmark (5M profile)
-        run: BENCH_PROFILE=nightly python scripts/bench_search.py
+        run: BENCH_PROFILE=nightly BENCH_KEEP=1 python scripts/bench_search.py
