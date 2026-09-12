@@ -19,7 +19,11 @@ dependencies = [
     "nh3>=0.2.17",
     "zstandard>=0.22",
     "pyjwt[crypto]>=2.8",
-    "svix>=1.20",
+    # Both bounds deliberate. svix 2.0 changed Webhook.verify() to verify only and
+    # return None, where 1.x also parsed the body and raised on malformed JSON; the
+    # route handles the 2.x contract, so 1.x would take a different path on a bad
+    # payload. >=1.20 with no ceiling is what silently broke this on an unpinned CI.
+    "svix>=2,<3",
 ]
 
 [project.optional-dependencies]
