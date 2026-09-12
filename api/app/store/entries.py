@@ -206,7 +206,7 @@ def _decode_cursor(cursor: str) -> tuple[datetime, int] | None:
         if not sep:
             return None
         return _CURSOR_EPOCH + timedelta(microseconds=int(micros_str)), int(id_str)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return None
 
 

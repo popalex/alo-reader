@@ -56,7 +56,7 @@ def _to_utc(parsed: time.struct_time | None) -> datetime | None:
         return None
     try:
         return datetime.fromtimestamp(time.mktime(parsed) - time.timezone, tz=UTC)
-    except (ValueError, OverflowError, OSError):
+    except ValueError, OverflowError, OSError:
         return None
 
 

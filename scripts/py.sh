@@ -6,7 +6,7 @@
 # the single place that version is decided.
 #
 #   ./scripts/py.sh 'ruff check .'
-#   PY_IMAGE=python:3.13-slim ./scripts/py.sh 'pytest -q'
+#   PY_IMAGE=python:3.12-slim ./scripts/py.sh 'pytest -q'
 #
 # ./api is mounted read-only and copied to a writable /app inside, so nothing the
 # container does (egg-info, __pycache__, tool caches) can land root-owned in the
@@ -16,7 +16,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-IMAGE="${PY_IMAGE:-python:3.12-slim}"
+IMAGE="${PY_IMAGE:-python:3.14-slim}"
 [[ $# -gt 0 ]] || { echo "usage: $0 '<command>'" >&2; exit 64; }
 
 # --network host + the docker socket: the suite provisions its own Postgres via
