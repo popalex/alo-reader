@@ -7,11 +7,15 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 COPY api/pyproject.toml ./pyproject.toml
+COPY api/requirements.txt api/requirements-otel.txt ./
 COPY api/app ./app
-# Default build is the lean image; the OTel compose overlay builds with
-# PIP_INSTALL_SPEC=".[otel]" to pull the OpenTelemetry SDK + instrumentation.
-ARG PIP_INSTALL_SPEC="."
-RUN pip install --no-cache-dir "${PIP_INSTALL_SPEC}"
+# Dependencies come from the lockfiles, never from pyproject's ranges, so an image
+# built today resolves exactly what CI tested. Default build is the lean image; the
+# OTel compose overlay sets PIP_REQUIREMENTS to add the OpenTelemetry SDK +
+# instrumentation on top.
+ARG PIP_REQUIREMENTS="-r requirements.txt"
+RUN pip install --no-cache-dir ${PIP_REQUIREMENTS} \
+    && pip install --no-cache-dir --no-deps .
 
 # Alembic config + migration scripts: needed by the `migrate` command so the
 # image can bring a database up to head on its own.
