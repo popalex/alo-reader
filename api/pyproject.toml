@@ -31,13 +31,13 @@ dependencies = [
 # (Dockerfile PIP_INSTALL_SPEC=".[otel]"); the default image and tests omit it, so
 # app.telemetry must import OTel lazily. Pinned (SDK 1.x paired with 0.xxb0 instrumentation).
 otel = [
-    "opentelemetry-exporter-otlp==1.43.0",
-    "opentelemetry-instrumentation-fastapi==0.64b0",
-    "opentelemetry-instrumentation-httpx==0.64b0",
-    "opentelemetry-instrumentation-logging==0.64b0",
-    "opentelemetry-instrumentation-sqlalchemy==0.64b0",
-    "opentelemetry-sdk==1.43.0",
-    "opentelemetry-semantic-conventions==0.64b0",
+    "opentelemetry-exporter-otlp==1.44.0",
+    "opentelemetry-instrumentation-fastapi==0.65b0",
+    "opentelemetry-instrumentation-httpx==0.65b0",
+    "opentelemetry-instrumentation-logging==0.65b0",
+    "opentelemetry-instrumentation-sqlalchemy==0.65b0",
+    "opentelemetry-sdk==1.44.0",
+    "opentelemetry-semantic-conventions==0.65b0",
 ]
 # Dev tooling is pinned exactly: with no Python lockfile, `>=` let CI float to
 # the latest release, and a mypy/ruff bump could add rules that fail CI on
@@ -45,9 +45,9 @@ otel = [
 dev = [
     "pytest==9.1.1",
     "pytest-asyncio==1.4.0",
-    "testcontainers[postgres]==4.14.2",
-    "ruff==0.15.20",
-    "mypy==2.2.0",
+    "testcontainers[postgres]==4.15.0",
+    "ruff==0.16.6",
+    "mypy==2.3.1",
 ]
 
 [build-system]

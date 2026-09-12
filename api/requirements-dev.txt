@@ -73,7 +73,7 @@ mako==1.4.1
     # via alembic
 markupsafe==3.0.3
     # via mako
-mypy==2.2.0
+mypy==2.3.1
     # via alo-reader-api (api/pyproject.toml)
 mypy-extensions==1.1.0
     # via mypy
@@ -93,7 +93,7 @@ pydantic==2.13.5
     #   fastapi
     #   pydantic-settings
     #   svix
-pydantic-core==2.46.5
+pydantic-core==2.48.0
     # via pydantic
 pydantic-settings==2.15.0
     # via alo-reader-api (api/pyproject.toml)
@@ -121,7 +121,7 @@ pyyaml==6.0.3
     # via uvicorn
 requests==2.34.2
     # via docker
-ruff==0.15.20
+ruff==0.16.6
     # via alo-reader-api (api/pyproject.toml)
 six==1.17.0
     # via python-dateutil
@@ -135,7 +135,7 @@ starlette==1.6.0
     # via fastapi
 svix==2.5.0
     # via alo-reader-api (api/pyproject.toml)
-testcontainers==4.14.2
+testcontainers==4.15.0
     # via alo-reader-api (api/pyproject.toml)
 typing-extensions==4.16.0
     # via

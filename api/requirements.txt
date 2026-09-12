@@ -71,7 +71,7 @@ pydantic==2.13.5
     #   fastapi
     #   pydantic-settings
     #   svix
-pydantic-core==2.46.5
+pydantic-core==2.48.0
     # via pydantic
 pydantic-settings==2.15.0
     # via alo-reader-api (api/pyproject.toml)

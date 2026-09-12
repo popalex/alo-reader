@@ -75,7 +75,7 @@ markupsafe==3.0.3
     # via mako
 nh3==0.3.7
     # via alo-reader-api (api/pyproject.toml)
-opentelemetry-api==1.43.0
+opentelemetry-api==1.44.0
     # via
     #   opentelemetry-exporter-otlp-proto-grpc
     #   opentelemetry-exporter-otlp-proto-http
@@ -87,44 +87,44 @@ opentelemetry-api==1.43.0
     #   opentelemetry-instrumentation-sqlalchemy
     #   opentelemetry-sdk
     #   opentelemetry-semantic-conventions
-opentelemetry-exporter-otlp==1.43.0
+opentelemetry-exporter-otlp==1.44.0
     # via alo-reader-api (api/pyproject.toml)
-opentelemetry-exporter-otlp-proto-common==1.43.0
+opentelemetry-exporter-otlp-proto-common==1.44.0
     # via
     #   opentelemetry-exporter-otlp-proto-grpc
     #   opentelemetry-exporter-otlp-proto-http
-opentelemetry-exporter-otlp-proto-grpc==1.43.0
+opentelemetry-exporter-otlp-proto-grpc==1.44.0
     # via opentelemetry-exporter-otlp
-opentelemetry-exporter-otlp-proto-http==1.43.0
+opentelemetry-exporter-otlp-proto-http==1.44.0
     # via opentelemetry-exporter-otlp
-opentelemetry-instrumentation==0.64b0
+opentelemetry-instrumentation==0.65b0
     # via
     #   opentelemetry-instrumentation-asgi
     #   opentelemetry-instrumentation-fastapi
     #   opentelemetry-instrumentation-httpx
     #   opentelemetry-instrumentation-logging
     #   opentelemetry-instrumentation-sqlalchemy
-opentelemetry-instrumentation-asgi==0.64b0
+opentelemetry-instrumentation-asgi==0.65b0
     # via opentelemetry-instrumentation-fastapi
-opentelemetry-instrumentation-fastapi==0.64b0
+opentelemetry-instrumentation-fastapi==0.65b0
     # via alo-reader-api (api/pyproject.toml)
-opentelemetry-instrumentation-httpx==0.64b0
+opentelemetry-instrumentation-httpx==0.65b0
     # via alo-reader-api (api/pyproject.toml)
-opentelemetry-instrumentation-logging==0.64b0
+opentelemetry-instrumentation-logging==0.65b0
     # via alo-reader-api (api/pyproject.toml)
-opentelemetry-instrumentation-sqlalchemy==0.64b0
+opentelemetry-instrumentation-sqlalchemy==0.65b0
     # via alo-reader-api (api/pyproject.toml)
-opentelemetry-proto==1.43.0
+opentelemetry-proto==1.44.0
     # via
     #   opentelemetry-exporter-otlp-proto-common
     #   opentelemetry-exporter-otlp-proto-grpc
     #   opentelemetry-exporter-otlp-proto-http
-opentelemetry-sdk==1.43.0
+opentelemetry-sdk==1.44.0
     # via
     #   alo-reader-api (api/pyproject.toml)
     #   opentelemetry-exporter-otlp-proto-grpc
     #   opentelemetry-exporter-otlp-proto-http
-opentelemetry-semantic-conventions==0.64b0
+opentelemetry-semantic-conventions==0.65b0
     # via
     #   alo-reader-api (api/pyproject.toml)
     #   opentelemetry-instrumentation
@@ -134,7 +134,7 @@ opentelemetry-semantic-conventions==0.64b0
     #   opentelemetry-instrumentation-logging
     #   opentelemetry-instrumentation-sqlalchemy
     #   opentelemetry-sdk
-opentelemetry-util-http==0.64b0
+opentelemetry-util-http==0.65b0
     # via
     #   opentelemetry-instrumentation-asgi
     #   opentelemetry-instrumentation-fastapi
@@ -155,7 +155,7 @@ pydantic==2.13.5
     #   fastapi
     #   pydantic-settings
     #   svix
-pydantic-core==2.46.5
+pydantic-core==2.48.0
     # via pydantic
 pydantic-settings==2.15.0
     # via alo-reader-api (api/pyproject.toml)
