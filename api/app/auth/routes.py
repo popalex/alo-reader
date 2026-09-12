@@ -4,6 +4,7 @@ These live inside ``app/auth/`` because /config and the webhook are
 Clerk-aware — nothing outside this package may reference Clerk.
 """
 
+import json
 from datetime import datetime
 
 from fastapi import APIRouter, Request
@@ -122,9 +123,17 @@ async def clerk_webhook(request: Request, session: Session) -> None:
     if not secret:
         raise ApiError(500, "internal", "webhook secret not configured")
     try:
-        event = Webhook(secret).verify(payload, dict(request.headers))
+        # svix 2.x verifies only and returns None, so the payload is decoded below.
+        Webhook(secret).verify(payload, dict(request.headers))
     except WebhookVerificationError:
         raise ApiError(401, "unauthenticated", "invalid webhook signature") from None
+
+    try:
+        event = json.loads(payload)
+    except ValueError:
+        raise ApiError(400, "bad_request", "webhook payload is not JSON") from None
+    if not isinstance(event, dict):
+        return
 
     event_type = event.get("type")
     data = event.get("data") or {}

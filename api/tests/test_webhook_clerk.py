@@ -135,3 +135,24 @@ async def test_unknown_event_acknowledged(
     payload = json.dumps({"type": "session.created", "data": {"id": "sess_1"}})
     response = await post_event(api_client, webhook_secret, payload)
     assert response.status_code == 204
+
+
+async def test_signed_non_json_body_rejected(
+    api_client: httpx.AsyncClient, webhook_secret: str
+) -> None:
+    """A correctly-signed body still has to be JSON.
+
+    svix 2.0 stopped parsing the payload during verify(), so the route decodes it
+    itself. This covers the branch that split off: signature good, body garbage.
+    """
+    response = await post_event(api_client, webhook_secret, "not json at all")
+    assert response.status_code == 400
+
+
+async def test_signed_json_scalar_acknowledged(
+    api_client: httpx.AsyncClient, webhook_secret: str
+) -> None:
+    # Valid JSON that isn't an object has no event type to act on — ack and drop it
+    # rather than raising on .get().
+    response = await post_event(api_client, webhook_secret, json.dumps("nope"))
+    assert response.status_code == 204
