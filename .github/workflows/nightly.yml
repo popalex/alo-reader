@@ -71,7 +71,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: "3.14"
       - run: python -m pip install -r api/requirements-dev.txt && python -m pip install -e ./api --no-deps
       - name: Build + start Postgres (rum)
         run: |

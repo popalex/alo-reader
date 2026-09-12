@@ -62,7 +62,7 @@ def get_runtime(app: FastAPI) -> AuthRuntime:
             ip_limiter=TokenBucket(settings.rate_limit_ip_rps, settings.rate_limit_ip_burst),
         )
         app.state.auth_runtime = runtime
-    return runtime  # type: ignore[no-any-return]
+    return runtime
 
 
 async def current_user(request: Request) -> AuthedUser:

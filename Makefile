@@ -1,9 +1,21 @@
-# alo-reader standard commands. Python is managed with a local .venv + pip
-# (no uv); the frontend uses pnpm.
+# alo-reader standard commands. The Python gates run inside a container pinned to
+# the interpreter the images ship, so they do not depend on whatever python3 the
+# host happens to have; the frontend uses pnpm on the host.
 
 VENV := .venv
 PY := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
+
+# Every Python gate runs through scripts/py.sh, a container pinned to the same
+# interpreter the images ship — so `make lint` on a laptop and the `lint` job in CI
+# execute on the same Python. PY_IMAGE (read by the script) is the single place
+# that version is decided; export it to try another interpreter and change nothing
+# else. Nothing the container does can land root-owned in the tree: ./api goes in
+# read-only and is copied to a writable /app inside.
+PY_RUN := ./scripts/py.sh
+# The pinned set, then the project itself without letting pip re-resolve it.
+PY_INSTALL := pip install --quiet -r requirements-dev.txt
+PY_PROJECT := pip install --quiet -e . --no-deps
 COMPOSE := docker compose -f deploy/docker-compose.yml
 COMPOSE_DEV := docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml
 COMPOSE_OTEL := docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.otel.yml
@@ -15,9 +27,11 @@ TEST_DATABASE_URL ?= postgresql+asyncpg://alo:alo@localhost:5432/alo
 
 .PHONY: venv lock lint typecheck test-api test-web e2e lighthouse size up seed dev down db db-down migrate generate-client bench-search loadtest pg-image
 
-## Create the virtualenv and install the api project from the lockfile.
-## --no-deps on the editable install: the pins in requirements-dev.txt are the
-## resolution, and pip must not re-resolve them from pyproject's ranges.
+## Optional: a local virtualenv, for editor tooling (autocomplete, go-to-def).
+## The gates below do not use it — they run in the toolchain container — so this
+## needs only a host python3 the project still supports, and skipping it breaks
+## nothing. --no-deps on the editable install: the pins in requirements-dev.txt
+## are the resolution, and pip must not re-resolve them from pyproject's ranges.
 venv:
 	python3 -m venv $(VENV)
 	$(PIP) install --upgrade pip
@@ -26,19 +40,25 @@ venv:
 
 ## Recompile the Python lockfiles from api/pyproject.toml. Run after changing a
 ## dependency range, and commit the result — CI installs from these, not from the
-## ranges, so an upstream release can never land in CI unannounced.
+## ranges, so an upstream release can never land in CI unannounced. Resolved inside
+## the toolchain container: environment markers are evaluated against whichever
+## interpreter does the resolving, so the host's python must not be the one deciding.
 lock:
-	$(PIP) install --quiet pip-tools
-	$(VENV)/bin/pip-compile --quiet --strip-extras -o api/requirements.txt api/pyproject.toml
-	$(VENV)/bin/pip-compile --quiet --strip-extras --extra dev -o api/requirements-dev.txt api/pyproject.toml
-	$(VENV)/bin/pip-compile --quiet --strip-extras --extra otel -o api/requirements-otel.txt api/pyproject.toml
+	$(PY_RUN) 'pip install --quiet pip-tools \
+	  && pip-compile --quiet --strip-extras -o requirements.txt pyproject.toml \
+	  && pip-compile --quiet --strip-extras --extra dev -o requirements-dev.txt pyproject.toml \
+	  && pip-compile --quiet --strip-extras --extra otel -o requirements-otel.txt pyproject.toml \
+	  && cp requirements.txt requirements-dev.txt requirements-otel.txt /out/ \
+	  && chown "$$HOST_UID:$$HOST_GID" /out/requirements*.txt' 
 
 lint:
-	$(VENV)/bin/ruff check api
-	$(VENV)/bin/ruff format --check api
+	$(PY_RUN) '$(PY_INSTALL) && ruff check . && ruff format --check .' 
 
+## mypy needs the otel extra or it cannot resolve the OpenTelemetry imports in
+## app/telemetry.py (imported lazily at runtime, but typecheck follows them).
+## The web half stays on the host with pnpm.
 typecheck:
-	$(VENV)/bin/mypy api
+	$(PY_RUN) '$(PY_INSTALL) -r requirements-otel.txt && $(PY_PROJECT) && mypy .'
 	pnpm -C web tsc
 	pnpm -C web lint
 
@@ -49,7 +69,7 @@ pg-image:
 ## Tests provision their own throwaway Postgres via Testcontainers — no `make db`
 ## needed, and the real/dev DB is never touched. Needs the rum image (migration 0003).
 test-api: pg-image
-	$(VENV)/bin/pytest api
+	$(PY_RUN) '$(PY_INSTALL) && $(PY_PROJECT) && pytest -q' 
 
 test-web:
 	pnpm -C web test

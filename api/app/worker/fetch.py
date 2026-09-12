@@ -67,7 +67,7 @@ def _parse_retry_after(value: str | None, *, now: datetime | None = None) -> flo
         return float(value)
     try:
         when = parsedate_to_datetime(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     if when is None:
         return None

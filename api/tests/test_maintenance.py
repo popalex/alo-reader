@@ -230,7 +230,7 @@ async def test_run_maintenance_sweeps_both(api_db: str) -> None:
     await _age_entry(sf, purge_id, 100)
     await _set_state(sf, user.id, purge_id, read=True)
 
-    settings = Settings(database_url="postgresql+asyncpg://x/y", auth_mode="none")  # type: ignore[call-arg]
+    settings = Settings(database_url="postgresql+asyncpg://x/y", auth_mode="none")
     gc, purged = await run_maintenance(sf, settings=settings)
     assert gc == 1 and purged == 1
 
@@ -254,7 +254,7 @@ async def test_retention_purge_batches_until_drained(api_db: str) -> None:
     assert first == 2
     assert len(await _surviving_ids(sf, feed_id)) == 3
 
-    settings = Settings(  # type: ignore[call-arg]
+    settings = Settings(
         database_url="postgresql+asyncpg://x/y",
         auth_mode="none",
         retention_purge_batch_size=2,
@@ -265,7 +265,7 @@ async def test_retention_purge_batches_until_drained(api_db: str) -> None:
 
 
 def test_next_wait_within_jitter_bounds() -> None:
-    settings = Settings(  # type: ignore[call-arg]
+    settings = Settings(
         database_url="postgresql+asyncpg://x/y",
         auth_mode="none",
         worker_maintenance_interval_s=1000.0,
@@ -278,7 +278,7 @@ def test_next_wait_within_jitter_bounds() -> None:
 
 
 def test_next_wait_clamped_non_negative() -> None:
-    settings = Settings(  # type: ignore[call-arg]
+    settings = Settings(
         database_url="postgresql+asyncpg://x/y",
         auth_mode="none",
         worker_maintenance_interval_s=10.0,

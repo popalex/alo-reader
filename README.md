@@ -8,7 +8,7 @@ for the implementation plan.
 
 ## Layout
 
-- `api/` — FastAPI app + worker (one image, two commands). Python 3.12, managed
+- `api/` — FastAPI app + worker (one image, two commands). Python 3.14, managed
   with a local `.venv` + pip.
 - `web/` — React 18 + TypeScript + Vite SPA (pnpm).
 - `deploy/` — Dockerfiles, Caddy, docker-compose (dev = prod).
