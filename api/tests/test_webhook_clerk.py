@@ -8,12 +8,17 @@ from typing import Any
 
 import httpx
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
+from sqlalchemy.ext.asyncio import AsyncSession
 from svix.webhooks import Webhook
 
 from app import db as app_db
 from app.auth import pat
-from app.models import ApiToken, User
+from app.models import Entry, User
+from app.store import entry_states as entry_states_store
+from app.store import feeds as feeds_store
+from app.store import folders as folders_store
+from app.store import subscriptions as subs_store
 from app.store import users as users_store
 
 WEBHOOK_PATH = "/api/v1/webhooks/clerk"
@@ -86,7 +91,54 @@ async def test_user_updated_and_created_idempotent(
     assert user is not None and user.email == "c@example.com"
 
 
+async def _user_owned_tables(session: AsyncSession) -> list[tuple[str, str]]:
+    """Every (table, column) with a foreign key onto users.id, read from the catalog.
+
+    Discovered rather than hardcoded on purpose: a later migration that adds a
+    user-owned table without ON DELETE CASCADE leaves rows behind on account
+    deletion, and the point of this test is to fail then, not to keep passing
+    because nobody remembered to extend a list.
+    """
+    rows = await session.execute(
+        text("""
+            SELECT tc.table_name, kcu.column_name
+            FROM information_schema.table_constraints AS tc
+            JOIN information_schema.key_column_usage AS kcu
+              ON kcu.constraint_name = tc.constraint_name
+             AND kcu.table_schema = tc.table_schema
+            JOIN information_schema.constraint_column_usage AS ccu
+              ON ccu.constraint_name = tc.constraint_name
+             AND ccu.table_schema = tc.table_schema
+            WHERE tc.constraint_type = 'FOREIGN KEY'
+              AND tc.table_schema = current_schema()
+              AND ccu.table_name = 'users'
+              AND ccu.column_name = 'id'
+            ORDER BY tc.table_name, kcu.column_name
+        """)
+    )
+    return [(r[0], r[1]) for r in rows.all()]
+
+
+async def _row_counts(
+    session: AsyncSession, tables: list[tuple[str, str]], user_id: int
+) -> dict[str, int]:
+    counts = {}
+    for table, column in tables:
+        # Identifiers come from the catalog, not from input, so interpolation is safe.
+        n = await session.scalar(
+            text(f'SELECT count(*) FROM "{table}" WHERE "{column}" = :uid'), {"uid": user_id}
+        )
+        counts[table] = int(n or 0)
+    return counts
+
+
 async def test_user_deleted_cascades(api_client: httpx.AsyncClient, webhook_secret: str) -> None:
+    """Deleting a Clerk user must remove every row that user owns.
+
+    This is the account-deletion obligation, so it is asserted across all four
+    user-owned tables rather than the api_tokens one it used to check — and the
+    table list is read from the database, so a new one cannot quietly escape it.
+    """
     await post_event(
         api_client, webhook_secret, user_event("user.created", "user_wh3", "x@example.com")
     )
@@ -94,17 +146,48 @@ async def test_user_deleted_cascades(api_client: httpx.AsyncClient, webhook_secr
         user = await users_store.get_by_clerk_id(s, "user_wh3")
         assert user is not None
         user_id = user.id
+
+        # Populate every user-owned table, so the post-delete assertions cannot pass
+        # by having had nothing to delete in the first place.
         await pat.create(s, user_id, label="doomed")
+        folder = await folders_store.create(s, user_id, name="Doomed")
+        feed = await feeds_store.upsert_by_url(s, feed_url="https://cascade.invalid/rss")
+        await subs_store.create(s, user_id, feed_id=feed.id, folder_id=folder.id)
+        entry = Entry(feed_id=feed.id, guid_hash=b"\x01" * 32, title="doomed entry")
+        s.add(entry)
+        await s.flush()
+        await entry_states_store.upsert(
+            s, user_id, entry.id, changed_at=datetime.now(UTC), is_read=True, is_starred=True
+        )
+
+    async with app_db.get_sessionmaker()() as s:
+        tables = await _user_owned_tables(s)
+        before = await _row_counts(s, tables, user_id)
+
+    # The guard that keeps this test honest: every table the cascade is supposed to
+    # clear actually had a row to clear.
+    assert set(before) == {"api_tokens", "folders", "subscriptions", "entry_states"}, before
+    assert all(n > 0 for n in before.values()), f"test did not populate every table: {before}"
 
     response = await post_event(api_client, webhook_secret, user_event("user.deleted", "user_wh3"))
     assert response.status_code == 204
 
     async with app_db.get_sessionmaker()() as s:
         assert await users_store.get_by_clerk_id(s, "user_wh3") is None
-        tokens = await s.scalar(
-            select(func.count()).select_from(ApiToken).where(ApiToken.user_id == user_id)
+        after = await _row_counts(s, tables, user_id)
+        # Feeds and their entries are shared, not user-owned: deleting this user's
+        # last subscription must not rip a feed out from under another subscriber.
+        # Nothing is kept, though — losing its last subscriber marks the feed
+        # orphaned (trigger, migration 0005) and the worker's GC deletes it, and
+        # its entries, once past orphan_grace_days. Assert that second stage is
+        # actually armed, or "shared, so we keep it" quietly becomes "we keep it".
+        orphaned_at = await s.scalar(
+            text("SELECT orphaned_at FROM feeds WHERE feed_url = :u"),
+            {"u": "https://cascade.invalid/rss"},
         )
-    assert tokens == 0  # FK cascade wiped the user's tokens
+
+    assert after == dict.fromkeys(before, 0), f"rows left behind after deletion: {after}"
+    assert orphaned_at is not None, "feed lost its last subscriber but was not queued for GC"
 
 
 async def test_invalid_signature_rejected(
