@@ -35,7 +35,11 @@ jobs:
       # [otel] too so mypy resolves the OpenTelemetry imports in app/telemetry.py
       # (the module imports them lazily at runtime, but typecheck follows them).
       - run: python -m pip install -r api/requirements-dev.txt -r api/requirements-otel.txt && python -m pip install -e ./api --no-deps
-      - run: mypy api
+      # From api/, not the repo root: mypy reads its config from the working
+      # directory, and [tool.mypy] (strict, pydantic plugin) lives in
+      # api/pyproject.toml. `mypy api` from the root silently ran on defaults.
+      - run: mypy .
+        working-directory: api
       - uses: actions/setup-node@v7
         with:
           node-version: "24"
