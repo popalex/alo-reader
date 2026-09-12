@@ -57,6 +57,26 @@ jobs:
       - name: make lighthouse
         run: make lighthouse
 
+  python-deps:
+    # What Python dependencies could be upgraded. Reports only: it never edits a
+    # lockfile, never opens a PR, and never fails the nightly — taking an update is
+    # the operator's call, made with `make lock-upgrade`.
+    #
+    # This replaces the Dependabot pip entry, which could not maintain this lockfile
+    # set: it edits requirements files in place rather than recompiling, so a shared
+    # transitive is resolved per file and the result is unsatisfiable (PR #38 died on
+    # ResolutionImpossible and failed every job). scripts/deps-report.sh resolves all
+    # three in one pass, the same way `make lock` does.
+    #
+    # The findings land in the run's job summary, so they are visible on the Actions
+    # page without opening logs.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Report available Python dependency updates
+        run: ./scripts/deps-report.sh
+
   bench-search:
     # Search p95 budget (< 100 ms) at full 5M-entry scale (DESIGN §4.1.6). Too slow
     # to seed per-PR; the 100k profile gates PRs in ci.yml.

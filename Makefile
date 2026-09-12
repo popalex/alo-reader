@@ -25,7 +25,7 @@ COMPOSE_DEV_OTEL := docker compose -f deploy/docker-compose.yml -f deploy/docker
 # (see `make db`). Postgres itself is never installed on the host.
 TEST_DATABASE_URL ?= postgresql+asyncpg://alo:alo@localhost:5432/alo
 
-.PHONY: venv lock lint typecheck test-api test-web e2e lighthouse size up seed dev down db db-down migrate generate-client bench-search loadtest pg-image
+.PHONY: venv lock lock-upgrade lint typecheck test-api test-web e2e lighthouse size up seed dev down db db-down migrate generate-client bench-search loadtest pg-image
 
 ## Optional: a local virtualenv, for editor tooling (autocomplete, go-to-def).
 ## The gates below do not use it — they run in the toolchain container — so this
@@ -43,13 +43,26 @@ venv:
 ## ranges, so an upstream release can never land in CI unannounced. Resolved inside
 ## the toolchain container: environment markers are evaluated against whichever
 ## interpreter does the resolving, so the host's python must not be the one deciding.
+##
+## This does NOT pick up new releases. pip-compile keeps any pin that still satisfies
+## the ranges, so re-running it after a dependency publishes a fix is a no-op — use
+## `make lock-upgrade` for that. Nothing else updates these files: Dependabot does not
+## watch /api (see .github/dependabot.yml for why), so the upgrade target is the only
+## way a newer Python dependency enters the tree.
 lock:
 	$(PY_RUN) 'pip install --quiet pip-tools \
-	  && pip-compile --quiet --strip-extras -o requirements.txt pyproject.toml \
-	  && pip-compile --quiet --strip-extras --extra dev -o requirements-dev.txt pyproject.toml \
-	  && pip-compile --quiet --strip-extras --extra otel -o requirements-otel.txt pyproject.toml \
+	  && pip-compile --quiet --strip-extras $(PIP_COMPILE_ARGS) -o requirements.txt pyproject.toml \
+	  && pip-compile --quiet --strip-extras $(PIP_COMPILE_ARGS) --extra dev -o requirements-dev.txt pyproject.toml \
+	  && pip-compile --quiet --strip-extras $(PIP_COMPILE_ARGS) --extra otel -o requirements-otel.txt pyproject.toml \
 	  && cp requirements.txt requirements-dev.txt requirements-otel.txt /out/ \
-	  && chown "$$HOST_UID:$$HOST_GID" /out/requirements*.txt' 
+	  && chown "$$HOST_UID:$$HOST_GID" /out/requirements*.txt'
+
+## Re-resolve every pin to the newest release its range allows, then review the diff.
+## The three files are regenerated together in one pass so they cannot disagree —
+## a shared dependency resolved separately per file is how a lockfile set goes
+## unsatisfiable (Dependabot's per-file edits did exactly that in PR #38).
+lock-upgrade:
+	$(MAKE) lock PIP_COMPILE_ARGS=--upgrade
 
 lint:
 	$(PY_RUN) '$(PY_INSTALL) && ruff check . && ruff format --check .' 
