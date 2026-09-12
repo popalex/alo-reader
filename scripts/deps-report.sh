@@ -44,8 +44,16 @@ rows = sorted(
     if committed.get(name) != latest[name]
 )
 
+md = os.environ.get("GITHUB_STEP_SUMMARY")
+
 if not rows:
-    print("Every Python dependency is already at the newest version its range allows.")
+    # Still say so. A job that writes nothing when there is nothing looks identical
+    # to a job that silently broke.
+    msg = "Every Python dependency is already at the newest version its range allows."
+    print(msg)
+    if md:
+        with open(md, "a") as fh:
+            fh.write(f"## Python dependencies\n\n{msg}\n")
     sys.exit(0)
 
 width = max(len(r[0]) for r in rows)
@@ -54,7 +62,7 @@ for name, cur, new in rows:
     print(f"  {name:<{width}}  {cur}  ->  {new}")
 print("\nNothing has been changed. Take them with `make lock-upgrade`, review the diff, commit.")
 
-if md := os.environ.get("GITHUB_STEP_SUMMARY"):
+if md:
     with open(md, "a") as fh:
         fh.write(f"## Python dependency updates available ({len(rows)})\n\n")
         fh.write("| package | current | available |\n|---|---|---|\n")
