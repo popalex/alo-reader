@@ -7,17 +7,19 @@
 # that change behaviour and deserve to be read.
 version: 2
 updates:
-  - package-ecosystem: pip
-    directory: /api
-    schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 5
-    groups:
-      python-minor-and-patch:
-        update-types: [minor, patch]
-    commit-message:
-      prefix: build(api)
+  # No pip entry, deliberately. /api is locked as three pip-compile files that must
+  # agree with each other (requirements.txt, and -dev / -otel layered on it).
+  # Dependabot edits requirements files in place rather than recompiling the set, so
+  # a shared transitive gets resolved per file and the result is unsatisfiable —
+  # PR #38 bumped 19 packages and died on
+  # `Cannot install -r requirements-dev.txt (line 90) and pydantic-core==2.48.0 ...
+  # ResolutionImpossible`, failing every job. That is not a stale-PR problem, it is
+  # not mergeable in principle, and a weekly cadence would reproduce it weekly.
+  #
+  # Python dependencies are refreshed with `make lock-upgrade`, which recompiles all
+  # three in one pass so they cannot disagree. CVEs are still covered: Dependabot
+  # security alerts are enabled repo-wide, and `pip-audit --skip-editable` gates every
+  # CI run. This suppresses routine version-update PRs, not vulnerability reporting.
 
   - package-ecosystem: npm
     directory: /web
