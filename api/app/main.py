@@ -28,6 +28,7 @@ from app.routes.opml import router as opml_router
 from app.routes.streams import router as streams_router
 from app.routes.subscriptions import router as subscriptions_router
 from app.security import SecurityHeadersMiddleware
+from app.version import APP_VERSION
 
 log = logging.getLogger("alo.api")
 
@@ -80,7 +81,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         telemetry.shutdown()
 
 
-app = FastAPI(title="alo-reader", version="0.0.0", lifespan=lifespan)
+app = FastAPI(title="alo-reader", version=APP_VERSION, lifespan=lifespan)
 register_exception_handlers(app)
 app.add_middleware(AuthMiddleware)
 # Added last → outermost: security headers land on every response, including the
@@ -108,7 +109,10 @@ api_v1 = APIRouter(prefix="/api/v1")
 
 @api_v1.get("/healthz")
 async def healthz() -> dict[str, str]:
-    return {"status": "ok"}
+    # version answers "which build is this?" from the outside, without shelling into
+    # the container. Deliberately still DB-free and auth-free: it is a liveness probe
+    # (deploy/docker-compose.yml) before it is anything else.
+    return {"status": "ok", "version": APP_VERSION}
 
 
 api_v1.include_router(auth_router)
