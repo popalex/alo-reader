@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: python -m pip install -r api/requirements-dev.txt && python -m pip install -e ./api --no-deps
@@ -29,14 +29,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       # [otel] too so mypy resolves the OpenTelemetry imports in app/telemetry.py
       # (the module imports them lazily at runtime, but typecheck follows them).
       - run: python -m pip install -r api/requirements-dev.txt -r api/requirements-otel.txt && python -m pip install -e ./api --no-deps
       - run: mypy api
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
       - run: corepack enable && corepack prepare pnpm@latest --activate
@@ -54,7 +54,7 @@ jobs:
         auth_mode: [clerk, none]
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: python -m pip install -r api/requirements-dev.txt && python -m pip install -e ./api --no-deps
@@ -70,7 +70,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
       - run: corepack enable && corepack prepare pnpm@latest --activate
@@ -82,7 +82,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
       - run: corepack enable && corepack prepare pnpm@latest --activate
@@ -96,11 +96,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: python -m pip install -r api/requirements-dev.txt && python -m pip install -e ./api --no-deps
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
       - run: corepack enable && corepack prepare pnpm@latest --activate
@@ -122,7 +122,7 @@ jobs:
       DATABASE_URL: postgresql+asyncpg://alo:alo@localhost:5432/alo
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: python -m pip install -r api/requirements-dev.txt && python -m pip install -e ./api --no-deps
@@ -145,13 +145,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: python -m pip install -r api/requirements-dev.txt pip-audit && python -m pip install -e ./api --no-deps
       - name: pip-audit (Python deps)
         run: pip-audit --skip-editable
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
       - run: corepack enable && corepack prepare pnpm@latest --activate
