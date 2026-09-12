@@ -138,8 +138,10 @@ jobs:
           for i in $(seq 1 30); do docker exec pg pg_isready -U alo -d alo && break; sleep 2; done
       - name: Migrate
         run: cd api && alembic upgrade head
+      # BENCH_KEEP=1: same reasoning as the nightly — the cascade delete runs against
+      # a database that is discarded with the job. Cheaper at 100k, still pointless.
       - name: Benchmark (100k profile)
-        run: BENCH_PROFILE=pr python scripts/bench_search.py
+        run: BENCH_PROFILE=pr BENCH_KEEP=1 python scripts/bench_search.py
 
   security-audit:
     # Supply-chain gate (WP-15): pip-audit for Python deps, pnpm audit for the
