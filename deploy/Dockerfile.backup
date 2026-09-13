@@ -1,0 +1,17 @@
+# Backup sidecar: pg_dump + zstd, with rclone for an optional off-box copy.
+#
+# postgres:18-alpine, not the server's postgres:18: only the client tools are
+# needed here, and the Alpine base is ~260MB against 456MB. What has to match is
+# the major version, because pg_dump refuses to dump a server newer than itself.
+# Bumping Postgres means bumping this line in the same commit.
+FROM postgres:18-alpine
+
+# zstd for the dumps; rclone only runs when BACKUP_RCLONE_REMOTE is set, but it is
+# baked in so enabling off-box backups is a variable rather than a rebuild.
+RUN apk add --no-cache zstd rclone
+
+COPY deploy/backup.sh /usr/local/bin/backup
+RUN chmod +x /usr/local/bin/backup
+
+ENTRYPOINT ["/usr/local/bin/backup"]
+CMD ["loop"]

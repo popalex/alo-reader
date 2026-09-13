@@ -145,6 +145,40 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  # Nightly pg_dump | zstd to the `backups` volume, 14 days kept, optionally
+  # copied off-box with rclone. DESIGN.md §1.5: running Postgres yourself means
+  # backups are your problem, so this is part of the stack rather than a runbook
+  # step. scripts/restore.sh is the other half.
+  backup:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.backup
+    restart: unless-stopped
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      # libpq's own variables: the app's DATABASE_URL is SQLAlchemy-flavoured
+      # (postgresql+asyncpg://) and libpq will not parse it.
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-alo}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-alo}
+      PGDATABASE: ${POSTGRES_DB:-alo}
+      BACKUP_SCHEDULE_UTC: ${BACKUP_SCHEDULE_UTC:-03:30}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      BACKUP_ON_START: ${BACKUP_ON_START:-false}
+      BACKUP_ZSTD_LEVEL: ${BACKUP_ZSTD_LEVEL:-10}
+      # Empty means local-only. Set it to an rclone remote (e.g. s3:bucket/alo)
+      # and each new dump is copied there and pruned on the same retention.
+      # rclone is configured from RCLONE_CONFIG_* variables in .env, which env_file
+      # above already passes through, so there is no config file to mount.
+      BACKUP_RCLONE_REMOTE: ${BACKUP_RCLONE_REMOTE:-}
+    volumes:
+      - backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   postgres:
     # Postgres 18 + RUM extension (search's index-ordered FTS; see Dockerfile).
     build:
@@ -167,5 +201,6 @@ services:
 
 volumes:
   pgdata:
+  backups:
   caddy_data:
   caddy_config:

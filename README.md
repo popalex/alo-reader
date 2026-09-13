@@ -92,12 +92,34 @@ deliberate: `none` must never be what you get by accident.
 `migrate` service that `api` and `worker` wait on, so the schema is current
 before anything serves, and it runs once regardless of replica count.
 
-### The database is yours
+### Backups
 
 Postgres runs in compose against the `pgdata` volume, so backups and disk are
-your problem, not a managed service's. A backup sidecar and a restore script are
-the next thing landing in WP-16; until then, take your own `pg_dump`. Moving to
-managed Postgres later is a `DATABASE_URL` change.
+your problem rather than a managed service's. The `backup` sidecar handles the
+first part: a nightly `pg_dump` to the `backups` volume, zstd-compressed, 14 days
+kept. Every dump is verified before it counts as one, so a failed dump does not
+leave a file that merely looks restorable.
+
+Backups on the same host are not backups if the host is what you lose. Set
+`BACKUP_RCLONE_REMOTE` and each dump is also copied off-box and pruned on the
+same retention; rclone reads its configuration from `RCLONE_CONFIG_*` variables
+in `.env`.
+
+To restore:
+
+```sh
+scripts/restore.sh              # newest backup, after you confirm
+scripts/restore.sh --latest -y  # no prompt, for a drill
+```
+
+It stops the app, restores, and starts it again. It replaces everything in the
+database, so it asks you to type the database name first.
+
+**Drill it before you need it.** A backup nobody has restored is a guess.
+[`deploy/BACKUP.md`](deploy/BACKUP.md) has the drill, the variables, and the
+things to check that a row count would not catch.
+
+Moving to managed Postgres later is a `DATABASE_URL` change.
 
 ## Configuration
 
