@@ -1,5 +1,15 @@
 # Base stack: dev = prod topology. Run from the repo root via `make up`.
-# Reads variables from the repo-root .env (see .env.example).
+#
+# Configuration comes from the repo-root .env (template: .env.example). Two
+# separate mechanisms, both needed:
+#   - `${VAR}` interpolation below, which compose resolves from the file named by
+#     --env-file. The Makefile passes --env-file .env, because compose otherwise
+#     derives its project directory from this file and reads deploy/.env.
+#   - `env_file:` on api/worker/migrate, which hands the whole file to the process.
+#     Settings has ~40 fields and only a handful were ever listed under
+#     `environment:`, so without this every other knob in .env.example was inert.
+# `environment:` entries win over env_file, which is what keeps the compose-level
+# defaults working on a machine with no .env at all.
 
 services:
   caddy:
@@ -24,6 +34,13 @@ services:
       dockerfile: deploy/Dockerfile.api
     command: ["migrate"]
     restart: "no"
+    env_file:
+      # The whole .env, so every Settings field is reachable without listing it
+      # here. Optional: a fresh clone and CI have no .env and fall back to the
+      # defaults below. Settings ignores unknown keys, so the Postgres/Grafana
+      # variables riding along are inert in these processes.
+      - path: ../.env
+        required: false
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://alo:alo@postgres:5432/alo}
     depends_on:
@@ -36,6 +53,13 @@ services:
       dockerfile: deploy/Dockerfile.api
     command: ["api"]
     restart: unless-stopped
+    env_file:
+      # The whole .env, so every Settings field is reachable without listing it
+      # here. Optional: a fresh clone and CI have no .env and fall back to the
+      # defaults below. Settings ignores unknown keys, so the Postgres/Grafana
+      # variables riding along are inert in these processes.
+      - path: ../.env
+        required: false
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://alo:alo@postgres:5432/alo}
       # No default on purpose: the API refuses to boot without an explicit
@@ -74,6 +98,13 @@ services:
     # unexpected crash (see worker/main.py), so this recovers a crashed poller
     # while still respecting an operator's explicit `docker compose stop`.
     restart: unless-stopped
+    env_file:
+      # The whole .env, so every Settings field is reachable without listing it
+      # here. Optional: a fresh clone and CI have no .env and fall back to the
+      # defaults below. Settings ignores unknown keys, so the Postgres/Grafana
+      # variables riding along are inert in these processes.
+      - path: ../.env
+        required: false
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://alo:alo@postgres:5432/alo}
       # Hostnames exempt from the SSRF private-range block (trusted internal feeds).
