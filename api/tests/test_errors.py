@@ -34,6 +34,42 @@ async def test_request_id_is_assigned_and_echoed(api_client: httpx.AsyncClient) 
     assert resp.headers.get("x-request-id")  # generated when absent
 
 
+async def test_request_id_is_echoed_on_a_500(api_client: httpx.AsyncClient) -> None:
+    """The id must survive the one path that bypasses the middleware.
+
+    A 500 is produced by ServerErrorMiddleware, outside RequestContextMiddleware's send
+    wrapper, so the header was absent on exactly the responses the id exists to
+    correlate: the log line had it, the client never did.
+    """
+    rid = "trace-me-9f2c"
+    resp = await api_client.get("/api/v1/__boom__", headers={"X-Request-ID": rid})
+    # Route doesn't exist -> 404, which still goes through the normal stack.
+    assert resp.headers.get("x-request-id") == rid
+
+
+async def test_unhandled_500_carries_the_request_id() -> None:
+    import httpx as _httpx
+    from fastapi import FastAPI
+
+    from app.errors import register_exception_handlers
+    from app.log import RequestContextMiddleware
+
+    test_app = FastAPI()
+    register_exception_handlers(test_app)
+    test_app.add_middleware(RequestContextMiddleware)
+
+    @test_app.get("/boom")
+    async def boom() -> None:
+        raise RuntimeError("kaboom")
+
+    transport = _httpx.ASGITransport(app=test_app, raise_app_exceptions=False)
+    async with _httpx.AsyncClient(transport=transport, base_url="http://t") as c:
+        resp = await c.get("/boom", headers={"X-Request-ID": "given-id-42"})
+
+    assert resp.status_code == 500
+    assert resp.headers.get("x-request-id") == "given-id-42"
+
+
 @pytest.mark.parametrize("rid", ["abc-123"])
 async def test_request_id_is_propagated(api_client: httpx.AsyncClient, rid: str) -> None:
     resp = await api_client.get("/api/v1/healthz", headers={"X-Request-ID": rid})

@@ -1,7 +1,10 @@
 """Security-header audit (WP-15, DESIGN.md §1.6).
 
 Asserts an API response carries *exactly* the audited header set — value for value —
-and that they're present on unauthenticated errors too (the middleware is outermost).
+and that they're present on unauthenticated errors and on a 500 too. The 500 is the
+case that shipped broken: Starlette hands an Exception handler to ServerErrorMiddleware,
+which wraps every user middleware, so that response never passed through the header
+middleware and went out with none of these at all.
 If the set in app.security changes, this test changes with it, on purpose.
 """
 
@@ -41,4 +44,31 @@ async def test_headers_present_on_unauthenticated_error(
     set_auth_mode("clerk")
     resp = await api_client.get("/api/v1/subscriptions")
     assert resp.status_code == 401
+    assert _present_security_headers(resp) == _EXPECTED
+
+
+async def test_exact_header_set_on_unhandled_error() -> None:
+    """A 500 must carry the same audited set as a 200.
+
+    It is built by ServerErrorMiddleware, outside the middleware that normally adds
+    these, so errors.py applies them itself. Without that, the one response most likely
+    to be rendered in a browser during an incident had no nosniff and no frame-ancestors.
+    """
+    import httpx as _httpx
+    from fastapi import FastAPI
+
+    from app.errors import register_exception_handlers
+
+    test_app = FastAPI()
+    register_exception_handlers(test_app)
+
+    @test_app.get("/boom")
+    async def boom() -> None:
+        raise RuntimeError("kaboom")
+
+    transport = _httpx.ASGITransport(app=test_app, raise_app_exceptions=False)
+    async with _httpx.AsyncClient(transport=transport, base_url="http://t") as c:
+        resp = await c.get("/boom")
+
+    assert resp.status_code == 500
     assert _present_security_headers(resp) == _EXPECTED
