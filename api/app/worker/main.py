@@ -20,11 +20,12 @@ from urllib.parse import urlsplit
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app import telemetry
+from app import sentry, telemetry
 from app.config import Settings, get_settings
 from app.db import get_engine, get_sessionmaker
 from app.models import Feed
 from app.store import feeds as feeds_store
+from app.version import APP_VERSION
 from app.worker.fetch import fetch_feed
 from app.worker.log import emit as _log
 from app.worker.maintenance import maintenance_loop
@@ -180,6 +181,10 @@ async def run(
         # Log-handler attachment is split out of configure_telemetry (see its docstring);
         # attach it so the worker's logs reach Loki.
         telemetry.enable_log_export()
+        # Independent of telemetry: Sentry groups and alerts on errors, OTel keeps
+        # shipping the logs. Turning one on does not turn the other off.
+        if sentry.configure_sentry(service_name="alo-worker", version=APP_VERSION):
+            _log("sentry_enabled", service="alo-worker", release=APP_VERSION)
     gate = HostGate(settings.worker_per_host_concurrency, settings.worker_per_host_delay_s)
     counters = Counters()
 

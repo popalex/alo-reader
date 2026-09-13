@@ -24,6 +24,11 @@ dependencies = [
     # route handles the 2.x contract, so 1.x would take a different path on a bad
     # payload. >=1.20 with no ceiling is what silently broke this on an unpinned CI.
     "svix>=2,<3",
+    # Error reporting, off unless SENTRY_DSN is set. A base dependency rather than an
+    # extra like otel below: it is one pure-Python package, and making it an extra would
+    # mean rebuilding the image to turn errors on, where the whole point is that one
+    # variable does it. Major-pinned because 3.x will move the init contract.
+    "sentry-sdk>=2.20,<3",
 ]
 
 [project.optional-dependencies]

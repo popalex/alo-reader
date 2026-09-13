@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager, suppress
 
 from fastapi import APIRouter, FastAPI
 
-from app import telemetry
+from app import sentry, telemetry
 from app.auth import AuthMiddleware
 from app.auth import router as auth_router
 from app.config import get_settings, validate_boot_config
@@ -70,6 +70,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # uvicorn.* loggers and the api's logs actually reach Loki.
     if telemetry.is_enabled():
         telemetry.enable_log_export()
+    # Sentry is initialised at import (below), but anything it logged there went
+    # nowhere: uvicorn installs its logging config after the module is imported, so an
+    # INFO line at import time is dropped. Say it here instead, where it is visible,
+    # because "is error reporting actually on?" is a question operators ask.
+    if sentry.is_enabled():
+        log.info("sentry_enabled service=alo-api release=%s", APP_VERSION)
     refresher = asyncio.create_task(_gauge_refresh_loop()) if telemetry.is_enabled() else None
     try:
         yield
@@ -103,6 +109,12 @@ if os.getenv("OTEL_ENABLED", "").strip().lower() in ("1", "true", "yes", "on"):
         app=app,
         engine=get_engine(),
     )
+
+# Sentry, independently of the above: either, both, or neither can be on. Gated on the
+# raw env var for the same reason telemetry is -- importing the app for a test or the
+# openapi dump must not construct Settings, which requires DATABASE_URL.
+if os.getenv("SENTRY_DSN", "").strip():
+    sentry.configure_sentry(service_name="alo-api", version=app.version)
 
 api_v1 = APIRouter(prefix="/api/v1")
 

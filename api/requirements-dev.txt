@@ -26,6 +26,7 @@ certifi==2026.7.22
     #   httpcore
     #   httpx
     #   requests
+    #   sentry-sdk
 cffi==2.1.1
     # via cryptography
 charset-normalizer==3.5.1
@@ -123,6 +124,8 @@ requests==2.34.2
     # via docker
 ruff==0.15.20
     # via alo-reader-api (pyproject.toml)
+sentry-sdk==2.69.1
+    # via alo-reader-api (pyproject.toml)
 six==1.17.0
     # via python-dateutil
 sqlalchemy==2.0.52
@@ -157,6 +160,7 @@ urllib3==2.7.0
     # via
     #   docker
     #   requests
+    #   sentry-sdk
     #   testcontainers
 uvicorn==0.52.4
     # via alo-reader-api (pyproject.toml)

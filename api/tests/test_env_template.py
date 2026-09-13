@@ -28,6 +28,7 @@ SENTINEL_REQUIRED = {"AUTH_MODE"}
 ILLUSTRATIVE = {
     "FETCH_CONTACT_URL": "shows the shape of a contact URL; the default is empty",
     "FETCH_ALLOW_HOSTS": "shows a fixture hostname; the default is empty",
+    "SENTRY_DSN": "shows the shape of a DSN; the default is empty, which means off",
 }
 
 
