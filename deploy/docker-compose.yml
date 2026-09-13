@@ -1,5 +1,15 @@
 # Base stack: dev = prod topology. Run from the repo root via `make up`.
-# Reads variables from the repo-root .env (see .env.example).
+#
+# Configuration comes from the repo-root .env (template: .env.example). Two
+# separate mechanisms, both needed:
+#   - `${VAR}` interpolation below, which compose resolves from the file named by
+#     --env-file. The Makefile passes --env-file .env, because compose otherwise
+#     derives its project directory from this file and reads deploy/.env.
+#   - `env_file:` on api/worker/migrate, which hands the whole file to the process.
+#     Settings has ~40 fields and only a handful were ever listed under
+#     `environment:`, so without this every other knob in .env.example was inert.
+# `environment:` entries win over env_file, which is what keeps the compose-level
+# defaults working on a machine with no .env at all.
 
 services:
   caddy:
@@ -7,8 +17,23 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile.caddy
     restart: unless-stopped
+    environment:
+      # Caddy's site address. Empty means :80, plain HTTP, which is what `make up`
+      # and CI want. Set it to a hostname you control and Caddy issues and renews a
+      # Let's Encrypt certificate on first request (see deploy/Caddyfile).
+      ALO_SITE_ADDRESS: ${ALO_SITE_ADDRESS:-:80}
     ports:
       - "80:80"
+      # Only listened on once ALO_SITE_ADDRESS names a host, but published either
+      # way: the ACME challenge needs both ports reachable, and publishing 443
+      # unused costs nothing.
+      - "443:443"
+    volumes:
+      # Issued certificates and the ACME account key. This has to survive a
+      # container recreate. Without it every `make up` re-issues, and Let's Encrypt
+      # caps duplicate certificates at 5 per week.
+      - caddy_data:/data
+      - caddy_config:/config
     depends_on:
       # Wait until the API reports healthy before proxying, so a cold start never
       # serves 502s from Caddy while uvicorn is still booting.
@@ -22,8 +47,20 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.api
+      args:
+        # Stamped into /api/v1/healthz, the OpenAPI document and every OTel span.
+        # Unset, a self-hosted build reports 0.0.0+dev forever; set it to the tag
+        # you are deploying. CI passes 0.0.0+<sha>.
+        APP_VERSION: ${APP_VERSION:-0.0.0+dev}
     command: ["migrate"]
     restart: "no"
+    env_file:
+      # The whole .env, so every Settings field is reachable without listing it
+      # here. Optional: a fresh clone and CI have no .env and fall back to the
+      # defaults below. Settings ignores unknown keys, so the Postgres/Grafana
+      # variables riding along are inert in these processes.
+      - path: ../.env
+        required: false
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://alo:alo@postgres:5432/alo}
     depends_on:
@@ -34,8 +71,20 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.api
+      args:
+        # Stamped into /api/v1/healthz, the OpenAPI document and every OTel span.
+        # Unset, a self-hosted build reports 0.0.0+dev forever; set it to the tag
+        # you are deploying. CI passes 0.0.0+<sha>.
+        APP_VERSION: ${APP_VERSION:-0.0.0+dev}
     command: ["api"]
     restart: unless-stopped
+    env_file:
+      # The whole .env, so every Settings field is reachable without listing it
+      # here. Optional: a fresh clone and CI have no .env and fall back to the
+      # defaults below. Settings ignores unknown keys, so the Postgres/Grafana
+      # variables riding along are inert in these processes.
+      - path: ../.env
+        required: false
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://alo:alo@postgres:5432/alo}
       # No default on purpose: the API refuses to boot without an explicit
@@ -69,11 +118,23 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.api
+      args:
+        # Stamped into /api/v1/healthz, the OpenAPI document and every OTel span.
+        # Unset, a self-hosted build reports 0.0.0+dev forever; set it to the tag
+        # you are deploying. CI passes 0.0.0+<sha>.
+        APP_VERSION: ${APP_VERSION:-0.0.0+dev}
     command: ["worker"]
     # unless-stopped (not on-failure): the worker also exits non-zero on an
     # unexpected crash (see worker/main.py), so this recovers a crashed poller
     # while still respecting an operator's explicit `docker compose stop`.
     restart: unless-stopped
+    env_file:
+      # The whole .env, so every Settings field is reachable without listing it
+      # here. Optional: a fresh clone and CI have no .env and fall back to the
+      # defaults below. Settings ignores unknown keys, so the Postgres/Grafana
+      # variables riding along are inert in these processes.
+      - path: ../.env
+        required: false
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://alo:alo@postgres:5432/alo}
       # Hostnames exempt from the SSRF private-range block (trusted internal feeds).
@@ -106,3 +167,5 @@ services:
 
 volumes:
   pgdata:
+  caddy_data:
+  caddy_config:

@@ -16,10 +16,17 @@ PY_RUN := ./scripts/py.sh
 # The pinned set, then the project itself without letting pip re-resolve it.
 PY_INSTALL := pip install --quiet -r requirements-dev.txt
 PY_PROJECT := pip install --quiet -e . --no-deps
-COMPOSE := docker compose -f deploy/docker-compose.yml
-COMPOSE_DEV := docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml
-COMPOSE_OTEL := docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.otel.yml
-COMPOSE_DEV_OTEL := docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml -f deploy/docker-compose.otel.yml
+# Compose resolves its project directory from the first -f file, so without this
+# it reads deploy/.env and the repo-root .env documented in .env.example is
+# silently ignored. --env-file points it back at the root. Passed only when the
+# file exists, because compose errors on a missing --env-file and a fresh clone
+# (and CI) has none.
+COMPOSE_ENV := $(if $(wildcard .env),--env-file .env,)
+DC := docker compose $(COMPOSE_ENV)
+COMPOSE := $(DC) -f deploy/docker-compose.yml
+COMPOSE_DEV := $(DC) -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml
+COMPOSE_OTEL := $(DC) -f deploy/docker-compose.yml -f deploy/docker-compose.otel.yml
+COMPOSE_DEV_OTEL := $(DC) -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml -f deploy/docker-compose.otel.yml
 
 # Host-run alembic/pytest talk to the dockerized Postgres over its localhost port
 # (see `make db`). Postgres itself is never installed on the host.

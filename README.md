@@ -9,16 +9,17 @@ for the implementation plan.
 ## Layout
 
 - `api/` — FastAPI app + worker (one image, two commands). Python 3.14, managed
-  with a local `.venv` + pip.
+  with pip. The gates run in a toolchain container (`scripts/py.sh`), so no host
+  interpreter has to match.
 - `web/` — React 18 + TypeScript + Vite SPA (pnpm).
 - `deploy/` — Dockerfiles, Caddy, docker-compose (dev = prod).
 
 ## Quick start
 
 ```sh
-cp .env.example .env      # optional: compose has matching defaults built in
+cp .env.example .env      # required: AUTH_MODE has no default and the API won't boot
 make up                   # build + start the stack (SPA + API via Caddy on :80)
-curl -s localhost/api/v1/healthz   # -> {"status":"ok"}
+curl -s localhost/api/v1/healthz   # -> {"status":"ok","version":"0.0.0+dev"}
 ```
 
 Local development (hot-reload both sides on http://localhost:3000):
@@ -39,12 +40,68 @@ make otel-down    # stop the OTel stack
 See [`deploy/observability/README.md`](deploy/observability/README.md) for the
 topology, what's exported, and the dashboards.
 
-Backend tooling (creates `.venv`):
+Gates (each runs in the toolchain container; `make venv` exists only to give an
+editor something to point at):
 
 ```sh
-make venv
 make lint typecheck test-api test-web
 ```
 
-Configuration is entirely environment-based — `DATABASE_URL` is the single DB
-connection knob; nothing is hardcoded. See `.env.example`.
+## Running it in production
+
+The same compose file, plus an `.env` and a domain. There is no separate
+production stack.
+
+**1. Fill in `.env`.** The top of `.env.example` lists the variables that ship
+with values wrong for production. Every other line in it is a commented-out copy
+of the code's default, and a test keeps it that way, so whatever you leave alone
+is what you get.
+
+```sh
+POSTGRES_PASSWORD=...                 # "alo" is in this public repo
+AUTH_MODE=clerk                       # or none; see below
+ALO_SITE_ADDRESS=reader.example.com   # a hostname here is what turns TLS on
+APP_VERSION=1.0.0                     # reported by /healthz; otherwise 0.0.0+dev
+```
+
+**2. Point DNS at the host** and open ports 80 and 443. The ACME challenge uses
+both. Then `make up`. Caddy obtains a Let's Encrypt certificate on first request
+and renews it from then on: no certificate to install, no renewal cron.
+
+Certificates and the ACME account key live in the `caddy_data` volume. Keep it.
+Let's Encrypt caps duplicate certificates at five per week, so an empty store
+means re-issuing on every container recreate and eventually no certificate at
+all for a few days.
+
+**3. Confirm what is running:** `curl -s https://your-domain/api/v1/healthz`
+returns the status and the `APP_VERSION` the image was built with.
+
+### Auth mode
+
+`AUTH_MODE` has no default and the API exits at startup without it. That is
+deliberate: `none` must never be what you get by accident.
+
+- `clerk` — hosted auth, for an instance other people sign into. Also set
+  `CLERK_ISSUER`, `CLERK_PUBLISHABLE_KEY` and `CLERK_WEBHOOK_SECRET`.
+- `none` — no authentication at all; every request is the same single user.
+  Only behind a private network, a VPN, or reverse-proxy auth.
+
+### Upgrading
+
+`git pull && make up` rebuilds and restarts. Migrations run as a one-shot
+`migrate` service that `api` and `worker` wait on, so the schema is current
+before anything serves, and it runs once regardless of replica count.
+
+### The database is yours
+
+Postgres runs in compose against the `pgdata` volume, so backups and disk are
+your problem, not a managed service's. A backup sidecar and a restore script are
+the next thing landing in WP-16; until then, take your own `pg_dump`. Moving to
+managed Postgres later is a `DATABASE_URL` change.
+
+## Configuration
+
+Entirely environment-based; nothing is hardcoded. `DATABASE_URL` is the single DB
+connection knob. `.env.example` documents every setting the app reads, with its
+default. The compose stack reads the repo-root `.env`, and so do non-Docker runs
+via python-dotenv; real environment variables win over both.
