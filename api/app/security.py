@@ -6,8 +6,13 @@ scripts, styles, or frames — so its CSP is the tightest possible: ``default-sr
 set at the edge in the Caddyfile; this module is the API half and the single source
 of truth the header-audit test asserts against.
 
-Added as an outer ASGI middleware so the headers land on *every* response, including
-the auth middleware's 401/429 and framework error envelopes.
+Added as an outer ASGI middleware so the headers land on every response the middleware
+stack produces, including the auth middleware's 401/429.
+
+One response escapes it: an unhandled exception. Starlette gives an ``Exception``
+handler to ``ServerErrorMiddleware``, which sits outside every user middleware, so that
+500 is built above this wrapper. ``errors.py`` applies ``SECURITY_HEADERS`` to it
+directly, which is why this is a module-level constant and not private to the class.
 """
 
 from starlette.datastructures import MutableHeaders

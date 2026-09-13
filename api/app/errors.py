@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.log import log, request_id
+from app.security import SECURITY_HEADERS
 
 
 class ErrorBody(BaseModel):
@@ -85,13 +86,22 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def unhandled(request: Request, exc: Exception) -> JSONResponse:
         # Anything not deliberately raised: keep the uniform envelope (never leak the
         # exception text/traceback to the client) and log it with request context.
+        rid = request_id(request)
         log.exception(
             "unhandled_error method=%s path=%s request_id=%s",
             request.method,
             request.url.path,
-            request_id(request),
+            rid,
         )
+        # This handler is the one response the middleware stack never sees. Starlette
+        # hands an Exception handler to ServerErrorMiddleware, which wraps *everything*,
+        # so the 500 is built outside SecurityHeadersMiddleware and outside
+        # RequestContextMiddleware's send wrapper. Both sets of headers are therefore
+        # applied here, from the same constants, or a 500 would go out with no nosniff,
+        # no frame-ancestors and no request id -- the last being the id a user quotes
+        # when reporting the error.
         return JSONResponse(
             status_code=500,
             content=error_envelope("internal", "internal server error"),
+            headers={**SECURITY_HEADERS, "X-Request-ID": rid},
         )
