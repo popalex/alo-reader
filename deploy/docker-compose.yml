@@ -47,6 +47,11 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.api
+      args:
+        # Stamped into /api/v1/healthz, the OpenAPI document and every OTel span.
+        # Unset, a self-hosted build reports 0.0.0+dev forever; set it to the tag
+        # you are deploying. CI passes 0.0.0+<sha>.
+        APP_VERSION: ${APP_VERSION:-0.0.0+dev}
     command: ["migrate"]
     restart: "no"
     env_file:
@@ -66,6 +71,11 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.api
+      args:
+        # Stamped into /api/v1/healthz, the OpenAPI document and every OTel span.
+        # Unset, a self-hosted build reports 0.0.0+dev forever; set it to the tag
+        # you are deploying. CI passes 0.0.0+<sha>.
+        APP_VERSION: ${APP_VERSION:-0.0.0+dev}
     command: ["api"]
     restart: unless-stopped
     env_file:
@@ -108,6 +118,11 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.api
+      args:
+        # Stamped into /api/v1/healthz, the OpenAPI document and every OTel span.
+        # Unset, a self-hosted build reports 0.0.0+dev forever; set it to the tag
+        # you are deploying. CI passes 0.0.0+<sha>.
+        APP_VERSION: ${APP_VERSION:-0.0.0+dev}
     command: ["worker"]
     # unless-stopped (not on-failure): the worker also exits non-zero on an
     # unexpected crash (see worker/main.py), so this recovers a crashed poller
