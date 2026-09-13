@@ -13,6 +13,10 @@
 # working tree. Anything a gate genuinely needs to produce goes to /out, which is
 # ./api read-write — see `make lock`, which chowns what it writes back to the
 # invoking user.
+#
+# The repo root is also mounted read-only at /repo (ALO_REPO_ROOT), because a
+# couple of gates assert against files that live above ./api — .env.example has to
+# stay in step with the Settings class.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -28,6 +32,8 @@ exec docker run --rm --network host \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v "$PWD/api:/src:ro" \
   -v "$PWD/api:/out" \
+  -v "$PWD:/repo:ro" \
+  -e ALO_REPO_ROOT=/repo \
   -e TESTCONTAINERS_RYUK_DISABLED=true \
   -e ALO_TEST_PG_IMAGE="${ALO_TEST_PG_IMAGE:-alo-reader-postgres:local}" \
   -e PYTHONDONTWRITEBYTECODE=1 \
