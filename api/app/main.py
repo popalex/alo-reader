@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager, suppress
 
 from fastapi import APIRouter, FastAPI
 
-from app import telemetry
+from app import sentry, telemetry
 from app.auth import AuthMiddleware
 from app.auth import router as auth_router
 from app.config import get_settings, validate_boot_config
@@ -29,6 +29,15 @@ from app.routes.streams import router as streams_router
 from app.routes.subscriptions import router as subscriptions_router
 from app.security import SecurityHeadersMiddleware
 from app.version import APP_VERSION
+
+# The API process had no logging configuration at all: uvicorn configures its own
+# uvicorn.* loggers and leaves root at WARNING with no handlers, so every INFO line the
+# app logged went nowhere and WARNING/ERROR only escaped through logging's lastResort
+# fallback, unformatted. basicConfig here mirrors what the worker already does at its
+# own import. It does not fight uvicorn (whose loggers do not propagate) and it does not
+# replace the OTLP handler, which telemetry.enable_log_export() attaches in the lifespan:
+# stdout and Loki both get the records.
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 log = logging.getLogger("alo.api")
 
@@ -70,6 +79,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # uvicorn.* loggers and the api's logs actually reach Loki.
     if telemetry.is_enabled():
         telemetry.enable_log_export()
+    # Sentry is initialised at import (below), but anything it logged there went
+    # nowhere: uvicorn installs its logging config after the module is imported, so an
+    # INFO line at import time is dropped. Say it here instead, where it is visible,
+    # because "is error reporting actually on?" is a question operators ask.
+    if sentry.is_enabled():
+        log.info("sentry_enabled service=alo-api release=%s", APP_VERSION)
     refresher = asyncio.create_task(_gauge_refresh_loop()) if telemetry.is_enabled() else None
     try:
         yield
@@ -103,6 +118,12 @@ if os.getenv("OTEL_ENABLED", "").strip().lower() in ("1", "true", "yes", "on"):
         app=app,
         engine=get_engine(),
     )
+
+# Sentry, independently of the above: either, both, or neither can be on. Gated on the
+# raw env var for the same reason telemetry is -- importing the app for a test or the
+# openapi dump must not construct Settings, which requires DATABASE_URL.
+if os.getenv("SENTRY_DSN", "").strip():
+    sentry.configure_sentry(service_name="alo-api", version=app.version)
 
 api_v1 = APIRouter(prefix="/api/v1")
 

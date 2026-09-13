@@ -51,6 +51,18 @@ class Settings(BaseSettings):
     # Same-origin path the browser posts spans to (Caddy proxies /otlp → collector).
     otel_traces_url: str = "/otlp/v1/traces"
 
+    # Sentry error reporting. Empty DSN = off, which is the default and the whole
+    # switch: no rebuild, no extra to install. Deliberately PARALLEL to OpenTelemetry
+    # rather than a replacement for it -- OTel keeps owning traces, metrics and log
+    # export to Loki, and Sentry only groups and alerts on errors. That is why the
+    # sample rate below defaults to 0: two tracing systems in one process means double
+    # instrumentation and two bills for the same spans.
+    sentry_dsn: str = ""
+    # Tags events so staging and production don't share an issue stream.
+    sentry_environment: str = ""
+    # Sentry's own tracing. Leave at 0 unless you are deliberately not using Tempo.
+    sentry_traces_sample_rate: float = 0.0
+
     # AUTH_MODE has deliberately no default: the server refuses to boot without
     # an explicit choice (DESIGN.md §0.1 — "none" must never be implicit).
     auth_mode: str | None = None

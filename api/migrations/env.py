@@ -12,7 +12,13 @@ from app.models import Base
 
 config = context.config
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # disable_existing_loggers defaults to True, which switches off every logger that
+    # already exists -- including "alo.api" and "worker". Harmless for the `migrate`
+    # container, which is a one-shot process that then exits, but the test suite runs
+    # command.upgrade() in-process, so the app's loggers were silently dead for the
+    # rest of every session and anything asserting on log output failed for reasons
+    # that had nothing to do with it.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 
