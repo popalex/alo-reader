@@ -30,6 +30,15 @@ from app.routes.subscriptions import router as subscriptions_router
 from app.security import SecurityHeadersMiddleware
 from app.version import APP_VERSION
 
+# The API process had no logging configuration at all: uvicorn configures its own
+# uvicorn.* loggers and leaves root at WARNING with no handlers, so every INFO line the
+# app logged went nowhere and WARNING/ERROR only escaped through logging's lastResort
+# fallback, unformatted. basicConfig here mirrors what the worker already does at its
+# own import. It does not fight uvicorn (whose loggers do not propagate) and it does not
+# replace the OTLP handler, which telemetry.enable_log_export() attaches in the lifespan:
+# stdout and Loki both get the records.
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+
 log = logging.getLogger("alo.api")
 
 # How often the SQL-derived gauges (worker lag, table/db sizes) are refreshed into
