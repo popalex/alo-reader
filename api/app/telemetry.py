@@ -41,7 +41,12 @@ def _db_span_name(statement: str) -> str | None:
 
 # Loggers whose records we ship to Loki via OTLP. uvicorn's loggers set
 # propagate=False, so the handler must be attached to them directly.
-_LOG_EXPORT_LOGGERS = ("alo.api", "worker", "uvicorn", "uvicorn.error", "uvicorn.access")
+# Loggers the OTLP handler is attached to. No entry may be an ancestor of another:
+# Python walks a record up the logger tree, so a handler on both "uvicorn" and
+# "uvicorn.error" exports every uvicorn.error record twice. "uvicorn" is therefore
+# absent -- uvicorn logs through uvicorn.error and uvicorn.access, and both are here.
+# test_telemetry_loggers.py enforces the no-ancestor rule.
+_LOG_EXPORT_LOGGERS = ("alo.api", "worker", "uvicorn.error", "uvicorn.access")
 
 
 class _HealthLogFilter(logging.Filter):
@@ -235,7 +240,18 @@ def configure_telemetry(
     # to the uvicorn.* loggers, which replaces their handlers and would drop one added now.
     # enable_log_export() (from the API lifespan + the worker) attaches it once logging has
     # settled, so the api's access/app logs actually reach Loki.
-    LoggingInstrumentor().instrument(tracer_provider=tracer_provider, inject_trace_context=True)
+    # enable_log_auto_instrumentation=False is load-bearing. Left at its default of
+    # true, LoggingInstrumentor attaches a LoggingHandler of its own to the ROOT logger
+    # that also exports to the logger provider. Every record from the loggers below then
+    # reaches the provider twice -- once from its own handler, once after propagating to
+    # root -- and every line is stored and billed twice in Loki. We attach handlers
+    # explicitly instead (see enable_log_export), because uvicorn's dictConfig would
+    # drop a handler added at import time.
+    LoggingInstrumentor().instrument(
+        tracer_provider=tracer_provider,
+        inject_trace_context=True,
+        enable_log_auto_instrumentation=False,
+    )
     log_handler = LoggingHandler(level=logging.INFO, logger_provider=logger_provider)
     log_handler.addFilter(_HealthLogFilter())
 
