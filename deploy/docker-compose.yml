@@ -17,8 +17,23 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile.caddy
     restart: unless-stopped
+    environment:
+      # Caddy's site address. Empty means :80, plain HTTP, which is what `make up`
+      # and CI want. Set it to a hostname you control and Caddy issues and renews a
+      # Let's Encrypt certificate on first request (see deploy/Caddyfile).
+      ALO_SITE_ADDRESS: ${ALO_SITE_ADDRESS:-:80}
     ports:
       - "80:80"
+      # Only listened on once ALO_SITE_ADDRESS names a host, but published either
+      # way: the ACME challenge needs both ports reachable, and publishing 443
+      # unused costs nothing.
+      - "443:443"
+    volumes:
+      # Issued certificates and the ACME account key. This has to survive a
+      # container recreate. Without it every `make up` re-issues, and Let's Encrypt
+      # caps duplicate certificates at 5 per week.
+      - caddy_data:/data
+      - caddy_config:/config
     depends_on:
       # Wait until the API reports healthy before proxying, so a cold start never
       # serves 502s from Caddy while uvicorn is still booting.
@@ -137,3 +152,5 @@ services:
 
 volumes:
   pgdata:
+  caddy_data:
+  caddy_config:

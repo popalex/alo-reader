@@ -1,6 +1,23 @@
 # Production / `make up`: serve the built SPA and reverse-proxy the API.
-# Listens on :80 (HTTP). Automatic TLS on a real domain is wired in WP-16.
-:80 {
+#
+# The site address comes from ALO_SITE_ADDRESS. Unset, it is `:80` — plain HTTP,
+# which is what `make up`, CI and a laptop want. Set it to a hostname you control
+# and Caddy obtains and renews a Let's Encrypt certificate on first request, then
+# redirects HTTP to HTTPS. That is the whole TLS setup; there is no certificate to
+# copy and no renewal cron. Requirements are DNS already pointing here and ports
+# 80 and 443 reachable, because the ACME challenge uses both.
+#
+# Certificates live in Caddy's /data, which docker-compose.yml keeps in a named
+# volume. Losing that volume means re-issuing on every container recreate, and
+# Let's Encrypt rate-limits duplicate certificates to 5 per week.
+#
+# The ACME account is anonymous, which is Caddy's default and is valid. There is
+# deliberately no ACME_EMAIL variable: both `tls` and the global `email` option
+# reject an empty argument, so an optional env-driven address cannot be expressed
+# here without a placeholder that expands to a whole directive. If you want the
+# expiry warnings, add a global options block at the top of this file:
+#     { email you@example.com }
+{$ALO_SITE_ADDRESS::80} {
 	encode gzip
 
 	# Same-origin OTLP/HTTP endpoint for browser tracing (only used when the OTel
