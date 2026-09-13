@@ -15,8 +15,13 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# The Makefile passes --env-file .env the same way, and for the same reason:
+# compose reads deploy/.env otherwise. Omitted when there is no .env, because
+# compose errors on a missing one.
 COMPOSE_ENV=()
-[[ -f .env ]] && COMPOSE_ENV=(--env-file .env)
+if [[ -f .env ]]; then
+	COMPOSE_ENV=(--env-file .env)
+fi
 DC=(docker compose "${COMPOSE_ENV[@]}" -f deploy/docker-compose.yml)
 
 assume_yes=false

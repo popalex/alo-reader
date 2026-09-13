@@ -115,9 +115,9 @@ scripts/restore.sh --latest -y  # no prompt, for a drill
 It stops the app, restores, and starts it again. It replaces everything in the
 database, so it asks you to type the database name first.
 
-**Drill it before you need it.** A backup nobody has restored is a guess. Restore
-into a scratch stack and check the row counts, not just that the command exited
-zero.
+**Drill it before you need it.** A backup nobody has restored is a guess.
+[`deploy/BACKUP.md`](deploy/BACKUP.md) has the drill, the variables, and the
+things to check that a row count would not catch.
 
 Moving to managed Postgres later is a `DATABASE_URL` change.
 
