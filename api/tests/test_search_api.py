@@ -285,3 +285,38 @@ async def test_feed_name_match_respects_subscription_and_tenant(
 
     hits = {e["id"] for e in (await search(api_client, pat_user, "all", "alpha")).json()["entries"]}
     assert hits == set(mine)
+
+
+async def test_a_listing_cursor_in_a_search_is_not_a_500(
+    api_client: httpx.AsyncClient, pat_user: PatUser
+) -> None:
+    # Cursors are opaque free-form query params, and the listing path hands out a
+    # composite "<micros>:<id>". Carrying one into a ?q= request used to hit a bare
+    # int() and raise into the catch-all handler: a 500 for a stale URL.
+    _, ids = await seed(
+        pat_user.user_id,
+        [{"title": f"entry {i}", "content_html": "<p>shared word</p>"} for i in range(3)],
+    )
+    listing = await api_client.get(
+        f"{BASE}/all/entries", params={"limit": 1}, headers=pat_user.headers
+    )
+    cursor = listing.json()["next_cursor"]
+    assert ":" in cursor  # the composite shape this test is about
+
+    resp = await search(api_client, pat_user, "all", "shared", cursor=cursor)
+
+    assert resp.status_code == 200
+    returned = [e["id"] for e in resp.json()["entries"]]
+    assert returned and max(returned) < max(ids)  # the id half of the cursor was applied
+
+
+async def test_a_junk_cursor_in_a_search_is_the_first_page(
+    api_client: httpx.AsyncClient, pat_user: PatUser
+) -> None:
+    await seed(
+        pat_user.user_id,
+        [{"title": "a", "content_html": "<p>shared word</p>"} for _ in range(2)],
+    )
+    resp = await search(api_client, pat_user, "all", "shared", cursor="not-a-cursor")
+    assert resp.status_code == 200
+    assert len(resp.json()["entries"]) == 2

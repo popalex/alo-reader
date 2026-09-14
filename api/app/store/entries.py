@@ -210,6 +210,20 @@ def _decode_cursor(cursor: str) -> tuple[datetime, int] | None:
         return None
 
 
+def _decode_search_cursor(cursor: str | None) -> int | None:
+    """Last-seen id from a search cursor; ``None`` (first page) if unparseable.
+
+    Tolerates the listing path's composite ``"<micros>:<id>"`` cursor, which a client
+    can carry across into a search request."""
+    if not cursor:
+        return None
+    _, sep, id_str = cursor.rpartition(":")
+    try:
+        return int(id_str if sep else cursor)
+    except ValueError:
+        return None
+
+
 def _paginate_by_recency[S: Select[Any]](stmt: S, cursor: str | None, limit: int) -> S:
     rec = _recency()
     decoded = _decode_cursor(cursor) if cursor else None
@@ -311,8 +325,12 @@ async def search_stream_page(
     """
     parsed = stream if isinstance(stream, Stream) else parse_stream(stream)
     # Search stays strictly id-desc (rum index-driven, §4.1.4), so its cursor is just
-    # the last id — parse it out of the opaque cursor string.
-    cursor_id = int(cursor) if cursor else None
+    # the last id. Cursors are opaque free-form query params, and the listing path hands
+    # out a composite "<micros>:<id>" that a client can carry into a ?q= request, so
+    # parse defensively: the id after the separator when there is one, and first page on
+    # anything unparseable, matching _decode_cursor. A bare int() here raised into the
+    # catch-all handler and returned 500 for what is at worst a stale URL.
+    cursor_id = _decode_search_cursor(cursor)
     es = aliased(EntryState)
     tsquery = func.websearch_to_tsquery(_ENGLISH, q)
     snippet = func.ts_headline(
