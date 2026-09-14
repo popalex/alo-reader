@@ -239,3 +239,24 @@ async def test_signed_json_scalar_acknowledged(
     # rather than raising on .get().
     response = await post_event(api_client, webhook_secret, json.dumps("nope"))
     assert response.status_code == 204
+
+
+async def test_update_after_delete_does_not_resurrect_the_account(
+    api_client: httpx.AsyncClient, webhook_secret: str
+) -> None:
+    # svix retries for up to a day and does not guarantee ordering, so a user.updated
+    # can land after user.deleted. Creating the row from it rebuilds the local identity
+    # of an account that no longer exists, and the next JWT carrying that sub would
+    # sign in against it.
+    await post_event(
+        api_client, webhook_secret, user_event("user.created", "user_gone", "gone@example.com")
+    )
+    await post_event(api_client, webhook_secret, user_event("user.deleted", "user_gone"))
+
+    late = await post_event(
+        api_client, webhook_secret, user_event("user.updated", "user_gone", "new@example.com")
+    )
+
+    assert late.status_code == 204  # acknowledged, so svix stops retrying
+    async with app_db.get_sessionmaker()() as s:
+        assert await users_store.get_by_clerk_id(s, "user_gone") is None

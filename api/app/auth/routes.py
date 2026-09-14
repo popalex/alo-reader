@@ -144,11 +144,17 @@ async def clerk_webhook(request: Request, session: Session) -> None:
     if event_type in ("user.created", "user.updated"):
         email = _primary_email(data)
         user = await users_store.get_by_clerk_id(session, clerk_user_id)
-        if user is None:
-            await users_store.create(session, clerk_user_id=clerk_user_id, email=email)
-        else:
+        if user is not None:
             user.email = email
             await session.flush()
+        elif event_type == "user.created":
+            await users_store.create(session, clerk_user_id=clerk_user_id, email=email)
+        # A user.updated for a row we do not have is dropped rather than created.
+        # svix retries for a day and does not guarantee order, so an update landing
+        # after the delete would otherwise rebuild the local identity of an account
+        # that no longer exists, and the next JWT carrying that sub would sign in
+        # against it. A live user missing locally is handled where it belongs: the
+        # JWT path auto-provisions on the next request.
     elif event_type == "user.deleted":
         user = await users_store.get_by_clerk_id(session, clerk_user_id)
         if user is not None:
