@@ -4,10 +4,11 @@ used by the claim loop, the maintenance loop, and the pipeline so the format can
 
 import logging
 
+from app.logfmt import line
+
 log = logging.getLogger("worker")
 
 
 def emit(event: str, **fields: object) -> None:
     """Emit a structured ``event key=value …`` line to the worker log."""
-    tail = " ".join(f"{k}={v}" for k, v in fields.items())
-    log.info("%s %s", event, tail)
+    log.info("%s", line(event, **fields))

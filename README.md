@@ -38,7 +38,10 @@ make otel-down    # stop the OTel stack
 ```
 
 See [`deploy/observability/README.md`](deploy/observability/README.md) for the
-topology, what's exported, and the dashboards.
+topology, what's exported, and the dashboards. The overlay also provisions three
+alerts (worker lag, 5xx rate, disk) and pushes them to Pushover once your keys are in
+`.env`; [`docs/ALERTS.md`](docs/ALERTS.md) covers the thresholds, the setup, and what
+to do when one fires.
 
 Gates (each runs in the toolchain container; `make venv` exists only to give an
 editor something to point at):

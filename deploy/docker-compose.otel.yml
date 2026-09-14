@@ -57,6 +57,13 @@ services:
         condition: service_started
     volumes:
       - ./observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      # Read-only host mounts for the unix exporter's filesystem collector, which is
+      # where the disk alert gets its numbers. rslave propagates mounts made after the
+      # container started, so a volume added later is still measured. Nothing is
+      # written, and only the filesystem collector runs (see config.alloy).
+      - /:/host/root:ro,rslave
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
 
   otel-lgtm:
     image: grafana/otel-lgtm:0.28.0
@@ -73,6 +80,11 @@ services:
       # your external URL in prod (e.g. https://example.com/grafana/).
       GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3000/grafana/}
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      # Pushover credentials for the alert floor (see alerting/notifications.yml).
+      # Unset means the contact point still provisions and alerts still show in
+      # Grafana; only delivery fails, and Grafana logs Pushover's own rejection.
+      ALO_PUSHOVER_USER_KEY: ${ALO_PUSHOVER_USER_KEY:-unset}
+      ALO_PUSHOVER_API_TOKEN: ${ALO_PUSHOVER_API_TOKEN:-unset}
     ports:
       # Loopback only — reachable from the host (localhost:3001) or an SSH tunnel, never a
       # public interface. Public access goes through Caddy's /grafana route instead.
@@ -83,6 +95,13 @@ services:
       # "alo-reader" Grafana folder (whole dir mounted read-only).
       - ./observability/dashboards:/otel-lgtm/grafana/dashboards/alo-reader:ro
       - ./observability/provisioning.yml:/otel-lgtm/grafana/conf/provisioning/dashboards/alo-reader.yml:ro
+      # The alert floor (worker lag, 5xx rate, disk). File-provisioned rules are
+      # read-only in the Grafana UI on purpose: they survive every container recreate
+      # exactly as written. Thresholds live in the file; see docs/ALERTS.md.
+      - ./observability/alerting/alo-floor.yml:/otel-lgtm/grafana/conf/provisioning/alerting/alo-floor.yml:ro
+      # The address and the routing that reaches it. Without the policy half, alerts
+      # fire into the image's default "empty" receiver and nobody hears anything.
+      - ./observability/alerting/notifications.yml:/otel-lgtm/grafana/conf/provisioning/alerting/notifications.yml:ro
 
 volumes:
   otel-lgtm-data:

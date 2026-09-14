@@ -140,6 +140,8 @@ svix==2.5.0
     # via alo-reader-api (pyproject.toml)
 testcontainers==4.14.2
     # via alo-reader-api (pyproject.toml)
+types-pyyaml==6.0.12.20260906
+    # via alo-reader-api (pyproject.toml)
 typing-extensions==4.16.0
     # via
     #   alembic

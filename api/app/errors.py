@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.log import log, request_id
+from app.logfmt import line
 from app.security import SECURITY_HEADERS
 
 
@@ -88,10 +89,13 @@ def register_exception_handlers(app: FastAPI) -> None:
         # exception text/traceback to the client) and log it with request context.
         rid = request_id(request)
         log.exception(
-            "unhandled_error method=%s path=%s request_id=%s",
-            request.method,
-            request.url.path,
-            rid,
+            "%s",
+            line(
+                "unhandled_error",
+                method=request.method,
+                path=request.url.path,
+                request_id=rid,
+            ),
         )
         # This handler is the one response the middleware stack never sees. Starlette
         # hands an Exception handler to ServerErrorMiddleware, which wraps *everything*,

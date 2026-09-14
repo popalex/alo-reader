@@ -35,3 +35,33 @@ otelcol.exporter.otlp "lgtm" {
     }
   }
 }
+
+// ── Host filesystem metrics ──────────────────────────────────────────────────
+// Disk is the one alert in the floor (see docs/ALERTS.md) that the app cannot report on
+// itself: Postgres has no SQL for free space, and by the time the volume is full the
+// database is refusing writes and the backup sidecar is writing truncated dumps. So
+// the collector runs the unix exporter's filesystem collector over the host's mounts,
+// read-only, and forwards it down the same OTLP pipeline as everything else.
+prometheus.exporter.unix "host" {
+  rootfs_path = "/host/root"
+  procfs_path = "/host/proc"
+  sysfs_path  = "/host/sys"
+
+  // Filesystems only. The full default set adds ~40 collectors (cpu, netdev, hwmon,
+  // thermal…) that nothing here alerts on or charts.
+  set_collectors = ["filesystem"]
+}
+
+prometheus.scrape "host" {
+  targets         = prometheus.exporter.unix.host.targets
+  forward_to      = [otelcol.receiver.prometheus.host.receiver]
+  scrape_interval = "30s"
+}
+
+// Bridge: Prometheus-format scrape → OTLP, so host metrics reach otel-lgtm the same
+// way the api and worker metrics do, with no second write path to configure.
+otelcol.receiver.prometheus "host" {
+  output {
+    metrics = [otelcol.processor.batch.applications.input]
+  }
+}

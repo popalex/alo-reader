@@ -44,6 +44,24 @@ browser SPA ──/otlp/v1/traces──▶ Caddy ──▶ otel-collector (Alloy
 Dashboards under `dashboards/` auto-provision into an **alo-reader** Grafana folder; drop
 a new `*.json` there to add one.
 
+## Alerts
+
+`alerting/alo-floor.yml` provisions three rules into the same folder: worker lag, API
+5xx rate, and host disk free. They are file-provisioned, so the Grafana UI shows them
+read-only and they survive every container recreate.
+
+`alerting/notifications.yml` is where they go: a Pushover contact point taking its
+credentials from `ALO_PUSHOVER_USER_KEY` / `ALO_PUSHOVER_API_TOKEN`, plus the policy
+that routes to it. The policy half is not optional, because the otel-lgtm image's
+default route points at a receiver named `empty`. Set both keys in `.env` and alerts
+arrive as a push on your phone; leave them unset and they stay in Grafana. Thresholds,
+reasoning, a runbook per alert and how to swap the channel:
+[`docs/ALERTS.md`](../../docs/ALERTS.md).
+
+The disk numbers are the reason the collector mounts `/`, `/proc` and `/sys` read-only:
+Postgres has no SQL for free space, so the unix exporter's filesystem collector runs in
+Alloy and its metrics ride the same OTLP pipeline as everything else.
+
 ## Notes
 
 - **Edge / CDN**: the browser posts to `/otlp` same-origin through Caddy (the app never

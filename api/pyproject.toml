@@ -53,6 +53,9 @@ dev = [
     "testcontainers[postgres]==4.14.2",
     "ruff==0.15.20",
     "mypy==2.2.0",
+    # Stubs only. pyyaml itself is a runtime dep (feedparser pulls it); the alert-rule
+    # test is what reads YAML directly, and mypy refuses an untyped import under strict.
+    "types-pyyaml==6.0.12.20260906",
 ]
 
 [build-system]

@@ -1,0 +1,48 @@
+# Where a firing alert goes: a push notification on the owner's phone.
+#
+# Two halves, and both are needed. The contact point is the Pushover account, taken
+# from .env (Grafana expands environment variables in provisioning files). The policy
+# is the routing, and it is not optional here: the otel-lgtm image ships a default
+# route pointing at a receiver named "empty", so alerts evaluate, fire, and go
+# nowhere. Provisioning a contact point alone changes a destination nothing routes to.
+#
+# Pushover rather than email because these three alerts fire when the box is sick, and
+# a push arrives now rather than whenever you next open your mail. Grafana speaks
+# Pushover natively, so there is no webhook template to escape by hand.
+#
+# Cost of provisioning the policy: Grafana marks it read-only in the UI. To route
+# somewhere else, edit this file, or drop the mount from docker-compose.otel.yml and
+# take over in the UI. See docs/ALERTS.md.
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: alo-pushover
+    receivers:
+      - uid: alo-owner-pushover
+        type: pushover
+        settings:
+          # From pushover.net: the user key is on the dashboard, the API token comes
+          # from an application you register there (call it alo-reader).
+          userKey: ${ALO_PUSHOVER_USER_KEY}
+          apiToken: ${ALO_PUSHOVER_API_TOKEN}
+          # 1 = high: red, and it ignores your quiet hours, which is the point of
+          # sending it to a phone. Resolved messages come in at -1 so the all-clear
+          # never wakes anyone.
+          #
+          # For 2 (emergency, retries until you acknowledge) set retry and expire in
+          # seconds as well, e.g. retry: "60", expire: "3600". Overkill for a feed
+          # reader; the right call for something that pages a rota.
+          priority: "1"
+          okPriority: "-1"
+
+policies:
+  - orgId: 1
+    receiver: alo-pushover
+    group_by: [grafana_folder, alertname]
+    # Batch the first burst, then stay quiet: one push 30s after a rule fires, at most
+    # one more every 5 minutes while new alerts join the group, and a reminder twice a
+    # day for as long as it keeps firing.
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 12h
