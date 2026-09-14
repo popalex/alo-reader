@@ -80,17 +80,11 @@ services:
       # your external URL in prod (e.g. https://example.com/grafana/).
       GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3000/grafana/}
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
-      # Alert email. ALO_ALERT_EMAIL is the address the floor notifies (see
-      # contact-points.yml); the GF_SMTP_* block is the server that carries it. With
-      # SMTP off, alerts still show in Grafana and nothing is delivered.
-      ALO_ALERT_EMAIL: ${ALO_ALERT_EMAIL:-alerts@localhost.localdomain}
-      GF_SMTP_ENABLED: ${GRAFANA_SMTP_ENABLED:-false}
-      GF_SMTP_HOST: ${GRAFANA_SMTP_HOST:-localhost:587}
-      GF_SMTP_USER: ${GRAFANA_SMTP_USER:-}
-      GF_SMTP_PASSWORD: ${GRAFANA_SMTP_PASSWORD:-}
-      GF_SMTP_FROM_ADDRESS: ${GRAFANA_SMTP_FROM_ADDRESS:-alo-reader@localhost.localdomain}
-      GF_SMTP_FROM_NAME: ${GRAFANA_SMTP_FROM_NAME:-alo-reader}
-      GF_SMTP_STARTTLS_POLICY: ${GRAFANA_SMTP_STARTTLS_POLICY:-OpportunisticStartTLS}
+      # Pushover credentials for the alert floor (see alerting/notifications.yml).
+      # Unset means the contact point still provisions and alerts still show in
+      # Grafana; only delivery fails, and Grafana logs Pushover's own rejection.
+      ALO_PUSHOVER_USER_KEY: ${ALO_PUSHOVER_USER_KEY:-unset}
+      ALO_PUSHOVER_API_TOKEN: ${ALO_PUSHOVER_API_TOKEN:-unset}
     ports:
       # Loopback only — reachable from the host (localhost:3001) or an SSH tunnel, never a
       # public interface. Public access goes through Caddy's /grafana route instead.
