@@ -1,0 +1,163 @@
+# The alert floor: the three alarms a self-hosted alo-reader should have before it
+# carries anyone's reading. Provisioned into Grafana's "alo-reader" folder by the OTel
+# compose overlay, which mounts this file into Grafana's alerting provisioning dir.
+#
+# Rationale, thresholds and what to do when one fires: docs/ALERTS.md.
+#
+# Editing: change a threshold in the evaluator params below and restart the otel-lgtm
+# container. Rules provisioned from a file cannot be edited in the Grafana UI, which is
+# the point. They come back identically on every recreate.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: floor
+    folder: alo-reader
+    interval: 1m
+    rules:
+      # ── Worker lag ───────────────────────────────────────────────────────────
+      # alo_worker_lag_seconds is the age of the oldest feed that is due and
+      # unclaimed, so it reads 0 in the steady state and climbs the moment the
+      # worker stops draining. A 1k-feed backlog drains in about 6 seconds (WP-15
+      # load test), and the shortest per-feed interval is 900s, so a sustained 300s
+      # is well past normal jitter without waiting a whole poll cycle to notice.
+      #
+      # The api computes this gauge, not the worker, which is what makes a dead
+      # worker visible at all. It also means no data here is itself a failure: the
+      # api is down, or telemetry stopped reaching the collector. Hence NoData
+      # alerts rather than resolving.
+      - uid: alo-worker-lag
+        title: Worker lag
+        condition: THRESHOLD
+        for: 10m
+        labels:
+          severity: page
+          service: alo-worker
+        annotations:
+          summary: The feed worker is not draining its queue
+          description: >-
+            The oldest due-but-unclaimed feed has been waiting over 5 minutes for
+            10 minutes straight. Feeds are going stale. See docs/ALERTS.md#worker-lag.
+        noDataState: Alerting
+        execErrState: Alerting
+        data:
+          - refId: QUERY
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              refId: QUERY
+              expr: max(alo_worker_lag_seconds)
+              instant: true
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: THRESHOLD
+            datasourceUid: __expr__
+            model:
+              refId: THRESHOLD
+              type: threshold
+              expression: QUERY
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [300]
+
+      # ── API 5xx rate ─────────────────────────────────────────────────────────
+      # Share of API responses that are 5xx, in percent. /healthz is excluded from
+      # instrumentation (telemetry.py excluded_urls), so probes do not pad the
+      # denominator and hide a burst on a quiet instance.
+      #
+      # No traffic means no ratio, which is not a fault, so NoData resolves here.
+      # A 404 storm or a rate-limited client stays out of this by construction:
+      # only 5xx counts, because only 5xx is the server's fault.
+      - uid: alo-api-5xx
+        title: API 5xx rate
+        condition: THRESHOLD
+        for: 10m
+        labels:
+          severity: page
+          service: alo-api
+        annotations:
+          summary: The API is returning server errors
+          description: >-
+            Over 5% of API responses have been 5xx for 10 minutes. Every one of them
+            is a request a reader lost. See docs/ALERTS.md#api-5xx-rate.
+        noDataState: OK
+        execErrState: Alerting
+        data:
+          - refId: QUERY
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              refId: QUERY
+              expr: >-
+                100 * sum(rate(http_server_duration_milliseconds_count{service_name="alo-api",http_status_code=~"5.."}[5m]))
+                / sum(rate(http_server_duration_milliseconds_count{service_name="alo-api"}[5m]))
+              instant: true
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: THRESHOLD
+            datasourceUid: __expr__
+            model:
+              refId: THRESHOLD
+              type: threshold
+              expression: QUERY
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [5]
+
+      # ── Disk ─────────────────────────────────────────────────────────────────
+      # Free space on the least free real filesystem, in percent. Pseudo and boot
+      # filesystems are filtered out; what is left includes whichever filesystem
+      # holds /var/lib/docker, and therefore the Postgres volume and the backups.
+      #
+      # 15% because a full disk is not a gradual failure: Postgres starts refusing
+      # writes, the nightly pg_dump writes a dump it then rejects, and the recovery
+      # is manual. At 15% on a small VPS there is still room to purge and breathe.
+      #
+      # NoData resolves: the numbers come from the collector's host mounts, which a
+      # non-Linux Docker host may not expose. Flip to Alerting once you have
+      # confirmed the panel has data (docs/ALERTS.md#disk).
+      - uid: alo-disk-free
+        title: Disk free
+        condition: THRESHOLD
+        for: 15m
+        labels:
+          severity: page
+          service: host
+        annotations:
+          summary: A host filesystem is nearly full
+          description: >-
+            Less than 15% free for 15 minutes. Postgres stops accepting writes on a
+            full disk and the nightly backup stops producing usable dumps.
+            See docs/ALERTS.md#disk.
+        noDataState: OK
+        execErrState: Alerting
+        data:
+          - refId: QUERY
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 900
+              to: 0
+            model:
+              refId: QUERY
+              expr: >-
+                min(100 * node_filesystem_avail_bytes{fstype!~"tmpfs|ramfs|vfat|squashfs|overlay|iso9660"}
+                / node_filesystem_size_bytes{fstype!~"tmpfs|ramfs|vfat|squashfs|overlay|iso9660"})
+              instant: true
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: THRESHOLD
+            datasourceUid: __expr__
+            model:
+              refId: THRESHOLD
+              type: threshold
+              expression: QUERY
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [15]

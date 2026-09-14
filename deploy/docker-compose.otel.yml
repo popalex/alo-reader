@@ -90,6 +90,10 @@ services:
       # "alo-reader" Grafana folder (whole dir mounted read-only).
       - ./observability/dashboards:/otel-lgtm/grafana/dashboards/alo-reader:ro
       - ./observability/provisioning.yml:/otel-lgtm/grafana/conf/provisioning/dashboards/alo-reader.yml:ro
+      # The alert floor (worker lag, 5xx rate, disk). File-provisioned rules are
+      # read-only in the Grafana UI on purpose: they survive every container recreate
+      # exactly as written. Thresholds live in the file; see docs/ALERTS.md.
+      - ./observability/alerting/alo-floor.yml:/otel-lgtm/grafana/conf/provisioning/alerting/alo-floor.yml:ro
 
 volumes:
   otel-lgtm-data:
