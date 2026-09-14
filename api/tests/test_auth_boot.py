@@ -40,6 +40,35 @@ def test_boot_refuses_empty_auth_mode(boot_env: pytest.MonkeyPatch) -> None:
 @pytest.mark.parametrize("mode", ["clerk", "none"])
 def test_boot_accepts_valid_modes(boot_env: pytest.MonkeyPatch, mode: str) -> None:
     boot_env.setenv("AUTH_MODE", mode)
+    boot_env.setenv("CLERK_ISSUER", "https://app.clerk.accounts.dev")
+    boot_env.setenv("CLERK_WEBHOOK_SECRET", "whsec_x")
+    get_settings.cache_clear()
+    validate_boot_config()  # must not raise
+
+
+@pytest.mark.parametrize(
+    ("issuer", "secret"),
+    [("", "whsec_x"), ("app.clerk.accounts.dev", "whsec_x"), ("https://app.clerk.dev", "")],
+)
+def test_clerk_mode_refuses_incomplete_config(
+    boot_env: pytest.MonkeyPatch, issuer: str, secret: str
+) -> None:
+    # Both settings fail silently at runtime: an empty issuer makes the JWKS URL
+    # relative, so every sign-in is a 401 with nothing in the log, and an empty
+    # webhook secret 500s every delivery until Clerk stops retrying, leaving local
+    # rows with no email and no deletions.
+    boot_env.setenv("AUTH_MODE", "clerk")
+    boot_env.setenv("CLERK_ISSUER", issuer)
+    boot_env.setenv("CLERK_WEBHOOK_SECRET", secret)
+    get_settings.cache_clear()
+    with pytest.raises(SystemExit, match="AUTH_MODE=clerk is missing"):
+        validate_boot_config()
+
+
+def test_none_mode_ignores_clerk_config(boot_env: pytest.MonkeyPatch) -> None:
+    boot_env.setenv("AUTH_MODE", "none")
+    boot_env.setenv("CLERK_ISSUER", "")
+    boot_env.setenv("CLERK_WEBHOOK_SECRET", "")
     get_settings.cache_clear()
     validate_boot_config()  # must not raise
 

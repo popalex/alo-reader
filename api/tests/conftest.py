@@ -32,6 +32,11 @@ from testcontainers.postgres import PostgresContainer  # type: ignore[import-unt
 # Ambient auth mode for the suite; `AUTH_MODE=clerk pytest api` overrides it.
 # Tests that depend on a specific mode pin it via the `set_auth_mode` fixture.
 os.environ.setdefault("AUTH_MODE", "none")
+# Boot validation requires these whenever the mode is clerk, so the whole suite can
+# run under AUTH_MODE=clerk (the CI matrix does). Tests that exercise Clerk build
+# their own ClerkSettings; these only have to be present and well-formed.
+os.environ.setdefault("CLERK_ISSUER", "https://clerk.test.invalid")
+os.environ.setdefault("CLERK_WEBHOOK_SECRET", "whsec_dGVzdC1zZWNyZXQtZm9yLXRoZS1zdWl0ZQ==")
 
 from app import db as app_db  # noqa: E402
 from app.config import get_settings  # noqa: E402

@@ -70,7 +70,10 @@ class Settings(BaseSettings):
 
     # Per-user token-bucket rate limit (DESIGN.md §1.4): refill rate and burst
     # capacity, per API replica.
-    rate_limit_rps: float = 10.0
+    # Must be > 0. At 0 a bucket never refills, which the idle-pruning in
+    # auth/ratelimit.py cannot express: it sweeps a drained bucket after the prune
+    # interval and recreates it full, silently resetting the limit it was enforcing.
+    rate_limit_rps: float = Field(default=10.0, gt=0)
     rate_limit_burst: int = 30
 
     # Per-IP token bucket applied BEFORE authentication (bounds the pre-auth cost of
@@ -78,7 +81,7 @@ class Settings(BaseSettings):
     # bogus Clerk token). Deliberately looser than the per-user bucket so an
     # authenticated user still hits the per-user limit first. Keyed on the real client
     # IP that Caddy injects (X-Real-IP); see AuthMiddleware. Per API replica.
-    rate_limit_ip_rps: float = 50.0
+    rate_limit_ip_rps: float = Field(default=50.0, gt=0)
     rate_limit_ip_burst: int = 120
 
     # Minimum spacing between manual /subscriptions/{id}/refresh calls per feed
@@ -186,11 +189,37 @@ def get_settings() -> Settings:
 
 
 def validate_boot_config() -> None:
-    """Refuse to boot without an explicit, valid AUTH_MODE (DESIGN.md §0.1)."""
+    """Refuse to boot without an explicit, valid AUTH_MODE (DESIGN.md §0.1), or
+    without the Clerk settings that mode needs to work at all."""
     mode = get_settings().auth_mode
     if mode not in AUTH_MODES:
         raise SystemExit(
             f"AUTH_MODE must be set to one of {'|'.join(AUTH_MODES)} (got {mode!r}). "
             "There is no default: 'none' disables auth entirely and must only be "
             "used behind a private network (see DESIGN.md §0.1)."
+        )
+    if mode == "clerk":
+        _validate_clerk_config()
+
+
+def _validate_clerk_config() -> None:
+    """Both of these fail silently when unset, which is the reason to check them here.
+
+    An empty issuer makes the JWKS URL relative, so every sign-in returns 401 with
+    nothing in the log to explain it. An empty webhook secret makes every delivery
+    500 until Clerk gives up retrying, and the local rows then never learn an email
+    address and never hear about a deleted account."""
+    from app.auth.clerk import ClerkSettings  # local: config must not import auth
+
+    clerk = ClerkSettings()
+    missing = []
+    if not clerk.issuer.startswith(("http://", "https://")):
+        missing.append(
+            f"CLERK_ISSUER must be your Clerk frontend API origin (got {clerk.issuer!r})"
+        )
+    if not clerk.webhook_secret:
+        missing.append("CLERK_WEBHOOK_SECRET must be the svix signing secret (whsec_...)")
+    if missing:
+        raise SystemExit(
+            "AUTH_MODE=clerk is missing required configuration:\n  - " + "\n  - ".join(missing)
         )
