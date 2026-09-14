@@ -40,12 +40,15 @@ read the next morning. Setup is three steps.
 2. Register an application at pushover.net/apps/build (call it `alo-reader`). That
    gives you an **API token**. 10,000 messages a month are free, and this alert floor
    sends single digits.
-3. Put both in `.env` and recreate the `otel-lgtm` container:
+3. Put both in `.env` at the repo root and recreate the `otel-lgtm` container
+   (`make otel-up`). These two lines are the whole configuration:
 
 ```sh
-ALO_PUSHOVER_USER_KEY=...
-ALO_PUSHOVER_API_TOKEN=...
+ALO_PUSHOVER_USER_KEY=uQiRzp...   # dashboard
+ALO_PUSHOVER_API_TOKEN=azGDOR...  # the application you made
 ```
+
+Then run `./scripts/test-alerts.sh` (see [Proving they work](#proving-they-work)).
 
 Grafana expands those into the contact point in
 [`alerting/notifications.yml`](../deploy/observability/alerting/notifications.yml).
@@ -189,20 +192,34 @@ healthy disk.
 
 Do this once, on purpose, before you rely on them.
 
-**Any rule, in one minute.** Copy a rule through the provisioning API with a threshold
-it already breaches and `for: 0s`, watch it fire, then delete it. This tests the query,
-the evaluator and the delivery path without waiting for a real outage:
-
 ```sh
-curl -u admin:admin http://localhost:3001/grafana/api/v1/provisioning/alert-rules
-# POST a copy with a loose threshold and X-Disable-Provenance: true, then DELETE it
+./scripts/test-alerts.sh
 ```
 
-**Worker lag, for real.** Stop the worker and backdate the schedule:
+Two stages. It posts straight to Pushover with the keys from `.env`, which separates
+wrong keys from wrong wiring, then creates a temporary rule that breaches immediately so
+Grafana notifies through the same contact point and policy the real alerts use. Deleting
+the rule sends the resolved notification, so you see both ends. Expect two pushes, three
+counting the credential check. `--no-probe` skips the first stage.
+
+It fails loudly and specifically: Pushover's own rejection when a key is wrong (a bad
+token usually means the user key was pasted in its place), or the delivery error from
+Grafana's log when the notification itself fails. The temporary rule is removed on the
+way out, including when the script exits early.
+
+The one thing no script can check is whether your phone actually buzzed. Pushover's own
+notification log at pushover.net is the place to confirm that.
+
+### The real failures, for real
+
+Worth doing at least once, since it exercises the queries rather than the plumbing.
+
+**Worker lag.** Stop the worker and backdate the schedule:
 
 ```sh
-docker compose ... stop worker
-docker compose ... exec postgres psql -U alo -d alo \
+docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.otel.yml stop worker
+docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.otel.yml \
+  exec postgres psql -U alo -d alo \
   -c "update feeds set next_check_at = now() - interval '30 minutes';"
 ```
 
@@ -210,5 +227,5 @@ The gauge climbs within about a minute (the api samples it every 15s, the collec
 exports every 60s) and the rule fires ten minutes later. Start the worker again and it
 drains back to 0.
 
-**5xx, for real.** Stop Postgres and hit an endpoint that needs it. Every request comes
-back 500 with the uniform envelope, and the ratio crosses 5% almost immediately.
+**5xx.** Stop Postgres and hit an endpoint that needs it. Every request comes back 500
+with the uniform envelope, and the ratio crosses 5% almost immediately.
