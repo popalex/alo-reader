@@ -19,7 +19,11 @@ PROBE=1
 read_env() {
 	[[ -f $ENV_FILE ]] || return 0
 	# Last uncommented assignment wins, quotes stripped: the same precedence compose uses.
-	grep -E "^[[:space:]]*$1=" "$ENV_FILE" | tail -1 | cut -d= -f2- | sed -e 's/^["'\'']//' -e 's/["'\'']$//'
+	# The `|| true` is load-bearing. Without it a key that is simply absent makes grep
+	# exit 1, which under `set -e` kills the script mid-assignment, before it can print
+	# the message explaining what is missing.
+	{ grep -E "^[[:space:]]*$1=" "$ENV_FILE" || true; } | tail -1 | cut -d= -f2- |
+		sed -e 's/^["'\'']//' -e 's/["'\'']$//'
 }
 
 USER_KEY="${ALO_PUSHOVER_USER_KEY:-$(read_env ALO_PUSHOVER_USER_KEY)}"
@@ -85,6 +89,23 @@ trap cleanup EXIT
                          "conditions":[{"evaluator":{"type":"gt","params":[0]}}]}}]}' \
 	"${GRAFANA}/api/v1/provisioning/alert-rules"
 
+# Grafana's alertmanager records the last delivery attempt per integration, which is
+# the only authoritative answer to "did it actually send". Remember where it stands
+# before the test so a stale attempt from an earlier run cannot be mistaken for ours.
+notify_state() {
+	"${CURL[@]}" "${GRAFANA}/api/alertmanager/grafana/config/api/v1/receivers" |
+		python3 -c '
+import json, sys
+for receiver in json.load(sys.stdin):
+    for integration in receiver.get("integrations", []):
+        if receiver["name"] == sys.argv[1]:
+            print(integration.get("lastNotifyAttempt", ""), integration.get("lastNotifyAttemptError", ""), sep="\t")
+' "$RECEIVER"
+}
+
+RECEIVER="${RECEIVER:-alo-pushover}"
+before=$(notify_state | cut -f1)
+
 state=""
 for _ in $(seq 1 24); do
 	sleep 5
@@ -101,24 +122,38 @@ if [[ $state != firing ]]; then
 	echo "     on its own tick, so try again, or look at Alerting > Alert rules." >&2
 	exit 1
 fi
-echo "     Rule is firing. The push goes out ~30s later (group_wait)."
-sleep 45
+echo "     Rule is firing. Waiting for Grafana to send (group_wait is 30s)..."
 
-# Grafana logs a delivery failure rather than surfacing it in the API, so read the log
-# if the container is reachable. Absence of an error is the only success signal there
-# is: Pushover cannot be asked whether the phone buzzed.
-if command -v docker >/dev/null && docker ps --format '{{.Names}}' | grep -q '^deploy-otel-lgtm-1$'; then
-	failures=$(docker exec deploy-otel-lgtm-1 sh -c \
-		'grep -i "Notify for alerts failed" /otel-lgtm/grafana/data/log/grafana.log | tail -2' 2>/dev/null || true)
-	if [[ -n $failures ]]; then
-		echo "     Grafana logged a delivery failure:" >&2
-		echo "$failures" | cut -c1-300 >&2
-		exit 1
-	fi
-	echo "     No delivery errors in Grafana's log."
+# Poll until the attempt timestamp moves. Deleting the rule any earlier cancels the
+# pending notification, which is how an earlier version of this script managed to
+# report success without anything being sent.
+attempt=""
+error=""
+for _ in $(seq 1 30); do
+	sleep 5
+	IFS=$'\t' read -r attempt error < <(notify_state)
+	[[ -n $attempt && $attempt != "$before" ]] && break
+done
+
+if [[ -z $attempt || $attempt == "$before" ]]; then
+	echo "     Grafana never attempted a delivery. Check that the notification policy" >&2
+	echo "     routes to ${RECEIVER} (Alerting > Notification policies)." >&2
+	exit 1
 fi
 
+if [[ -n $error ]]; then
+	echo "     Delivery failed: $error" >&2
+	echo "     Wrong keys are the usual cause; ./scripts/test-alerts.sh without" >&2
+	echo "     --no-probe checks them against Pushover directly." >&2
+	exit 1
+fi
+
+echo "     Grafana delivered it at ${attempt} with no error."
+
 echo
-echo "Done. Expect two notifications: the firing one, and the resolved one as the"
-echo "test rule is deleted now. If they did not arrive, check Pushover's own"
-echo "notification log at pushover.net, then docs/ALERTS.md."
+echo "Done. One push now, the one Grafana just confirmed. A second follows about five"
+echo "minutes later: deleting the test rule does not resolve the alert, it lets it"
+echo "expire, and the resolved notification goes out on that timeout."
+echo
+echo "Grafana can only vouch for the handoff to Pushover. If your phone stayed quiet,"
+echo "pushover.net's own notification log says whether the message reached a device."

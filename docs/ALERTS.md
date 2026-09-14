@@ -202,9 +202,16 @@ Grafana notifies through the same contact point and policy the real alerts use. 
 the rule sends the resolved notification, so you see both ends. Expect two pushes, three
 counting the credential check. `--no-probe` skips the first stage.
 
+Expect one push while it runs and a second about five minutes later: deleting the test
+rule does not resolve the alert, it lets it expire, and the resolved notification goes
+out on that timeout.
+
 It fails loudly and specifically: Pushover's own rejection when a key is wrong (a bad
-token usually means the user key was pasted in its place), or the delivery error from
-Grafana's log when the notification itself fails. The temporary rule is removed on the
+token usually means the user key was pasted in its place), or Grafana's recorded
+delivery error when the notification itself fails. One error worth recognising is a bare
+`webhook response status 400 Bad Request` with credentials that work by hand. That is
+Pushover refusing a malformed field, and the field is almost always `priority` quoted as
+a string in `notifications.yml` instead of written as a number. The temporary rule is removed on the
 way out, including when the script exits early.
 
 The one thing no script can check is whether your phone actually buzzed. Pushover's own
