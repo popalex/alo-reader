@@ -5,9 +5,12 @@ grace period + entry cascade, and every branch of the DESIGN.md §0.3/§4 retent
 rule. Rows are aged with direct UPDATEs to stand in for elapsed time.
 """
 
+import asyncio
 import random
 from datetime import UTC, datetime, timedelta
 
+import pytest
+from pydantic import ValidationError
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -286,3 +289,42 @@ def test_next_wait_clamped_non_negative() -> None:
     )
     rng = random.Random(1)
     assert all(next_wait(settings, rng) >= 0.0 for _ in range(200))
+
+
+async def test_retention_purge_stops_when_asked_to(api_db: str) -> None:
+    # A 90-day backlog is hundreds of batches. Without a stop check between them a
+    # SIGTERM cannot drain the worker: gather never returns, telemetry is never
+    # flushed, and the container is SIGKILLed on the compose grace period.
+    sf = app_db.get_sessionmaker()
+    async with sf() as s, s.begin():
+        user = await factories.make_user(s)
+        feed = await factories.make_feed(s)
+        await factories.make_subscription(s, user, feed)
+        entries = await factories.add_entries(s, feed, 6)
+        user_id, feed_id = user.id, feed.id
+    for e in entries:
+        await _age_entry(sf, e.id, 100)
+        await _set_state(sf, user_id, e.id, read=True)
+
+    settings = Settings(
+        database_url="postgresql+asyncpg://x/y",
+        auth_mode="none",
+        retention_purge_batch_size=2,
+    )
+    stop = asyncio.Event()
+    stop.set()  # already stopping: one batch may be in flight, no more may start
+    _, purged = await run_maintenance(sf, settings=settings, stop=stop)
+
+    assert purged <= 2, "purge kept going after stop was set"
+    assert len(await _surviving_ids(sf, feed_id)) >= 4
+
+
+def test_zero_purge_batch_size_is_rejected() -> None:
+    # At 0 the purge deletes nothing, never satisfies `n < batch`, and spins on the
+    # database forever. Refuse it at config load instead.
+    with pytest.raises(ValidationError):
+        Settings(
+            database_url="postgresql+asyncpg://x/y",
+            auth_mode="none",
+            retention_purge_batch_size=0,
+        )
