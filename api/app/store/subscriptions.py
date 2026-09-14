@@ -4,6 +4,7 @@ from collections.abc import Sequence
 
 from sqlalchemy import Row, func, select
 from sqlalchemy import delete as sql_delete
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Entry, EntryState, Feed, Icon, Subscription
@@ -126,5 +127,16 @@ async def delete(session: AsyncSession, user_id: int, sub_id: int) -> bool:
         )
     else:
         # Nobody left subscribed → delete the feed; entries + read/star state cascade.
-        await session.execute(sql_delete(Feed).where(Feed.id == feed_id))
+        #
+        # Under READ COMMITTED the count above cannot see an uncommitted concurrent
+        # subscribe, so the DELETE can block on that transaction's row lock and then
+        # fail the foreign key check when it commits. Without the savepoint that error
+        # poisons this transaction and the unsubscribe 500s, having already removed the
+        # subscription row. Inside one, losing the race just means the feed now has a
+        # subscriber again and keeping it is the right outcome.
+        try:
+            async with session.begin_nested():
+                await session.execute(sql_delete(Feed).where(Feed.id == feed_id))
+        except IntegrityError:
+            pass
     return True

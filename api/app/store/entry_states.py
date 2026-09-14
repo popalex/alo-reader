@@ -12,7 +12,7 @@ from sqlalchemy import case, literal, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Entry, EntryState
+from app.models import Entry, EntryState, Subscription
 from app.store import rowcount
 
 
@@ -39,11 +39,21 @@ async def upsert(
         is_starred=bool(is_starred) if is_starred is not None else False,
         changed_at=changed_at,
     )
+    # Same tie rule as apply_state_batch: strictly newer overwrites, equal biases the
+    # flag to true so a replayed offline write can never downgrade one. The two writers
+    # sit on the same table, so disagreeing here would make the merge order-dependent.
+    strictly_newer = EntryState.changed_at < stmt.excluded.changed_at
     set_: dict[str, object] = {"changed_at": stmt.excluded.changed_at}
     if is_read is not None:
-        set_["is_read"] = stmt.excluded.is_read
+        set_["is_read"] = case(
+            (strictly_newer, stmt.excluded.is_read),
+            else_=or_(EntryState.is_read, stmt.excluded.is_read),
+        )
     if is_starred is not None:
-        set_["is_starred"] = stmt.excluded.is_starred
+        set_["is_starred"] = case(
+            (strictly_newer, stmt.excluded.is_starred),
+            else_=or_(EntryState.is_starred, stmt.excluded.is_starred),
+        )
     stmt = stmt.on_conflict_do_update(
         index_elements=["user_id", "entry_id"],
         set_=set_,
@@ -74,13 +84,23 @@ async def apply_state_batch(
     if not entry_ids or (is_read is None and is_starred is None):
         return 0
 
-    src = select(
-        literal(user_id).label("user_id"),
-        Entry.id.label("entry_id"),
-        literal(bool(is_read)).label("is_read"),
-        literal(bool(is_starred)).label("is_starred"),
-        literal(changed_at).label("changed_at"),
-    ).where(Entry.id.in_(entry_ids))
+    # Scoped to the caller's subscriptions, not just to the ids they sent. Without the
+    # join, POST /entries/state accepts any id in the instance, and since the starred
+    # stream matches on entry_states alone (a star deliberately outlives unsubscribing),
+    # starring a range of ids turns into a read of entries the caller never subscribed
+    # to: title, url, summary, feed_title, and a ts_headline snippet of the content.
+    # Ids outside the subscription are dropped the same way non-existent ids are.
+    src = (
+        select(
+            literal(user_id).label("user_id"),
+            Entry.id.label("entry_id"),
+            literal(bool(is_read)).label("is_read"),
+            literal(bool(is_starred)).label("is_starred"),
+            literal(changed_at).label("changed_at"),
+        )
+        .join(Subscription, Subscription.feed_id == Entry.feed_id)
+        .where(Entry.id.in_(entry_ids), Subscription.user_id == user_id)
+    )
     stmt = pg_insert(EntryState).from_select(
         ["user_id", "entry_id", "is_read", "is_starred", "changed_at"], src
     )

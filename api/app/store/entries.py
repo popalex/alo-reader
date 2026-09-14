@@ -210,6 +210,20 @@ def _decode_cursor(cursor: str) -> tuple[datetime, int] | None:
         return None
 
 
+def _decode_search_cursor(cursor: str | None) -> int | None:
+    """Last-seen id from a search cursor; ``None`` (first page) if unparseable.
+
+    Tolerates the listing path's composite ``"<micros>:<id>"`` cursor, which a client
+    can carry across into a search request."""
+    if not cursor:
+        return None
+    _, sep, id_str = cursor.rpartition(":")
+    try:
+        return int(id_str if sep else cursor)
+    except ValueError:
+        return None
+
+
 def _paginate_by_recency[S: Select[Any]](stmt: S, cursor: str | None, limit: int) -> S:
     rec = _recency()
     decoded = _decode_cursor(cursor) if cursor else None
@@ -311,8 +325,12 @@ async def search_stream_page(
     """
     parsed = stream if isinstance(stream, Stream) else parse_stream(stream)
     # Search stays strictly id-desc (rum index-driven, §4.1.4), so its cursor is just
-    # the last id — parse it out of the opaque cursor string.
-    cursor_id = int(cursor) if cursor else None
+    # the last id. Cursors are opaque free-form query params, and the listing path hands
+    # out a composite "<micros>:<id>" that a client can carry into a ?q= request, so
+    # parse defensively: the id after the separator when there is one, and first page on
+    # anything unparseable, matching _decode_cursor. A bare int() here raised into the
+    # catch-all handler and returned 500 for what is at worst a stale URL.
+    cursor_id = _decode_search_cursor(cursor)
     es = aliased(EntryState)
     tsquery = func.websearch_to_tsquery(_ENGLISH, q)
     snippet = func.ts_headline(
@@ -346,9 +364,17 @@ async def search_stream_page(
     # in feed membership is no longer a pure `@@`, so the rum index can't drive the
     # id ordering and we fall back to a sort — acceptable because it only happens
     # when a query matches a *subscribed feed's name* (rare). The common case stays
-    # on the rum index.
+    # on the rum index. The subscription join is what makes that sentence true:
+    # unscoped, any feed title anywhere in the instance pushed this user onto the sort
+    # path, and the materialized id list grew with the whole feeds table toward the
+    # 65535 bind-parameter ceiling instead of with one user's subscriptions. Isolation
+    # was never at risk — _apply_stream scopes the outer query — only the cost was.
     feed_ids = (
-        await session.scalars(select(Feed.id).where(Feed.search_tsv.op("@@")(tsquery)))
+        await session.scalars(
+            select(Feed.id)
+            .join(Subscription, Subscription.feed_id == Feed.id)
+            .where(Feed.search_tsv.op("@@")(tsquery), Subscription.user_id == user_id)
+        )
     ).all()
 
     if feed_ids:
@@ -433,9 +459,17 @@ async def mark_read_bounded(
         ),
         user_id,
         parsed,
+        # "all" so an already-read entry is still visited (the upsert below counts
+        # only the ones it flips), but the pre-subscription archive stays out of it:
+        # those entries were never unread, so marking them writes a state row per
+        # archived entry and inflates the returned count, which is documented as
+        # entries newly flipped from unread to read. The starred stream has no
+        # subscription row to bound against and does not need one.
         status="all",
         es=es,
     )
+    if parsed.kind != "starred":
+        src = src.where(Entry.id > Subscription.since_entry_id)
     if max_entry_id is not None:
         src = src.where(Entry.id <= max_entry_id)
     stmt = pg_insert(EntryState).from_select(

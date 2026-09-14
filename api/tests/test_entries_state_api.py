@@ -6,6 +6,7 @@ import httpx
 
 from app import db as app_db
 from app.store import entry_states as states_store
+from app.store import subscriptions as subs_store
 from tests.apihelpers import seed_feed_with_entries
 
 from .conftest import PatUser, make_pat_user
@@ -130,15 +131,37 @@ async def test_state_too_many_ids_422(api_client: httpx.AsyncClient, pat_user: P
 async def test_state_cross_tenant_isolation(
     api_client: httpx.AsyncClient, pat_user: PatUser
 ) -> None:
-    _, ids = await seed_feed_with_entries(pat_user.user_id, 1)
+    feed_id, ids = await seed_feed_with_entries(pat_user.user_id, 1)
     entry_id = ids[0]
     # A marks it read.
     await api_client.post(STATE, json={"ids": [entry_id], "read": True}, headers=pat_user.headers)
 
-    # B sets its own state (read=false) on the same entry id.
+    # B subscribes to the same (globally deduped) feed and sets its own state.
     other = await make_pat_user("frank@example.com")
+    async with app_db.get_sessionmaker()() as s, s.begin():
+        await subs_store.create(s, other.user_id, feed_id=feed_id)
     await api_client.post(STATE, json={"ids": [entry_id], "read": False}, headers=other.headers)
 
     # Direct DB assertion: each user has their own row; B never touched A's.
     assert await _state(pat_user.user_id, entry_id) == (True, False)
     assert await _state(other.user_id, entry_id) == (False, False)
+
+
+async def test_state_on_an_unsubscribed_entry_is_dropped(
+    api_client: httpx.AsyncClient, pat_user: PatUser
+) -> None:
+    # Ids the caller has no subscription for are ignored, exactly like ids that do not
+    # exist. Otherwise starring a range of them turns the starred stream into a reader
+    # for feeds the caller never subscribed to: the stream matches on entry_states
+    # alone, because a star is meant to outlive unsubscribing.
+    _, ids = await seed_feed_with_entries(pat_user.user_id, 1)
+    other = await make_pat_user("mallory@example.com")
+
+    resp = await api_client.post(STATE, json={"ids": ids, "starred": True}, headers=other.headers)
+
+    assert resp.status_code == 200
+    assert resp.json()["updated"] == 0
+    assert await _state(other.user_id, ids[0]) is None
+    stream = await api_client.get("/api/v1/streams/starred/entries", headers=other.headers)
+    assert stream.status_code == 200
+    assert stream.json()["entries"] == []
