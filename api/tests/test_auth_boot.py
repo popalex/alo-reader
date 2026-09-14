@@ -42,16 +42,23 @@ def test_boot_accepts_valid_modes(boot_env: pytest.MonkeyPatch, mode: str) -> No
     boot_env.setenv("AUTH_MODE", mode)
     boot_env.setenv("CLERK_ISSUER", "https://app.clerk.accounts.dev")
     boot_env.setenv("CLERK_WEBHOOK_SECRET", "whsec_x")
+    boot_env.setenv("CLERK_PUBLISHABLE_KEY", "pk_test_x")
     get_settings.cache_clear()
     validate_boot_config()  # must not raise
 
 
 @pytest.mark.parametrize(
-    ("issuer", "secret"),
-    [("", "whsec_x"), ("app.clerk.accounts.dev", "whsec_x"), ("https://app.clerk.dev", "")],
+    ("issuer", "secret", "publishable"),
+    [
+        ("", "whsec_x", "pk_x"),
+        ("app.clerk.accounts.dev", "whsec_x", "pk_x"),  # no scheme
+        ("https://", "whsec_x", "pk_x"),  # scheme, no host
+        ("https://app.clerk.dev", "", "pk_x"),
+        ("https://app.clerk.dev", "whsec_x", ""),  # the SPA cannot boot without it
+    ],
 )
 def test_clerk_mode_refuses_incomplete_config(
-    boot_env: pytest.MonkeyPatch, issuer: str, secret: str
+    boot_env: pytest.MonkeyPatch, issuer: str, secret: str, publishable: str
 ) -> None:
     # Both settings fail silently at runtime: an empty issuer makes the JWKS URL
     # relative, so every sign-in is a 401 with nothing in the log, and an empty
@@ -60,6 +67,7 @@ def test_clerk_mode_refuses_incomplete_config(
     boot_env.setenv("AUTH_MODE", "clerk")
     boot_env.setenv("CLERK_ISSUER", issuer)
     boot_env.setenv("CLERK_WEBHOOK_SECRET", secret)
+    boot_env.setenv("CLERK_PUBLISHABLE_KEY", publishable)
     get_settings.cache_clear()
     with pytest.raises(SystemExit, match="AUTH_MODE=clerk is missing"):
         validate_boot_config()
@@ -69,6 +77,7 @@ def test_none_mode_ignores_clerk_config(boot_env: pytest.MonkeyPatch) -> None:
     boot_env.setenv("AUTH_MODE", "none")
     boot_env.setenv("CLERK_ISSUER", "")
     boot_env.setenv("CLERK_WEBHOOK_SECRET", "")
+    boot_env.setenv("CLERK_PUBLISHABLE_KEY", "")
     get_settings.cache_clear()
     validate_boot_config()  # must not raise
 
