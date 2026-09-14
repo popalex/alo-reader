@@ -30,19 +30,68 @@ collector, which runs the unix exporter's filesystem collector over read-only ho
 mounts (`/`, `/proc`, `/sys`, see `docker-compose.otel.yml`). Postgres has no SQL for
 free space, so there is no in-app way to get this.
 
-## Where the notifications go
+## Getting the mail
 
-Nowhere, until you say so. A firing rule turns red in Grafana and stops there, because
-the default contact point is an email address Grafana cannot send to without SMTP.
-A red panel nobody looks at is not an alert.
+Set two things in `.env` and the alerts arrive in your inbox:
 
-Pick one destination and wire it: **Alerting > Contact points > Add contact point**,
-then set it as the default in **Notification policies**. A webhook to Slack, Discord,
-ntfy or Pushover takes a URL and nothing else. For email, set `GF_SMTP_ENABLED=true`
-and the rest of Grafana's `GF_SMTP_*` variables on the `otel-lgtm` service.
+```sh
+ALO_ALERT_EMAIL=you@example.com        # who gets alerted
+GRAFANA_SMTP_ENABLED=true              # and the server that carries it
+GRAFANA_SMTP_HOST=smtp.example.com:587
+GRAFANA_SMTP_USER=...
+GRAFANA_SMTP_PASSWORD=...
+GRAFANA_SMTP_FROM_ADDRESS=alerts@yourdomain.com
+```
 
-Do this before you need it, then break something on purpose (below) and confirm the
-message arrives on your phone.
+`ALO_ALERT_EMAIL` lands in the contact point through
+[`alerting/notifications.yml`](../deploy/observability/alerting/notifications.yml),
+which Grafana expands from the environment. The `GRAFANA_SMTP_*` values become
+Grafana's own `GF_SMTP_*` settings. Recreate the `otel-lgtm` container to apply either.
+
+Four things that cost me time, so they are worth knowing up front:
+
+- **Routing is provisioned, not just the address.** The otel-lgtm image ships a default
+  route pointing at a receiver named `empty`, so alerts fire into a black hole. The
+  file provisions the policy as well, which is why email works out of the box. Grafana
+  then marks the policy read-only in the UI. To route somewhere else, edit the file, or
+  drop its mount from `docker-compose.otel.yml` and take the policy back in the UI.
+- **`GRAFANA_SMTP_FROM_ADDRESS` must be a valid address**, and one your SMTP account is
+  allowed to send as. Grafana refuses to start on a malformed one, and providers reject
+  a mismatched sender.
+- **Set `GRAFANA_ROOT_URL` to your public URL.** Every link in the alert mail is built
+  from it, so on the default it sends you to `localhost`.
+- **The mail is batched, not instant.** 30s after a rule fires, at most one more every
+  5 minutes while alerts join the group, then a reminder every 12 hours while it keeps
+  firing. Change `group_wait` / `repeat_interval` in the same file.
+
+### Five ways to send it
+
+Any SMTP server works. In rough order of how quickly you will have it running:
+
+1. **Gmail or Google Workspace with an app password.** `smtp.gmail.com:587`, your
+   address as the user, an app password (needs 2FA) as the password. Free, five minutes
+   of work, about 500 messages a day. Alerts are low volume, so the cap is irrelevant.
+2. **A transactional provider's free tier** (Resend, Brevo, Mailgun, Postmark,
+   SendGrid). SMTP credentials from the dashboard, roughly 100 to 300 messages a day
+   free, and deliverability is their business rather than yours. The one to pick if
+   alerts must not land in spam.
+3. **Your own mailbox provider** (Fastmail, Migadu, Zoho, Purelymail, or whoever hosts
+   the domain's mail). Same shape as Gmail, sends as `alerts@yourdomain`, and no extra
+   account anywhere.
+4. **Amazon SES.** Cheapest at volume and reliable, but you start in a sandbox that only
+   sends to verified addresses, and getting out of it means asking for production access.
+   Worth it only if you are already on AWS.
+5. **A relay on the host** (Postfix or msmtp as a satellite, pointed at any of the
+   above), with `GRAFANA_SMTP_HOST=host.docker.internal:25`. Useful when several
+   services on the box should share one set of credentials. Sending straight to the
+   internet from your own MTA is the version to avoid: most providers block port 25
+   outbound, and without SPF, DKIM and a matching PTR record the mail goes to spam.
+
+**The option I would actually take:** skip email and send alerts to your phone. Add a
+webhook contact point in Grafana pointing at [ntfy](https://ntfy.sh), Pushover, Slack,
+Discord or Telegram. No SMTP, no deliverability, no spam folder, and the alert arrives
+as a push notification instead of an email you read the next morning. Email is the
+better fallback of the two, not the better primary.
 
 ## Worker lag
 
@@ -148,7 +197,7 @@ Do this once, on purpose, before you rely on them.
 
 **Any rule, in one minute.** Copy a rule through the provisioning API with a threshold
 it already breaches and `for: 0s`, watch it fire, then delete it. This tests the query,
-the evaluator and your contact point without waiting for a real outage:
+the evaluator and the mail path without waiting for a real outage:
 
 ```sh
 curl -u admin:admin http://localhost:3001/grafana/api/v1/provisioning/alert-rules

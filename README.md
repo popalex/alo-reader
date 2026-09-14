@@ -39,8 +39,9 @@ make otel-down    # stop the OTel stack
 
 See [`deploy/observability/README.md`](deploy/observability/README.md) for the
 topology, what's exported, and the dashboards. The overlay also provisions three
-alerts (worker lag, 5xx rate, disk); [`docs/ALERTS.md`](docs/ALERTS.md) covers the
-thresholds, where to send the notifications, and what to do when one fires.
+alerts (worker lag, 5xx rate, disk) and mails them to `ALO_ALERT_EMAIL` once SMTP is
+configured; [`docs/ALERTS.md`](docs/ALERTS.md) covers the thresholds, the delivery
+options, and what to do when one fires.
 
 Gates (each runs in the toolchain container; `make venv` exists only to give an
 editor something to point at):

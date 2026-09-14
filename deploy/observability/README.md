@@ -48,9 +48,14 @@ a new `*.json` there to add one.
 
 `alerting/alo-floor.yml` provisions three rules into the same folder: worker lag, API
 5xx rate, and host disk free. They are file-provisioned, so the Grafana UI shows them
-read-only and they survive every container recreate. **Nothing is notified until you
-add a contact point** in Grafana. Thresholds, reasoning and a runbook per alert:
-[`docs/ALERTS.md`](../../docs/ALERTS.md).
+read-only and they survive every container recreate.
+
+`alerting/notifications.yml` is where they go: an email contact point taking its
+address from `ALO_ALERT_EMAIL`, plus the policy that routes to it. The policy half is
+not optional, because the otel-lgtm image's default route points at a receiver named
+`empty`. Set `ALO_ALERT_EMAIL` and the `GRAFANA_SMTP_*` block in `.env` and the alerts
+arrive as mail; leave SMTP off and they stay in Grafana. Thresholds, reasoning, a
+runbook per alert and five ways to send the mail: [`docs/ALERTS.md`](../../docs/ALERTS.md).
 
 The disk numbers are the reason the collector mounts `/`, `/proc` and `/sys` read-only:
 Postgres has no SQL for free space, so the unix exporter's filesystem collector runs in
