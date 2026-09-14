@@ -1,11 +1,13 @@
 """Unsubscribe cleanup: delete removes all of a feed when nobody's left, but keeps a
 shared feed (only dropping the leaving user's read/star state)."""
 
+import asyncio
 from datetime import UTC, datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import db as app_db
 from app.models import Entry, EntryState, Feed
 from app.store import entry_states as states_store
 from app.store import subscriptions as subs_store
@@ -53,3 +55,37 @@ async def test_delete_keeps_feed_with_other_subscribers(session: AsyncSession) -
     assert await _count(session, Entry, feed_id=feed.id) == 2
     assert await _count(session, EntryState, user_id=alice.id) == 0
     assert await _count(session, EntryState, user_id=bob.id) == 1
+
+
+async def test_unsubscribe_survives_a_concurrent_subscribe(api_db: str) -> None:
+    # The last subscriber leaving counts remaining = 0 without seeing an uncommitted
+    # concurrent subscribe, so the feed DELETE can hit a foreign key violation once
+    # that transaction commits. Unscoped, that error takes the whole unsubscribe with
+    # it: a 500, with the subscription row already gone.
+    sf = app_db.get_sessionmaker()
+    async with sf() as s, s.begin():
+        alice = await make_user(s, clerk_user_id="race_alice")
+        bob = await make_user(s, clerk_user_id="race_bob")
+        feed = await make_feed(s)
+        sub = await subs_store.create(s, alice.id, feed_id=feed.id)
+        alice_id, bob_id, feed_id, sub_id = alice.id, bob.id, feed.id, sub.id
+
+    # Bob subscribes in a transaction that is still open when Alice unsubscribes.
+    bob_session = sf()
+    await bob_session.begin()
+    await subs_store.create(bob_session, bob_id, feed_id=feed_id)
+
+    async def unsubscribe() -> bool:
+        async with sf() as s, s.begin():
+            return await subs_store.delete(s, alice_id, sub_id)
+
+    task = asyncio.create_task(unsubscribe())
+    await asyncio.sleep(0.2)  # let it reach the blocking DELETE
+    await bob_session.commit()
+    await bob_session.close()
+
+    assert await task is True
+    async with sf() as s:
+        assert await s.get(Feed, feed_id) is not None  # Bob's subscription kept it
+        assert await subs_store.count_for_user(s, bob_id) == 1
+        assert await subs_store.count_for_user(s, alice_id) == 0
