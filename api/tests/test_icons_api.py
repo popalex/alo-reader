@@ -172,3 +172,26 @@ async def test_a_failing_icon_write_does_not_discard_the_poll(api_db: str) -> No
         assert refreshed.icon_id is None  # the icon is what was lost
         assert refreshed.error_count == 0  # the poll was not
     assert await wutil.count_entries(sf, feed.id) == 1
+async def test_declared_icon_survives_an_oversized_home_page(api_db: str) -> None:
+    # The <link rel=icon> is in <head>, so a page over the cap is still usable. Without
+    # truncation guarded_get returns ok=False, the declared icon is thrown away after
+    # being downloaded in full, and the feed silently falls back to /favicon.ico.
+    settings = wutil.worker_settings(worker_fetch_favicons=True, discover_max_bytes=2048)
+    padding = b"<!--" + b"x" * 8192 + b"-->"
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        p = req.url.path
+        if p == "/":
+            body = b'<html><head><link rel="icon" href="/declared.png"></head><body>'
+            return httpx.Response(
+                200, headers={"content-type": "text/html"}, content=body + padding
+            )
+        if p == "/declared.png":
+            return httpx.Response(200, headers={"content-type": "image/png"}, content=PNG)
+        return httpx.Response(404)  # /favicon.ico is deliberately absent
+
+    favicon = await fetch_favicon(
+        "https://feed.example/", settings=settings, transport=httpx.MockTransport(handler)
+    )
+    assert favicon is not None
+    assert favicon.url == "https://feed.example/declared.png"
