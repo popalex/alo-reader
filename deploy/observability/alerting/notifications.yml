@@ -1,0 +1,40 @@
+# Where a firing alert goes: the owner's mailbox.
+#
+# Two halves, and both are needed. The contact point is the address, taken from
+# ALO_ALERT_EMAIL in .env (Grafana expands environment variables in provisioning
+# files). The policy is the routing, and it is not optional here: the otel-lgtm image
+# ships a default route pointing at a receiver named "empty", so alerts evaluate, fire,
+# and go nowhere. Overriding only the contact point changes an address nothing routes
+# to.
+#
+# The SMTP server that carries the mail is the otel-lgtm service's GF_SMTP_* block.
+# With SMTP off, alerts still show in Grafana and nothing is delivered.
+#
+# Cost of provisioning the policy: Grafana marks it read-only in the UI. To route
+# somewhere else, edit this file, or drop the mount from docker-compose.otel.yml and
+# take over in the UI. See docs/ALERTS.md.
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: grafana-default-email
+    receivers:
+      - uid: alo-owner-email
+        type: email
+        settings:
+          addresses: ${ALO_ALERT_EMAIL}
+          # One mail per notification, listing every alert in the group, rather than
+          # one mail per alert. A disk alert that fans out per filesystem should not
+          # arrive as six messages.
+          singleEmail: true
+
+policies:
+  - orgId: 1
+    receiver: grafana-default-email
+    group_by: [grafana_folder, alertname]
+    # Batch the first burst, then stay quiet: one mail 30s after a rule fires, at most
+    # one more every 5 minutes while new alerts join the group, and a reminder twice a
+    # day for as long as it keeps firing.
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 12h

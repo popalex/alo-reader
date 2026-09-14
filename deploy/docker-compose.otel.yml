@@ -80,6 +80,17 @@ services:
       # your external URL in prod (e.g. https://example.com/grafana/).
       GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3000/grafana/}
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      # Alert email. ALO_ALERT_EMAIL is the address the floor notifies (see
+      # contact-points.yml); the GF_SMTP_* block is the server that carries it. With
+      # SMTP off, alerts still show in Grafana and nothing is delivered.
+      ALO_ALERT_EMAIL: ${ALO_ALERT_EMAIL:-alerts@localhost.localdomain}
+      GF_SMTP_ENABLED: ${GRAFANA_SMTP_ENABLED:-false}
+      GF_SMTP_HOST: ${GRAFANA_SMTP_HOST:-localhost:587}
+      GF_SMTP_USER: ${GRAFANA_SMTP_USER:-}
+      GF_SMTP_PASSWORD: ${GRAFANA_SMTP_PASSWORD:-}
+      GF_SMTP_FROM_ADDRESS: ${GRAFANA_SMTP_FROM_ADDRESS:-alo-reader@localhost.localdomain}
+      GF_SMTP_FROM_NAME: ${GRAFANA_SMTP_FROM_NAME:-alo-reader}
+      GF_SMTP_STARTTLS_POLICY: ${GRAFANA_SMTP_STARTTLS_POLICY:-OpportunisticStartTLS}
     ports:
       # Loopback only — reachable from the host (localhost:3001) or an SSH tunnel, never a
       # public interface. Public access goes through Caddy's /grafana route instead.
@@ -94,6 +105,9 @@ services:
       # read-only in the Grafana UI on purpose: they survive every container recreate
       # exactly as written. Thresholds live in the file; see docs/ALERTS.md.
       - ./observability/alerting/alo-floor.yml:/otel-lgtm/grafana/conf/provisioning/alerting/alo-floor.yml:ro
+      # The address and the routing that reaches it. Without the policy half, alerts
+      # fire into the image's default "empty" receiver and nobody hears anything.
+      - ./observability/alerting/notifications.yml:/otel-lgtm/grafana/conf/provisioning/alerting/notifications.yml:ro
 
 volumes:
   otel-lgtm-data:
