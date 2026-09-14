@@ -66,9 +66,21 @@ class JwksCache:
         else:
             response = await client.get(self._url)
         response.raise_for_status()
+        try:
+            document = response.json()
+        except ValueError:  # a proxy's error page, say
+            document = {}
         keys: dict[str, jwt.PyJWK] = {}
-        for entry in response.json().get("keys", []):
-            key = jwt.PyJWK(entry)
+        for entry in document.get("keys", []) if isinstance(document, dict) else []:
+            # Skip what we cannot build instead of raising, exactly as PyJWT's own
+            # PyJWKSet does. One unusable entry in the issuer's document would
+            # otherwise fail every request, for every user, including the ones whose
+            # key parsed fine — and since _fetched_at stays unset on the failure path,
+            # every following request retries and fails the same way.
+            try:
+                key = jwt.PyJWK(entry)
+            except Exception:  # noqa: BLE001 — any malformed entry, whatever the shape
+                continue
             if key.key_id is not None:
                 keys[key.key_id] = key
         self._keys = keys
@@ -89,6 +101,7 @@ class JwksCache:
                 await self._refresh()
                 key = self._keys.get(kid)
         return key
+
 
 
 class ClerkProvider:
@@ -140,7 +153,13 @@ class ClerkProvider:
                 issuer=self._settings.issuer,
                 options=options,
             )
-        except jwt.InvalidTokenError:
+        except jwt.PyJWTError, TypeError, ValueError:
+            # PyJWTError covers the invalid-token family and the key-handling errors
+            # beside it (PyJWKError, InvalidKeyError), which are siblings rather than
+            # subclasses of InvalidTokenError. TypeError/ValueError catch the key
+            # preparation failures underneath: a JWKS entry whose type does not match
+            # the token's alg makes jwt.decode raise a bare "Expecting a PEM-formatted
+            # key", which used to escape as a 500 on an unauthenticated request.
             return None
         return dict(claims)
 
