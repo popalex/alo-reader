@@ -364,9 +364,17 @@ async def search_stream_page(
     # in feed membership is no longer a pure `@@`, so the rum index can't drive the
     # id ordering and we fall back to a sort — acceptable because it only happens
     # when a query matches a *subscribed feed's name* (rare). The common case stays
-    # on the rum index.
+    # on the rum index. The subscription join is what makes that sentence true:
+    # unscoped, any feed title anywhere in the instance pushed this user onto the sort
+    # path, and the materialized id list grew with the whole feeds table toward the
+    # 65535 bind-parameter ceiling instead of with one user's subscriptions. Isolation
+    # was never at risk — _apply_stream scopes the outer query — only the cost was.
     feed_ids = (
-        await session.scalars(select(Feed.id).where(Feed.search_tsv.op("@@")(tsquery)))
+        await session.scalars(
+            select(Feed.id)
+            .join(Subscription, Subscription.feed_id == Feed.id)
+            .where(Feed.search_tsv.op("@@")(tsquery), Subscription.user_id == user_id)
+        )
     ).all()
 
     if feed_ids:
