@@ -1,5 +1,6 @@
 """Clerk JWT verification against a mocked JWKS endpoint (httpx.MockTransport)."""
 
+import asyncio
 import json
 import time
 from collections.abc import AsyncIterator
@@ -15,7 +16,13 @@ from jwt.algorithms import RSAAlgorithm
 from sqlalchemy import func, select
 
 from app import db as app_db
-from app.auth.clerk import ClerkSettings
+from app.auth.clerk import (
+    JWKS_MISS_REFRESH_S,
+    JWKS_TTL_S,
+    ClerkSettings,
+    JwksCache,
+)
+from app.auth.provider import AuthUnavailable
 from app.auth.ratelimit import TokenBucket
 from app.auth.runtime import AuthRuntime, build_provider
 from app.main import app
@@ -220,7 +227,9 @@ async def test_a_key_that_cannot_verify_the_alg_is_a_401(
     # A JWKS entry whose type does not match the token's alg makes jwt.decode raise
     # a bare TypeError from key preparation, which is not an InvalidTokenError: it
     # used to escape as a 500 on an unauthenticated request.
-    document = {"keys": [{"kty": "oct", "kid": KID, "alg": "RS256", "k": "c2VjcmV0"}]}
+    # Builds fine as an HMAC key, then cannot verify an RS256 token: PyJWT raises a
+    # bare TypeError out of key preparation, which is not an InvalidTokenError.
+    document = {"keys": [{"kty": "oct", "kid": KID, "alg": "HS256", "k": "c2VjcmV0"}]}
 
     def handler(_request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json=document)
@@ -278,3 +287,109 @@ async def test_jwks_outage_is_503_not_a_sign_out(
     assert second.status_code == 503
     # The second request rode the failure cooldown instead of opening its own fetch.
     assert len(attempts) == 1
+
+
+async def test_rotated_kid_is_refetched_within_the_miss_window(
+    api_client: httpx.AsyncClient, api_db: str, rsa_key: rsa.RSAPrivateKey
+) -> None:
+    # Clerk rotates signing keys. The warm-cache refetch exists so a token signed by
+    # the new kid does not 401 for the rest of the hour-long TTL; an in-lock check
+    # against the TTL rather than the miss window turned it into a no-op.
+    old_jwk = json.loads(RSAAlgorithm.to_jwk(rsa_key.public_key()))
+    old_jwk.update({"kid": "kid-old", "alg": "RS256", "use": "sig"})
+    new_jwk = dict(old_jwk, kid=KID)
+    documents = [{"keys": [old_jwk]}, {"keys": [old_jwk, new_jwk]}]
+    fetches: list[int] = []
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        fetches.append(1)
+        return httpx.Response(200, json=documents[min(len(fetches) - 1, 1)])
+
+    http_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    cache = JwksCache(f"{ISSUER}/.well-known/jwks.json", http_client=http_client)
+    try:
+        assert await cache.get_key("kid-old") is not None  # cold fetch
+        cache._fetched_at = time.monotonic() - (JWKS_MISS_REFRESH_S + 1)  # noqa: SLF001
+        rotated = await cache.get_key(KID)
+    finally:
+        await http_client.aclose()
+
+    assert rotated is not None, "the rotated key was never refetched"
+    assert len(fetches) == 2
+
+
+async def test_an_outage_serves_the_keys_already_held(
+    api_client: httpx.AsyncClient, api_db: str, rsa_key: rsa.RSAPrivateKey
+) -> None:
+    # Keys in memory still verify the tokens they signed. Once the TTL lapsed, a
+    # refresh failure used to 503 the whole instance for the length of the outage.
+    jwk = json.loads(RSAAlgorithm.to_jwk(rsa_key.public_key()))
+    jwk.update({"kid": KID, "alg": "RS256", "use": "sig"})
+    fetches: list[int] = []
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        fetches.append(1)
+        if len(fetches) == 1:
+            return httpx.Response(200, json={"keys": [jwk]})
+        raise httpx.ConnectError("issuer unreachable")
+
+    http_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    cache = JwksCache(f"{ISSUER}/.well-known/jwks.json", http_client=http_client)
+    try:
+        assert await cache.get_key(KID) is not None
+        cache._fetched_at = time.monotonic() - (JWKS_TTL_S + 1)  # noqa: SLF001
+        during_outage = await cache.get_key(KID)
+    finally:
+        await http_client.aclose()
+
+    assert during_outage is not None, "held keys were discarded during an outage"
+
+
+async def test_an_empty_key_document_does_not_replace_a_good_cache(
+    api_client: httpx.AsyncClient, api_db: str, rsa_key: rsa.RSAPrivateKey
+) -> None:
+    jwk = json.loads(RSAAlgorithm.to_jwk(rsa_key.public_key()))
+    jwk.update({"kid": KID, "alg": "RS256", "use": "sig"})
+    documents: list[dict[str, object]] = [{"keys": [jwk]}, {"keys": []}]
+    fetches: list[int] = []
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        fetches.append(1)
+        return httpx.Response(200, json=documents[min(len(fetches) - 1, 1)])
+
+    http_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    cache = JwksCache(f"{ISSUER}/.well-known/jwks.json", http_client=http_client)
+    try:
+        assert await cache.get_key(KID) is not None
+        cache._fetched_at = time.monotonic() - (JWKS_TTL_S + 1)  # noqa: SLF001
+        after_empty = await cache.get_key(KID)
+    finally:
+        await http_client.aclose()
+
+    assert after_empty is not None, "an empty document wiped the working keys"
+
+
+async def test_a_failing_fetch_is_attempted_once_for_all_waiters(
+    api_client: httpx.AsyncClient, api_db: str
+) -> None:
+    # Every request that arrives during a failing fetch queues on the lock. Checking
+    # the cooldown only before the lock meant each waiter then ran its own fetch in
+    # turn, so an outage serialized into minutes of waiting.
+    fetches: list[int] = []
+
+    async def slow_failure(_request: httpx.Request) -> httpx.Response:
+        fetches.append(1)
+        await asyncio.sleep(0.05)
+        raise httpx.ConnectError("issuer unreachable")
+
+    http_client = httpx.AsyncClient(transport=httpx.MockTransport(slow_failure))
+    cache = JwksCache(f"{ISSUER}/.well-known/jwks.json", http_client=http_client)
+    try:
+        results = await asyncio.gather(
+            *(cache.get_key(KID) for _ in range(10)), return_exceptions=True
+        )
+    finally:
+        await http_client.aclose()
+
+    assert all(isinstance(r, AuthUnavailable) for r in results)
+    assert len(fetches) == 1, f"one fetch expected for ten waiters, got {len(fetches)}"

@@ -74,7 +74,7 @@ class Settings(BaseSettings):
     # auth/ratelimit.py cannot express: it sweeps a drained bucket after the prune
     # interval and recreates it full, silently resetting the limit it was enforcing.
     rate_limit_rps: float = Field(default=10.0, gt=0)
-    rate_limit_burst: int = 30
+    rate_limit_burst: int = Field(default=30, gt=0)
 
     # Per-IP token bucket applied BEFORE authentication (bounds the pre-auth cost of
     # the provider chain — a DB lookup for an invalid PAT, a JWT signature verify for a
@@ -82,7 +82,12 @@ class Settings(BaseSettings):
     # authenticated user still hits the per-user limit first. Keyed on the real client
     # IP that Caddy injects (X-Real-IP); see AuthMiddleware. Per API replica.
     rate_limit_ip_rps: float = Field(default=50.0, gt=0)
-    rate_limit_ip_burst: int = 120
+    rate_limit_ip_burst: int = Field(default=120, gt=0)
+    # The unauthenticated routes (icons, the Clerk webhook, /config) use their own
+    # per-IP bucket, far looser than the API one: a cold page load fetches one icon
+    # per subscription, so a shared bucket would 429 a large account's own images.
+    rate_limit_public_rps: float = Field(default=200.0, gt=0)
+    rate_limit_public_burst: int = Field(default=600, gt=0)
 
     # Minimum spacing between manual /subscriptions/{id}/refresh calls per feed
     # (per API replica), so a user can't hammer the poller.
@@ -203,22 +208,29 @@ def validate_boot_config() -> None:
 
 
 def _validate_clerk_config() -> None:
-    """Both of these fail silently when unset, which is the reason to check them here.
+    """These fail silently when unset, which is the reason to check them here.
 
     An empty issuer makes the JWKS URL relative, so every sign-in returns 401 with
     nothing in the log to explain it. An empty webhook secret makes every delivery
     500 until Clerk gives up retrying, and the local rows then never learn an email
     address and never hear about a deleted account."""
+    from urllib.parse import urlsplit
+
     from app.auth.clerk import ClerkSettings  # local: config must not import auth
 
     clerk = ClerkSettings()
     missing = []
-    if not clerk.issuer.startswith(("http://", "https://")):
+    parts = urlsplit(clerk.issuer)
+    if parts.scheme not in ("http", "https") or not parts.netloc:
         missing.append(
             f"CLERK_ISSUER must be your Clerk frontend API origin (got {clerk.issuer!r})"
         )
     if not clerk.webhook_secret:
         missing.append("CLERK_WEBHOOK_SECRET must be the svix signing secret (whsec_...)")
+    if not clerk.publishable_key:
+        # /api/v1/config hands this to the SPA, which renders a boot error without it:
+        # the API would come up in a mode nobody can sign in to.
+        missing.append("CLERK_PUBLISHABLE_KEY must be set (the SPA needs it to boot)")
     if missing:
         raise SystemExit(
             "AUTH_MODE=clerk is missing required configuration:\n  - " + "\n  - ".join(missing)

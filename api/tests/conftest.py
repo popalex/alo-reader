@@ -37,6 +37,7 @@ os.environ.setdefault("AUTH_MODE", "none")
 # their own ClerkSettings; these only have to be present and well-formed.
 os.environ.setdefault("CLERK_ISSUER", "https://clerk.test.invalid")
 os.environ.setdefault("CLERK_WEBHOOK_SECRET", "whsec_dGVzdC1zZWNyZXQtZm9yLXRoZS1zdWl0ZQ==")
+os.environ.setdefault("CLERK_PUBLISHABLE_KEY", "pk_test_suite")
 
 from app import db as app_db  # noqa: E402
 from app.config import get_settings  # noqa: E402

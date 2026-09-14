@@ -155,6 +155,12 @@ async def clerk_webhook(request: Request, session: Session) -> None:
         # that no longer exists, and the next JWT carrying that sub would sign in
         # against it. A live user missing locally is handled where it belongs: the
         # JWT path auto-provisions on the next request.
+        #
+        # A retried user.created landing after the delete still recreates the row.
+        # Telling that apart from a first delivery needs a tombstone table, and the
+        # blast radius does not justify one: the Clerk account is gone, so no JWT can
+        # be minted for it, and what survives is an empty local row with no data
+        # attached. The cascade already removed everything that mattered.
     elif event_type == "user.deleted":
         user = await users_store.get_by_clerk_id(session, clerk_user_id)
         if user is not None:

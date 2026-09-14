@@ -68,8 +68,9 @@ async def test_per_ip_pre_auth_limit(api_client: httpx.AsyncClient, api_db: str)
     # A different client IP has its own bucket (Caddy injects the real one).
     assert (await api_client.get("/api/v1/me", headers={"X-Real-IP": "2.2.2.2"})).status_code == 401
 
-    # Public paths skip the IP gate entirely.
-    assert (await api_client.get("/api/v1/config")).status_code == 200
+    # Public paths are gated too, but on their own much looser bucket, so draining
+    # the API bucket for this IP does not take the unauthenticated routes with it.
+    assert (await api_client.get("/api/v1/config", headers=ip_a)).status_code == 200
 
 
 async def test_public_paths_are_rate_limited_but_the_probe_is_not(
@@ -82,7 +83,8 @@ async def test_public_paths_are_rate_limited_but_the_probe_is_not(
     app.state.auth_runtime = AuthRuntime(
         provider=PatProvider(app_db.get_sessionmaker),
         limiter=TokenBucket(rate=1000.0, burst=1000),
-        ip_limiter=TokenBucket(rate=0.0, burst=2),  # no refill: exactly 2 then 429
+        ip_limiter=TokenBucket(rate=1000.0, burst=1000),
+        public_limiter=TokenBucket(rate=0.0, burst=2),  # no refill: exactly 2 then 429
     )
     try:
         statuses = [
@@ -116,3 +118,26 @@ def test_zero_refill_rate_is_rejected() -> None:
         Settings(database_url="postgresql+asyncpg://x/y", auth_mode="none", rate_limit_rps=0)
     with pytest.raises(ValidationError):
         Settings(database_url="postgresql+asyncpg://x/y", auth_mode="none", rate_limit_ip_rps=0)
+
+
+async def test_public_and_api_buckets_are_separate(api_client: httpx.AsyncClient) -> None:
+    # A cold page load fetches one icon per subscription. Sharing the API bucket means
+    # a large account 429s its own images, and then the API calls behind them.
+    app.state.auth_runtime = AuthRuntime(
+        provider=PatProvider(app_db.get_sessionmaker),
+        limiter=TokenBucket(rate=1000.0, burst=1000),
+        ip_limiter=TokenBucket(rate=0.0, burst=1),  # API bucket: one request, then 429
+        public_limiter=TokenBucket(rate=1000.0, burst=1000),
+    )
+    ip = {"X-Real-IP": "9.9.9.9"}
+    try:
+        assert (await api_client.get("/api/v1/me", headers=ip)).status_code == 401
+        assert (await api_client.get("/api/v1/me", headers=ip)).status_code == 429
+        # The API bucket for this IP is empty; the public routes still answer.
+        public = [
+            (await api_client.get("/api/v1/config", headers=ip)).status_code for _ in range(5)
+        ]
+    finally:
+        del app.state.auth_runtime
+
+    assert public == [200] * 5

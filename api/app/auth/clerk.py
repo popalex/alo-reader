@@ -91,6 +91,11 @@ class JwksCache:
                 continue
             if key.key_id is not None:
                 keys[key.key_id] = key
+        if not keys:
+            # An empty document, a JSON array, or every entry skipped above. Caching
+            # that as a success would discard working keys and 401 everyone until the
+            # TTL lapses; the caller keeps what it has and answers 503 instead.
+            raise AuthUnavailable("JWKS contained no usable keys")
         self._keys = keys
         self._fetched_at = time.monotonic()
 
@@ -100,31 +105,47 @@ class JwksCache:
         now = time.monotonic()
         stale = self._fetched_at is None or now - self._fetched_at >= JWKS_TTL_S
         if stale:
-            await self._refresh_once(now)
+            await self._refresh_once(JWKS_TTL_S)
         key = self._keys.get(kid)
         if key is None and not stale and self._fetched_at is not None:
             # Unknown kid on a warm cache: allow one refetch per minute so key
-            # rotation doesn't lock users out for the full TTL.
+            # rotation doesn't lock users out for the full TTL. The age to beat is
+            # the miss window, not the TTL — passing the TTL here would make every
+            # one of these calls a no-op, since this branch only runs on a cache
+            # younger than the TTL, and rotation would lock users out for an hour.
             if now - self._fetched_at >= JWKS_MISS_REFRESH_S:
-                await self._refresh_once(now)
+                await self._refresh_once(JWKS_MISS_REFRESH_S)
                 key = self._keys.get(kid)
         return key
 
-    async def _refresh_once(self, now: float) -> None:
-        """Refresh under a lock, with a short cooldown after a failure.
+    async def _refresh_once(self, min_age_s: float) -> None:
+        """Refresh under a lock, skipping the fetch if the cache is younger than
+        ``min_age_s`` (someone else just did it) and backing off after a failure.
 
-        Raises :class:`AuthUnavailable` when the issuer cannot be reached, so the
-        caller can answer 503 instead of pretending the token was bad."""
-        if self._failed_at is not None and now - self._failed_at < JWKS_FAILURE_COOLDOWN_S:
-            raise AuthUnavailable("JWKS is unreachable")
+        Raises :class:`AuthUnavailable` only when there is nothing usable to fall
+        back on, so the caller answers 503 instead of pretending the token was bad.
+        """
         async with self._lock:
-            # Another request may have refreshed while we waited for the lock.
-            if self._fetched_at is not None and time.monotonic() - self._fetched_at < JWKS_TTL_S:
+            now = time.monotonic()
+            # Both checks belong inside the lock. Outside it, every request that
+            # arrived during a failing 10s fetch passes the cooldown gate, queues on
+            # the lock, and then runs its own fetch in turn: an outage serializes into
+            # minutes of waiting, which is what the lock is here to prevent.
+            if self._fetched_at is not None and now - self._fetched_at < min_age_s:
                 return
+            if self._failed_at is not None and now - self._failed_at < JWKS_FAILURE_COOLDOWN_S:
+                if self._keys:
+                    return
+                raise AuthUnavailable("JWKS is unreachable")
             try:
                 await self._refresh()
             except (httpx.HTTPError, AuthUnavailable) as exc:
                 self._failed_at = time.monotonic()
+                if self._keys:
+                    # Keys we already hold still verify the tokens they signed. An
+                    # expired TTL is not a reason to 503 a whole instance through an
+                    # issuer outage; it is a reason to try again on the next request.
+                    return
                 raise AuthUnavailable(str(exc) or "JWKS fetch failed") from exc
             self._failed_at = None
 
