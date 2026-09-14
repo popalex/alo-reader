@@ -57,6 +57,13 @@ services:
         condition: service_started
     volumes:
       - ./observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      # Read-only host mounts for the unix exporter's filesystem collector, which is
+      # where the disk alert gets its numbers. rslave propagates mounts made after the
+      # container started, so a volume added later is still measured. Nothing is
+      # written, and only the filesystem collector runs (see config.alloy).
+      - /:/host/root:ro,rslave
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
 
   otel-lgtm:
     image: grafana/otel-lgtm:0.28.0
