@@ -1,11 +1,15 @@
 """Per-user token-bucket rate limiting (in-process, per replica)."""
 
 import httpx
+import pytest
+from pydantic import ValidationError
 
 from app import db as app_db
+from app.auth.middleware import _is_probe, _is_public
 from app.auth.pat import PatProvider
 from app.auth.ratelimit import TokenBucket
 from app.auth.runtime import AuthRuntime
+from app.config import Settings
 from app.main import app
 
 from .conftest import PatUser, make_pat_user
@@ -66,3 +70,49 @@ async def test_per_ip_pre_auth_limit(api_client: httpx.AsyncClient, api_db: str)
 
     # Public paths skip the IP gate entirely.
     assert (await api_client.get("/api/v1/config")).status_code == 200
+
+
+async def test_public_paths_are_rate_limited_but_the_probe_is_not(
+    api_client: httpx.AsyncClient,
+) -> None:
+    # The webhook reads an unbounded body and runs an HMAC verify plus DB writes, and
+    # an icon read streams a blob: both unauthenticated, and Caddy sets no rate limit,
+    # so this middleware is the only gate in front of them. healthz stays exempt, or a
+    # 429'd liveness probe restarts a container that was fine.
+    app.state.auth_runtime = AuthRuntime(
+        provider=PatProvider(app_db.get_sessionmaker),
+        limiter=TokenBucket(rate=1000.0, burst=1000),
+        ip_limiter=TokenBucket(rate=0.0, burst=2),  # no refill: exactly 2 then 429
+    )
+    try:
+        statuses = [
+            (await api_client.get("/api/v1/config")).status_code,
+            (await api_client.get("/api/v1/config")).status_code,
+            (await api_client.get("/api/v1/config")).status_code,
+        ]
+        probes = [(await api_client.get("/api/v1/healthz")).status_code for _ in range(5)]
+    finally:
+        del app.state.auth_runtime
+
+    assert statuses[-1] == 429
+    assert probes == [200] * 5
+
+
+async def test_healthz_with_a_trailing_slash_is_still_the_probe() -> None:
+    # Starlette 307s the trailing-slash form to the same route, so treating it as a
+    # different path ran the whole provider chain (a DB round-trip) first, against the
+    # route's own promise to stay DB-free.
+    assert _is_probe("/api/v1/healthz/") is True
+    assert _is_public("/api/v1/icons/12/") is True
+    assert _is_probe("/api/v1/entries") is False
+
+
+def test_zero_refill_rate_is_rejected() -> None:
+    # A bucket that never refills cannot survive idle pruning: the sweep drops a
+    # drained bucket after the prune interval and the next request recreates it full,
+    # silently resetting the limit. The pruning comment claims to be
+    # behavior-preserving, and with a positive rate it is.
+    with pytest.raises(ValidationError):
+        Settings(database_url="postgresql+asyncpg://x/y", auth_mode="none", rate_limit_rps=0)
+    with pytest.raises(ValidationError):
+        Settings(database_url="postgresql+asyncpg://x/y", auth_mode="none", rate_limit_ip_rps=0)

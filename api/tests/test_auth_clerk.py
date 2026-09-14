@@ -181,3 +181,100 @@ async def test_config_exposes_publishable_key(
         "clerk_publishable_key": "pk_test_visible",
         "otel_enabled": False,
     }
+
+
+async def test_one_unbuildable_jwks_key_does_not_break_the_instance(
+    api_client: httpx.AsyncClient, api_db: str, rsa_key: rsa.RSAPrivateKey
+) -> None:
+    # jwt.PyJWK raises on an entry it cannot build, and nothing in the verify path
+    # caught it: one bad key in the issuer's document and every request 500s, for
+    # every user, permanently, because the cache timestamp is only set on success.
+    jwk = json.loads(RSAAlgorithm.to_jwk(rsa_key.public_key()))
+    jwk.update({"kid": KID, "alg": "RS256", "use": "sig"})
+    document = {"keys": [{"kty": "OCT", "kid": "broken"}, jwk]}
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=document)
+
+    env = ClerkEnv(key=rsa_key)
+    http_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    app.state.auth_runtime = AuthRuntime(
+        provider=build_provider(
+            "clerk",
+            clerk_settings=ClerkSettings(issuer=ISSUER, audience=AUDIENCE),
+            clerk_http_client=http_client,
+        ),
+        limiter=TokenBucket(1000, 1000),
+        ip_limiter=TokenBucket(1000, 1000),
+    )
+    try:
+        resp = await api_client.get("/api/v1/me", headers=env.headers(env.make_jwt("user_ok")))
+        assert resp.status_code == 200
+    finally:
+        await http_client.aclose()
+
+
+async def test_a_key_that_cannot_verify_the_alg_is_a_401(
+    api_client: httpx.AsyncClient, api_db: str, rsa_key: rsa.RSAPrivateKey
+) -> None:
+    # A JWKS entry whose type does not match the token's alg makes jwt.decode raise
+    # a bare TypeError from key preparation, which is not an InvalidTokenError: it
+    # used to escape as a 500 on an unauthenticated request.
+    document = {"keys": [{"kty": "oct", "kid": KID, "alg": "RS256", "k": "c2VjcmV0"}]}
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=document)
+
+    env = ClerkEnv(key=rsa_key)
+    http_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    app.state.auth_runtime = AuthRuntime(
+        provider=build_provider(
+            "clerk",
+            clerk_settings=ClerkSettings(issuer=ISSUER, audience=AUDIENCE),
+            clerk_http_client=http_client,
+        ),
+        limiter=TokenBucket(1000, 1000),
+        ip_limiter=TokenBucket(1000, 1000),
+    )
+    try:
+        resp = await api_client.get("/api/v1/me", headers=env.headers(env.make_jwt("user_y")))
+    finally:
+        await http_client.aclose()
+
+    assert resp.status_code == 401
+
+
+async def test_jwks_outage_is_503_not_a_sign_out(
+    api_client: httpx.AsyncClient, api_db: str, rsa_key: rsa.RSAPrivateKey
+) -> None:
+    # 401 tells the SPA the session is invalid and it signs the user out. A JWKS
+    # fetch that failed says nothing about the token, so it has to be retryable.
+    attempts: list[int] = []
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        attempts.append(1)
+        raise httpx.ConnectError("issuer unreachable")
+
+    env = ClerkEnv(key=rsa_key)
+    http_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    app.state.auth_runtime = AuthRuntime(
+        provider=build_provider(
+            "clerk",
+            clerk_settings=ClerkSettings(issuer=ISSUER, audience=AUDIENCE),
+            clerk_http_client=http_client,
+        ),
+        limiter=TokenBucket(1000, 1000),
+        ip_limiter=TokenBucket(1000, 1000),
+    )
+    try:
+        headers = env.headers(env.make_jwt("user_x"))
+        first = await api_client.get("/api/v1/me", headers=headers)
+        second = await api_client.get("/api/v1/me", headers=headers)
+    finally:
+        await http_client.aclose()
+
+    assert first.status_code == 503
+    assert first.json()["error"]["code"] == "unavailable"
+    assert second.status_code == 503
+    # The second request rode the failure cooldown instead of opening its own fetch.
+    assert len(attempts) == 1
