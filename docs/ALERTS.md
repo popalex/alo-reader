@@ -30,68 +30,62 @@ collector, which runs the unix exporter's filesystem collector over read-only ho
 mounts (`/`, `/proc`, `/sys`, see `docker-compose.otel.yml`). Postgres has no SQL for
 free space, so there is no in-app way to get this.
 
-## Getting the mail
+## Getting the alerts on your phone
 
-Set two things in `.env` and the alerts arrive in your inbox:
+Alerts go to [Pushover](https://pushover.net): a push notification, not an email you
+read the next morning. Setup is three steps.
+
+1. Install the app and buy it. $4.99 once per platform after a 30-day trial. Your
+   **user key** is on the dashboard at pushover.net.
+2. Register an application at pushover.net/apps/build (call it `alo-reader`). That
+   gives you an **API token**. 10,000 messages a month are free, and this alert floor
+   sends single digits.
+3. Put both in `.env` and recreate the `otel-lgtm` container:
 
 ```sh
-ALO_ALERT_EMAIL=you@example.com        # who gets alerted
-GRAFANA_SMTP_ENABLED=true              # and the server that carries it
-GRAFANA_SMTP_HOST=smtp.example.com:587
-GRAFANA_SMTP_USER=...
-GRAFANA_SMTP_PASSWORD=...
-GRAFANA_SMTP_FROM_ADDRESS=alerts@yourdomain.com
+ALO_PUSHOVER_USER_KEY=...
+ALO_PUSHOVER_API_TOKEN=...
 ```
 
-`ALO_ALERT_EMAIL` lands in the contact point through
-[`alerting/notifications.yml`](../deploy/observability/alerting/notifications.yml),
-which Grafana expands from the environment. The `GRAFANA_SMTP_*` values become
-Grafana's own `GF_SMTP_*` settings. Recreate the `otel-lgtm` container to apply either.
+Grafana expands those into the contact point in
+[`alerting/notifications.yml`](../deploy/observability/alerting/notifications.yml).
+Leave them unset and everything still runs: alerts evaluate, they show in Grafana, and
+only delivery fails, with Pushover's own rejection in the Grafana log.
 
-Four things that cost me time, so they are worth knowing up front:
+Four things worth knowing up front:
 
-- **Routing is provisioned, not just the address.** The otel-lgtm image ships a default
-  route pointing at a receiver named `empty`, so alerts fire into a black hole. The
-  file provisions the policy as well, which is why email works out of the box. Grafana
-  then marks the policy read-only in the UI. To route somewhere else, edit the file, or
-  drop its mount from `docker-compose.otel.yml` and take the policy back in the UI.
-- **`GRAFANA_SMTP_FROM_ADDRESS` must be a valid address**, and one your SMTP account is
-  allowed to send as. Grafana refuses to start on a malformed one, and providers reject
-  a mismatched sender.
-- **Set `GRAFANA_ROOT_URL` to your public URL.** Every link in the alert mail is built
-  from it, so on the default it sends you to `localhost`.
-- **The mail is batched, not instant.** 30s after a rule fires, at most one more every
-  5 minutes while alerts join the group, then a reminder every 12 hours while it keeps
-  firing. Change `group_wait` / `repeat_interval` in the same file.
+- **Routing is provisioned, not just the destination.** The otel-lgtm image ships a
+  default route pointing at a receiver named `empty`, so alerts fire into a black hole.
+  The file provisions the policy as well, which is why this works out of the box.
+  Grafana then marks the policy read-only in the UI. To route somewhere else, edit the
+  file, or drop its mount from `docker-compose.otel.yml` and take the policy back in
+  the UI.
+- **Firing goes out at priority 1, resolved at -1.** Priority 1 is red and ignores your
+  quiet hours, which is the point of a push. The all-clear stays quiet. For priority 2,
+  which retries until you acknowledge it, add `retry` and `expire` alongside it in the
+  same file. That is the right setting for something that pages a rota, and overkill
+  for a feed reader.
+- **Set `GRAFANA_ROOT_URL` to your public URL.** Every link in the notification is
+  built from it, so on the default it sends you to `localhost`.
+- **Notifications are batched, not instant.** One 30s after a rule fires, at most one
+  more every 5 minutes while alerts join the group, then a reminder every 12 hours
+  while it keeps firing. Change `group_wait` / `repeat_interval` in the same file.
 
-### Five ways to send it
+### Wanting a different channel
 
-Any SMTP server works. In rough order of how quickly you will have it running:
+Grafana speaks Pushover natively, which is why there is no webhook template here to
+escape by hand. If you want something else, add the contact point in
+`notifications.yml` and point the policy at it:
 
-1. **Gmail or Google Workspace with an app password.** `smtp.gmail.com:587`, your
-   address as the user, an app password (needs 2FA) as the password. Free, five minutes
-   of work, about 500 messages a day. Alerts are low volume, so the cap is irrelevant.
-2. **A transactional provider's free tier** (Resend, Brevo, Mailgun, Postmark,
-   SendGrid). SMTP credentials from the dashboard, roughly 100 to 300 messages a day
-   free, and deliverability is their business rather than yours. The one to pick if
-   alerts must not land in spam.
-3. **Your own mailbox provider** (Fastmail, Migadu, Zoho, Purelymail, or whoever hosts
-   the domain's mail). Same shape as Gmail, sends as `alerts@yourdomain`, and no extra
-   account anywhere.
-4. **Amazon SES.** Cheapest at volume and reliable, but you start in a sandbox that only
-   sends to verified addresses, and getting out of it means asking for production access.
-   Worth it only if you are already on AWS.
-5. **A relay on the host** (Postfix or msmtp as a satellite, pointed at any of the
-   above), with `GRAFANA_SMTP_HOST=host.docker.internal:25`. Useful when several
-   services on the box should share one set of credentials. Sending straight to the
-   internet from your own MTA is the version to avoid: most providers block port 25
-   outbound, and without SPF, DKIM and a matching PTR record the mail goes to spam.
-
-**The option I would actually take:** skip email and send alerts to your phone. Add a
-webhook contact point in Grafana pointing at [ntfy](https://ntfy.sh), Pushover, Slack,
-Discord or Telegram. No SMTP, no deliverability, no spam folder, and the alert arrives
-as a push notification instead of an email you read the next morning. Email is the
-better fallback of the two, not the better primary.
+- **Email** needs a contact point of type `email` plus `GF_SMTP_*` settings on the
+  `otel-lgtm` service. Workable, but it is the channel you read late.
+- **ntfy** is open source and free, and goes through a `webhook` contact point with a
+  custom JSON payload. Two things to know: Grafana's template functions have no
+  `toJson`, so a quote or newline in an annotation produces invalid JSON and the
+  notification fails; and self-hosting ntfy on this same host means the disk-full alert
+  dies with the box it is reporting on.
+- **Slack, Telegram, Discord, PagerDuty and OpsGenie** all have native integrations,
+  same shape as the Pushover block.
 
 ## Worker lag
 
@@ -197,7 +191,7 @@ Do this once, on purpose, before you rely on them.
 
 **Any rule, in one minute.** Copy a rule through the provisioning API with a threshold
 it already breaches and `for: 0s`, watch it fire, then delete it. This tests the query,
-the evaluator and the mail path without waiting for a real outage:
+the evaluator and the delivery path without waiting for a real outage:
 
 ```sh
 curl -u admin:admin http://localhost:3001/grafana/api/v1/provisioning/alert-rules

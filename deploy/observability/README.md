@@ -50,12 +50,13 @@ a new `*.json` there to add one.
 5xx rate, and host disk free. They are file-provisioned, so the Grafana UI shows them
 read-only and they survive every container recreate.
 
-`alerting/notifications.yml` is where they go: an email contact point taking its
-address from `ALO_ALERT_EMAIL`, plus the policy that routes to it. The policy half is
-not optional, because the otel-lgtm image's default route points at a receiver named
-`empty`. Set `ALO_ALERT_EMAIL` and the `GRAFANA_SMTP_*` block in `.env` and the alerts
-arrive as mail; leave SMTP off and they stay in Grafana. Thresholds, reasoning, a
-runbook per alert and five ways to send the mail: [`docs/ALERTS.md`](../../docs/ALERTS.md).
+`alerting/notifications.yml` is where they go: a Pushover contact point taking its
+credentials from `ALO_PUSHOVER_USER_KEY` / `ALO_PUSHOVER_API_TOKEN`, plus the policy
+that routes to it. The policy half is not optional, because the otel-lgtm image's
+default route points at a receiver named `empty`. Set both keys in `.env` and alerts
+arrive as a push on your phone; leave them unset and they stay in Grafana. Thresholds,
+reasoning, a runbook per alert and how to swap the channel:
+[`docs/ALERTS.md`](../../docs/ALERTS.md).
 
 The disk numbers are the reason the collector mounts `/`, `/proc` and `/sys` read-only:
 Postgres has no SQL for free space, so the unix exporter's filesystem collector runs in
