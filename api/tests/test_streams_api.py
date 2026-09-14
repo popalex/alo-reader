@@ -1,6 +1,10 @@
 """Stream listing + bounded mark-read endpoints (WP-07)."""
 
 import httpx
+from sqlalchemy import select, update
+
+from app import db as app_db
+from app.models import EntryState, Subscription
 
 from .apihelpers import add_entries, seed_feed_with_entries
 from .conftest import PatUser
@@ -148,3 +152,35 @@ async def test_mark_read_no_bound_marks_whole_stream(
 
     unread = await api_client.get(f"{BASE}/all/entries?status=unread", headers=h)
     assert unread.json()["entries"] == []
+
+
+async def test_mark_read_skips_the_pre_subscription_archive(
+    api_client: httpx.AsyncClient, pat_user: PatUser
+) -> None:
+    # since_entry_id exists so a new subscription's archive is not dumped as unread.
+    # Mark-all-read used to walk it anyway: a state row per archived entry, and an
+    # "updated" count that contradicts its documented meaning (entries newly flipped
+    # from unread to read) since none of them were unread.
+    feed_id, old_ids = await seed_feed_with_entries(pat_user.user_id, 3)
+    async with app_db.get_sessionmaker()() as s, s.begin():
+        await s.execute(
+            update(Subscription)
+            .where(Subscription.user_id == pat_user.user_id, Subscription.feed_id == feed_id)
+            .values(since_entry_id=max(old_ids))
+        )
+    new_ids = await add_entries(feed_id, 2, start=100)
+    h = pat_user.headers
+
+    resp = await api_client.post(f"{BASE}/all/mark-read", json={}, headers=h)
+
+    assert resp.json()["updated"] == len(new_ids)
+    async with app_db.get_sessionmaker()() as s:
+        rows = (
+            await s.scalars(
+                select(EntryState.entry_id).where(EntryState.user_id == pat_user.user_id)
+            )
+        ).all()
+    assert set(rows) == set(new_ids)  # nothing written for the archive
+    assert (await api_client.get(f"{BASE}/all/entries?status=unread", headers=h)).json()[
+        "entries"
+    ] == []

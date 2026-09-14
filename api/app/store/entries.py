@@ -459,9 +459,17 @@ async def mark_read_bounded(
         ),
         user_id,
         parsed,
+        # "all" so an already-read entry is still visited (the upsert below counts
+        # only the ones it flips), but the pre-subscription archive stays out of it:
+        # those entries were never unread, so marking them writes a state row per
+        # archived entry and inflates the returned count, which is documented as
+        # entries newly flipped from unread to read. The starred stream has no
+        # subscription row to bound against and does not need one.
         status="all",
         es=es,
     )
+    if parsed.kind != "starred":
+        src = src.where(Entry.id > Subscription.since_entry_id)
     if max_entry_id is not None:
         src = src.where(Entry.id <= max_entry_id)
     stmt = pg_insert(EntryState).from_select(
