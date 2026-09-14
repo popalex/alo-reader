@@ -139,7 +139,11 @@ async def poll_once(
 
     async def _run_one(feed: Feed) -> None:
         try:
-            async with global_sem, gate.slot(_host(feed.feed_url)):
+            # Per-host gate first, global cap second. The other order lets a feed that
+            # is only queued behind one host hold a global slot: a batch with 20 feeds
+            # on one host (routine, an OPML import from one platform) parks every slot
+            # on that host's queue and the rest of the batch cannot start at all.
+            async with gate.slot(_host(feed.feed_url)), global_sem:
                 outcome = await process_feed(
                     session_factory,
                     feed,  # Feed satisfies FeedRow structurally

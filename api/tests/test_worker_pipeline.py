@@ -5,6 +5,8 @@ MockTransport + the ``public_dns`` resolver). Exercises the exactly-once guarant
 dedup, error backoff, and permanent-redirect handling.
 """
 
+import asyncio
+
 import httpx
 import pytest
 from sqlalchemy import text, update
@@ -12,7 +14,9 @@ from sqlalchemy import text, update
 from app import db as app_db
 from app import telemetry
 from app.models import Feed
+from app.worker.fetch import FetchResult
 from app.worker.main import Counters, poll_once
+from app.worker.pipeline import process_feed
 from tests import wutil
 
 pytestmark = pytest.mark.usefixtures("public_dns")
@@ -145,3 +149,31 @@ async def test_permanent_redirect_collision_marks_error(api_db: str) -> None:
     assert moved.feed_url == "https://old.example/rss"  # not silently merged
     assert moved.error_count == 1
     assert "already exists" in (moved.last_error or "")
+async def test_one_busy_host_does_not_starve_the_rest_of_the_batch(api_db: str) -> None:
+    # The global cap must be taken inside the per-host gate, not outside it. The other
+    # way round, feeds merely queued behind one host hold global slots: a batch with
+    # several feeds on one host (an OPML import from one platform) parks every slot on
+    # that host's queue and the rest of the batch cannot start at all.
+    sf = app_db.get_sessionmaker()
+    for i in range(3):
+        await wutil.seed_feed(sf, f"https://busy.example/rss{i}")
+    await wutil.seed_feed(sf, "https://quick.example/rss")
+
+    release = asyncio.Event()
+    quick_done = asyncio.Event()
+
+    async def fetch(feed: object, **_kw: object) -> FetchResult:
+        url = feed.feed_url  # type: ignore[attr-defined]
+        if "quick.example" in url:
+            quick_done.set()
+        else:
+            await release.wait()
+        return FetchResult("new_body", final_url=url, body=wutil.rss(_ITEMS))
+
+    settings = wutil.worker_settings(worker_max_concurrency=2, worker_per_host_concurrency=1)
+    poll = asyncio.create_task(poll_once(sf, settings=settings, fetch=fetch))
+    try:
+        await asyncio.wait_for(quick_done.wait(), timeout=5)
+    finally:
+        release.set()
+        await poll
