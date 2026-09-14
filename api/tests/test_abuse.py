@@ -5,7 +5,8 @@ The adversarial end-to-end checks the operator re-runs before a release:
 * the SSRF probe set driven **through the full API path** — /discover (page fetch)
   and /subscriptions → the worker poll (feed fetch) — not just the guard's unit tests;
 * a deleted user's PAT can no longer authenticate (webhook cascade closes the door);
-* quota bypass attempts are refused.
+* quota bypass attempts are refused;
+* a state write cannot be used as a read into another tenant's entries.
 
 SSRF probes use IP *literals* so the guard rejects them before any socket opens —
 no real network, no mock resolver needed.
@@ -25,6 +26,7 @@ from app.store import users as users_store
 from app.worker.main import Counters, poll_once
 from tests import wutil
 
+from .apihelpers import seed_feed_with_entries
 from .conftest import PatUser, make_pat_user
 
 DISCOVER = "/api/v1/discover"
@@ -161,3 +163,38 @@ async def test_api_token_quota_bypass_fails(
             assert await pat.count_for_user(s, pat_user.user_id) == 1
     finally:
         get_settings.cache_clear()
+
+
+async def test_starring_another_tenants_entries_reads_nothing(
+    api_client: httpx.AsyncClient, pat_user: PatUser
+) -> None:
+    """The bypass this suite exists to catch: a write used as a read.
+
+    State writes take entry ids, the starred stream matches on entry_states alone so
+    that a star outlives unsubscribing, and entries are globally deduped. Post a range
+    of ids as starred and the stream would hand back title, url, summary and
+    feed_title for feeds the caller never subscribed to, with ?q= adding a snippet of
+    the content.
+    """
+    victim = await make_pat_user("abuse-victim@example.com")
+    _, hidden = await seed_feed_with_entries(victim.user_id, 3)
+
+    starred = await api_client.post(
+        "/api/v1/entries/state",
+        json={"ids": hidden + [id_ + 10_000 for id_ in hidden], "starred": True},
+        headers=pat_user.headers,
+    )
+    assert starred.status_code == 200
+    assert starred.json()["updated"] == 0  # ids outside the subscription, and junk ids
+
+    for url in (
+        "/api/v1/streams/starred/entries?status=all",
+        "/api/v1/streams/starred/entries?status=all&q=entry",
+    ):
+        resp = await api_client.get(url, headers=pat_user.headers)
+        assert resp.status_code == 200
+        assert resp.json()["entries"] == []
+
+    # And the entries themselves stay 404, as get_for_user already promised.
+    detail = await api_client.get(f"/api/v1/entries/{hidden[0]}", headers=pat_user.headers)
+    assert detail.status_code == 404
