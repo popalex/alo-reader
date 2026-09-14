@@ -153,10 +153,16 @@ async def _maybe_fetch_favicon(
             site_url, settings=settings, transport=transport, image_url=image_url
         )
         if favicon is not None:
-            icon = await icons_store.get_or_create(
-                session, url=favicon.url, mime=favicon.mime, data=favicon.data
-            )
-            await icons_store.set_feed_icon(session, feed_id, icon.id)
+            # A savepoint, because "best-effort" has to hold for database errors too.
+            # Catching the exception does not un-poison the transaction: a failed
+            # statement marks it rollback-only, and the outer commit would then discard
+            # the entries and the successful poll this decorates. update_feed_url above
+            # guards the same way.
+            async with session.begin_nested():
+                icon = await icons_store.get_or_create(
+                    session, url=favicon.url, mime=favicon.mime, data=favicon.data
+                )
+                await icons_store.set_feed_icon(session, feed_id, icon.id)
     except Exception as exc:  # noqa: BLE001 — best-effort, log and move on
         log.warning("%s", line("favicon_fetch_failed", feed_id=feed_id, error=repr(exc)))
 

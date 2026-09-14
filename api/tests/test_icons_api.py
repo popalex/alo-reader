@@ -144,3 +144,31 @@ async def test_favicon_disabled_by_default_in_worker_settings(api_db: str) -> No
     async with sf() as s:
         refreshed = await s.get(Feed, feed.id)
         assert refreshed is not None and refreshed.icon_id is None
+
+
+
+async def test_a_failing_icon_write_does_not_discard_the_poll(api_db: str) -> None:
+    # "Best effort" has to hold for database errors too. A failed statement marks the
+    # transaction rollback-only, so without a savepoint the outer commit takes the
+    # entries and the recorded success down with the favicon.
+    sf = app_db.get_sessionmaker()
+    feed = await _bare_feed("https://feed.example/rss")
+    settings = wutil.worker_settings(worker_fetch_favicons=True)
+
+    async def explode(session: object, **kwargs: object) -> None:
+        from sqlalchemy import text as sql_text
+
+        await session.execute(sql_text("SELECT 1 / 0"))  # type: ignore[attr-defined]
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(icons_store, "get_or_create", explode)
+        outcome = await process_feed(sf, feed, settings=settings, transport=_site_transport())
+
+    assert outcome.status == "new_body"
+    assert outcome.new_entries == 1
+    async with sf() as s:
+        refreshed = await s.get(Feed, feed.id)
+        assert refreshed is not None
+        assert refreshed.icon_id is None  # the icon is what was lost
+        assert refreshed.error_count == 0  # the poll was not
+    assert await wutil.count_entries(sf, feed.id) == 1
