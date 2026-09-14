@@ -63,7 +63,11 @@ def _parse_retry_after(value: str | None, *, now: datetime | None = None) -> flo
     if not value:
         return None
     value = value.strip()
-    if value.isdigit():
+    # isdecimal, not isdigit: isdigit is true for superscripts ("2") that float()
+    # then refuses, and this call sits outside the try below, so the ValueError would
+    # escape fetch_feed entirely and turn a 429 into an unhandled failure with no
+    # backoff recorded.
+    if value.isdecimal():
         return float(value)
     try:
         when = parsedate_to_datetime(value)
