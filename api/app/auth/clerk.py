@@ -199,8 +199,12 @@ class ClerkProvider:
             async with self._session_factory()() as session, session.begin():
                 user = await users_store.create(session, clerk_user_id=clerk_user_id)
                 return authed(user)
-        except IntegrityError:
+        except IntegrityError as exc:
+            # Lost the auto-provision race: the winner's row is there to re-read.
+            # If it is not, the constraint that fired was a different one, and an
+            # assert would both lie about that and vanish under python -O.
             async with self._session_factory()() as session, session.begin():
                 user = await users_store.get_by_clerk_id(session, clerk_user_id)
-                assert user is not None
+                if user is None:
+                    raise AuthUnavailable("could not provision the local user") from exc
                 return authed(user)
