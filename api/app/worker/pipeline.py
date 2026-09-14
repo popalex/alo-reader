@@ -101,7 +101,9 @@ async def _apply_new_body(
     transport: httpx.AsyncBaseTransport | None,
 ) -> FeedOutcome:
     if result.body is None:  # defensive: new_body always carries a body
-        return await _apply_error(session, feed, result, settings, "empty body")
+        return await _apply_error(
+            session, feed, result, settings, "empty body", status="empty_body"
+        )
     parsed, rows = await asyncio.to_thread(
         _build_entries, result.body, max_entries=settings.worker_max_entries_per_fetch
     )

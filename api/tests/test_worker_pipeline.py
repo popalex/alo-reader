@@ -177,3 +177,24 @@ async def test_one_busy_host_does_not_starve_the_rest_of_the_batch(api_db: str) 
     finally:
         release.set()
         await poll
+async def test_empty_body_is_recorded_as_an_error_not_a_success(api_db: str) -> None:
+    # The defensive guard for a new_body result carrying no body used to leave the
+    # outcome status at "new_body", so the DB recorded an error and backoff while the
+    # counters and OTel metrics reported a successful poll.
+    sf = app_db.get_sessionmaker()
+    feed_id = await wutil.seed_feed(sf, "https://feed.example/rss")
+    feed = await wutil.get_feed(sf, feed_id)
+
+    async def fetch_without_body(*_a: object, **_kw: object) -> FetchResult:
+        return FetchResult("new_body", final_url="https://feed.example/rss", body=None)
+
+    outcome = await process_feed(
+        sf, feed, settings=wutil.worker_settings(), fetch=fetch_without_body
+    )
+
+    assert outcome.status == "empty_body"
+    counters = Counters()
+    counters.record(outcome)
+    assert (counters.errors, counters.new_body) == (1, 0)
+    refreshed = await wutil.get_feed(sf, feed_id)
+    assert refreshed.error_count == 1
