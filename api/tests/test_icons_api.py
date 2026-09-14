@@ -146,7 +146,6 @@ async def test_favicon_disabled_by_default_in_worker_settings(api_db: str) -> No
         assert refreshed is not None and refreshed.icon_id is None
 
 
-
 async def test_a_failing_icon_write_does_not_discard_the_poll(api_db: str) -> None:
     # "Best effort" has to hold for database errors too. A failed statement marks the
     # transaction rollback-only, so without a savepoint the outer commit takes the
@@ -172,6 +171,8 @@ async def test_a_failing_icon_write_does_not_discard_the_poll(api_db: str) -> No
         assert refreshed.icon_id is None  # the icon is what was lost
         assert refreshed.error_count == 0  # the poll was not
     assert await wutil.count_entries(sf, feed.id) == 1
+
+
 async def test_declared_icon_survives_an_oversized_home_page(api_db: str) -> None:
     # The <link rel=icon> is in <head>, so a page over the cap is still usable. Without
     # truncation guarded_get returns ok=False, the declared icon is thrown away after

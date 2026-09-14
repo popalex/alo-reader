@@ -149,6 +149,8 @@ async def test_permanent_redirect_collision_marks_error(api_db: str) -> None:
     assert moved.feed_url == "https://old.example/rss"  # not silently merged
     assert moved.error_count == 1
     assert "already exists" in (moved.last_error or "")
+
+
 async def test_one_busy_host_does_not_starve_the_rest_of_the_batch(api_db: str) -> None:
     # The global cap must be taken inside the per-host gate, not outside it. The other
     # way round, feeds merely queued behind one host hold global slots: a batch with
@@ -177,6 +179,8 @@ async def test_one_busy_host_does_not_starve_the_rest_of_the_batch(api_db: str) 
     finally:
         release.set()
         await poll
+
+
 async def test_empty_body_is_recorded_as_an_error_not_a_success(api_db: str) -> None:
     # The defensive guard for a new_body result carrying no body used to leave the
     # outcome status at "new_body", so the DB recorded an error and backoff while the
@@ -198,6 +202,8 @@ async def test_empty_body_is_recorded_as_an_error_not_a_success(api_db: str) -> 
     assert (counters.errors, counters.new_body) == (1, 0)
     refreshed = await wutil.get_feed(sf, feed_id)
     assert refreshed.error_count == 1
+
+
 async def test_redirect_to_a_broken_page_keeps_the_original_url(api_db: str) -> None:
     # A 301 is still permanent when it lands on a login or error page. Repointing
     # feed_url there loses the original for good: the feed can never recover, even
