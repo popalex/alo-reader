@@ -1,12 +1,15 @@
 """CRUD + cross-tenant isolation for the store layer."""
 
+from datetime import UTC, datetime
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.store import entry_states as states_store
 from app.store import feeds as feeds_store
 from app.store import folders as folders_store
 from app.store import subscriptions as subs_store
 from app.store import users as users_store
-from tests.factories import make_feed, make_subscription, make_user
+from tests.factories import add_entries, make_feed, make_subscription, make_user
 
 
 async def test_user_create_get_delete(session: AsyncSession) -> None:
@@ -59,3 +62,20 @@ async def test_subscription_crud_and_isolation(session: AsyncSession) -> None:
     )
     assert moved is not None and moved.title_override == "Custom"
     assert await subs_store.delete(session, alice.id, sub.id) is True
+
+
+async def test_upsert_tie_does_not_downgrade_a_flag(session: AsyncSession) -> None:
+    # apply_state_batch biases an equal-timestamp write to true, so a replayed offline
+    # change can never un-read something. upsert assigned the incoming value outright,
+    # so on the same table the merge result depended on which writer ran.
+    user = await make_user(session)
+    feed = await make_feed(session)
+    await make_subscription(session, user, feed)
+    entry = (await add_entries(session, feed, 1))[0]
+    when = datetime.now(UTC)
+
+    await states_store.upsert(session, user.id, entry.id, changed_at=when, is_read=True)
+    await states_store.upsert(session, user.id, entry.id, changed_at=when, is_read=False)
+
+    row = await states_store.get(session, user.id, entry.id)
+    assert row is not None and row.is_read is True

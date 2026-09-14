@@ -39,11 +39,21 @@ async def upsert(
         is_starred=bool(is_starred) if is_starred is not None else False,
         changed_at=changed_at,
     )
+    # Same tie rule as apply_state_batch: strictly newer overwrites, equal biases the
+    # flag to true so a replayed offline write can never downgrade one. The two writers
+    # sit on the same table, so disagreeing here would make the merge order-dependent.
+    strictly_newer = EntryState.changed_at < stmt.excluded.changed_at
     set_: dict[str, object] = {"changed_at": stmt.excluded.changed_at}
     if is_read is not None:
-        set_["is_read"] = stmt.excluded.is_read
+        set_["is_read"] = case(
+            (strictly_newer, stmt.excluded.is_read),
+            else_=or_(EntryState.is_read, stmt.excluded.is_read),
+        )
     if is_starred is not None:
-        set_["is_starred"] = stmt.excluded.is_starred
+        set_["is_starred"] = case(
+            (strictly_newer, stmt.excluded.is_starred),
+            else_=or_(EntryState.is_starred, stmt.excluded.is_starred),
+        )
     stmt = stmt.on_conflict_do_update(
         index_elements=["user_id", "entry_id"],
         set_=set_,
