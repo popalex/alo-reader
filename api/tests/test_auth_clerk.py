@@ -242,3 +242,39 @@ async def test_a_key_that_cannot_verify_the_alg_is_a_401(
         await http_client.aclose()
 
     assert resp.status_code == 401
+
+
+async def test_jwks_outage_is_503_not_a_sign_out(
+    api_client: httpx.AsyncClient, api_db: str, rsa_key: rsa.RSAPrivateKey
+) -> None:
+    # 401 tells the SPA the session is invalid and it signs the user out. A JWKS
+    # fetch that failed says nothing about the token, so it has to be retryable.
+    attempts: list[int] = []
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        attempts.append(1)
+        raise httpx.ConnectError("issuer unreachable")
+
+    env = ClerkEnv(key=rsa_key)
+    http_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    app.state.auth_runtime = AuthRuntime(
+        provider=build_provider(
+            "clerk",
+            clerk_settings=ClerkSettings(issuer=ISSUER, audience=AUDIENCE),
+            clerk_http_client=http_client,
+        ),
+        limiter=TokenBucket(1000, 1000),
+        ip_limiter=TokenBucket(1000, 1000),
+    )
+    try:
+        headers = env.headers(env.make_jwt("user_x"))
+        first = await api_client.get("/api/v1/me", headers=headers)
+        second = await api_client.get("/api/v1/me", headers=headers)
+    finally:
+        await http_client.aclose()
+
+    assert first.status_code == 503
+    assert first.json()["error"]["code"] == "unavailable"
+    assert second.status_code == 503
+    # The second request rode the failure cooldown instead of opening its own fetch.
+    assert len(attempts) == 1

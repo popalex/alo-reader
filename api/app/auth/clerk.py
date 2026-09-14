@@ -11,6 +11,7 @@ This module is the ONLY place (plus the routes/webhook wiring in this package)
 allowed to know about Clerk.
 """
 
+import asyncio
 import time
 
 import httpx
@@ -23,11 +24,13 @@ from starlette.requests import Request
 from app.store import users as users_store
 
 from .pat import TOKEN_PREFIX, SessionFactory
-from .provider import AuthedUser, authed, bearer_token
+from .provider import AuthedUser, AuthUnavailable, authed, bearer_token
 
 JWKS_TTL_S = 3600
 # Refetch at most this often when an unknown kid shows up (key rotation).
 JWKS_MISS_REFRESH_S = 60
+# After a failed fetch, answer 503 for this long instead of hammering a down issuer.
+JWKS_FAILURE_COOLDOWN_S = 10
 
 
 class ClerkSettings(BaseSettings):
@@ -57,6 +60,11 @@ class JwksCache:
         self._client = http_client
         self._keys: dict[str, jwt.PyJWK] = {}
         self._fetched_at: float | None = None
+        self._failed_at: float | None = None
+        # One refresh at a time. Without it, an upstream that is slow or down has
+        # every concurrent request open its own 10s fetch, and the pile-up outlives
+        # the outage.
+        self._lock = asyncio.Lock()
 
     async def _refresh(self) -> None:
         client = self._client
@@ -68,8 +76,8 @@ class JwksCache:
         response.raise_for_status()
         try:
             document = response.json()
-        except ValueError:  # a proxy's error page, say
-            document = {}
+        except ValueError as exc:  # a proxy's error page, say
+            raise AuthUnavailable("JWKS response was not JSON") from exc
         keys: dict[str, jwt.PyJWK] = {}
         for entry in document.get("keys", []) if isinstance(document, dict) else []:
             # Skip what we cannot build instead of raising, exactly as PyJWT's own
@@ -92,16 +100,33 @@ class JwksCache:
         now = time.monotonic()
         stale = self._fetched_at is None or now - self._fetched_at >= JWKS_TTL_S
         if stale:
-            await self._refresh()
+            await self._refresh_once(now)
         key = self._keys.get(kid)
         if key is None and not stale and self._fetched_at is not None:
             # Unknown kid on a warm cache: allow one refetch per minute so key
             # rotation doesn't lock users out for the full TTL.
             if now - self._fetched_at >= JWKS_MISS_REFRESH_S:
-                await self._refresh()
+                await self._refresh_once(now)
                 key = self._keys.get(kid)
         return key
 
+    async def _refresh_once(self, now: float) -> None:
+        """Refresh under a lock, with a short cooldown after a failure.
+
+        Raises :class:`AuthUnavailable` when the issuer cannot be reached, so the
+        caller can answer 503 instead of pretending the token was bad."""
+        if self._failed_at is not None and now - self._failed_at < JWKS_FAILURE_COOLDOWN_S:
+            raise AuthUnavailable("JWKS is unreachable")
+        async with self._lock:
+            # Another request may have refreshed while we waited for the lock.
+            if self._fetched_at is not None and time.monotonic() - self._fetched_at < JWKS_TTL_S:
+                return
+            try:
+                await self._refresh()
+            except (httpx.HTTPError, AuthUnavailable) as exc:
+                self._failed_at = time.monotonic()
+                raise AuthUnavailable(str(exc) or "JWKS fetch failed") from exc
+            self._failed_at = None
 
 
 class ClerkProvider:
@@ -134,10 +159,9 @@ class ClerkProvider:
             header = jwt.get_unverified_header(token)
         except jwt.InvalidTokenError:
             return None
-        try:
-            key = await self._jwks.get_key(header.get("kid"))
-        except httpx.HTTPError:
-            return None
+        # get_key raises AuthUnavailable when the issuer cannot be reached, which
+        # the middleware answers with 503. An outage says nothing about this token.
+        key = await self._jwks.get_key(header.get("kid"))
         if key is None:
             return None
         audience = self._settings.audience or None

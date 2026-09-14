@@ -13,6 +13,15 @@ from starlette.requests import Request
 from app.models import User
 
 
+class AuthUnavailable(Exception):
+    """Authentication could not be decided, as opposed to being refused.
+
+    Returning None here would mean "not authenticated", which the middleware turns
+    into a 401 and the SPA turns into a sign-out. An upstream that is merely down
+    (Clerk's JWKS, or the database behind auto-provisioning) is a 503 the client
+    should retry, not a verdict about the caller's identity."""
+
+
 @dataclass(frozen=True)
 class AuthedUser:
     """The authenticated identity attached to a request."""

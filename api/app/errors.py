@@ -41,6 +41,7 @@ STATUS_CODES = {
     422: "validation_error",
     429: "rate_limited",
     500: "internal",
+    503: "unavailable",
 }
 
 
