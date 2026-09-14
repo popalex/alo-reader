@@ -63,7 +63,11 @@ def _parse_retry_after(value: str | None, *, now: datetime | None = None) -> flo
     if not value:
         return None
     value = value.strip()
-    if value.isdigit():
+    # isdecimal, not isdigit: isdigit is true for superscripts ("2") that float()
+    # then refuses, and this call sits outside the try below, so the ValueError would
+    # escape fetch_feed entirely and turn a 429 into an unhandled failure with no
+    # backoff recorded.
+    if value.isdecimal():
         return float(value)
     try:
         when = parsedate_to_datetime(value)
@@ -173,8 +177,12 @@ async def _classify_final(
     resp: httpx.Response, *, redirected: bool, all_permanent: bool, max_bytes: int
 ) -> FetchResult:
     final_url = str(resp.url)
-    # Only a clean permanent-redirect chain justifies repointing feed_url.
-    permanent_url = final_url if redirected and all_permanent else None
+    # Only a clean permanent-redirect chain justifies repointing feed_url, and only
+    # when the target actually serves something. A 301 to a login page or an error
+    # page is still "permanent", and repointing to it loses the original URL for good:
+    # the feed can never recover, even once the site is fixed.
+    usable = 200 <= resp.status_code < 400  # 2xx bodies and the 304 no-change reply
+    permanent_url = final_url if redirected and all_permanent and usable else None
 
     if resp.status_code == 304:
         return FetchResult(

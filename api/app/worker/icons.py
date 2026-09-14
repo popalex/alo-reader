@@ -92,7 +92,15 @@ async def fetch_favicon(
 
     icon_url: str | None = None
     page = await guarded_get(
-        site_url, max_bytes=settings.discover_max_bytes, settings=settings, transport=transport
+        site_url,
+        max_bytes=settings.discover_max_bytes,
+        settings=settings,
+        transport=transport,
+        # The <link rel="icon"> lives in <head>, so a cut-off body is still enough.
+        # Without this a homepage over the cap (script-heavy sites routinely are)
+        # comes back ok=False, the declared icon is thrown away after downloading it,
+        # and the feed falls back to /favicon.ico, which often 404s.
+        truncate=True,
     )
     if page.ok and page.body:
         href = _icon_href(page.body)

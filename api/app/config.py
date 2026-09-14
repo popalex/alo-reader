@@ -16,6 +16,7 @@ Auth-provider-specific settings (e.g. the hosted-auth SaaS keys) live inside
 from functools import lru_cache
 
 from dotenv import load_dotenv
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Populate os.environ from a repo-root .env when present. Real environment
@@ -130,10 +131,14 @@ class Settings(BaseSettings):
     # WORKER_LEASE_S lease, and fetches at most WORKER_MAX_CONCURRENCY at once.
     worker_poll_interval_s: float = 5.0
     worker_claim_batch: int = 50
-    # Lease must outlast the worst-case time to drain one claimed batch, or a slow
-    # batch loses its lease mid-flight and another replica re-claims in-flight feeds
-    # (idempotent, but wasteful). Worst case ≈ ceil(batch/concurrency) × fetch_timeout
-    # = ceil(50/20) × 30s = 90s, plus per-host spacing — 300s leaves comfortable margin.
+    # Lease must outlast the time to drain one claimed batch, or a slow batch loses
+    # its lease mid-flight and another replica re-claims in-flight feeds (idempotent,
+    # but wasteful). Spread across hosts that is ceil(batch/concurrency) x
+    # fetch_timeout = ceil(50/20) x 30s = 90s, and 300s leaves comfortable margin.
+    # The case the default does NOT cover is a batch concentrated on one host: the
+    # per-host gate serializes those, so 50 feeds on one host is 50 x (timeout +
+    # per-host delay), which no sane lease covers. Raise WORKER_LEASE_S, or lower
+    # WORKER_CLAIM_BATCH, if you poll many feeds from a single platform.
     worker_lease_s: int = 300
     worker_max_concurrency: int = 20
     # Cap entries persisted from a single fetch, so a pathological feed advertising
@@ -169,8 +174,10 @@ class Settings(BaseSettings):
     # them (starred kept forever; unread never purged). DESIGN.md §0.3.
     retention_horizon_days: int = 90
     # Retention purge runs in bounded batches (per transaction) so a large backlog
-    # never locks the whole entries table in one statement.
-    retention_purge_batch_size: int = 5000
+    # never locks the whole entries table in one statement. Must be > 0: at 0 the
+    # purge deletes nothing, never reaches its "short batch means done" exit, and
+    # spins on the database forever.
+    retention_purge_batch_size: int = Field(default=5000, gt=0)
 
 
 @lru_cache

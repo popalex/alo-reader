@@ -35,15 +35,25 @@ def next_wait(settings: Settings, rng: random.Random | None = None) -> float:
 
 
 async def run_maintenance(
-    session_factory: async_sessionmaker[AsyncSession], *, settings: Settings
+    session_factory: async_sessionmaker[AsyncSession],
+    *,
+    settings: Settings,
+    stop: asyncio.Event | None = None,
 ) -> tuple[int, int]:
-    """Run one GC + purge sweep. Returns ``(feeds_gc'd, entries_purged)``."""
+    """Run one GC + purge sweep. Returns ``(feeds_gc'd, entries_purged)``.
+
+    ``stop``, when given, cuts the purge short between batches: a 90-day backlog is
+    hundreds of batches, and without this a SIGTERM during one cannot drain.
+    """
     with telemetry.start_span("run_maintenance"):
-        return await _run_maintenance(session_factory, settings=settings)
+        return await _run_maintenance(session_factory, settings=settings, stop=stop)
 
 
 async def _run_maintenance(
-    session_factory: async_sessionmaker[AsyncSession], *, settings: Settings
+    session_factory: async_sessionmaker[AsyncSession],
+    *,
+    settings: Settings,
+    stop: asyncio.Event | None = None,
 ) -> tuple[int, int]:
     gc = 0
     purged = 0
@@ -59,7 +69,7 @@ async def _run_maintenance(
     try:
         # Purge in bounded batches, each its own transaction, so a large backlog
         # never locks/rewrites the whole entries table in one long-held statement.
-        while True:
+        while not (stop is not None and stop.is_set()):
             async with session_factory() as session, session.begin():
                 n = await entries_store.purge_retained(session, horizon=horizon, limit=batch)
             purged += n
@@ -89,4 +99,4 @@ async def maintenance_loop(
             pass
         if stop.is_set():
             break
-        await run_maintenance(session_factory, settings=settings)
+        await run_maintenance(session_factory, settings=settings, stop=stop)
