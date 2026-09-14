@@ -44,8 +44,8 @@ read the next morning. Setup is three steps.
    (`make otel-up`). These two lines are the whole configuration:
 
 ```sh
-ALO_PUSHOVER_USER_KEY=uQiRzp...   # dashboard
-ALO_PUSHOVER_API_TOKEN=azGDOR...  # the application you made
+ALO_PUSHOVER_USER_KEY=uQiRzp...    # 30 chars, from the dashboard
+ALO_PUSHOVER_API_TOKEN=azGDOR...   # 30 chars, from the application you made
 ```
 
 Then run `./scripts/test-alerts.sh` (see [Proving they work](#proving-they-work)).
