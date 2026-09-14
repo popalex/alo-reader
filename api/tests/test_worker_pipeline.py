@@ -198,3 +198,21 @@ async def test_empty_body_is_recorded_as_an_error_not_a_success(api_db: str) -> 
     assert (counters.errors, counters.new_body) == (1, 0)
     refreshed = await wutil.get_feed(sf, feed_id)
     assert refreshed.error_count == 1
+async def test_redirect_to_a_broken_page_keeps_the_original_url(api_db: str) -> None:
+    # A 301 is still permanent when it lands on a login or error page. Repointing
+    # feed_url there loses the original for good: the feed can never recover, even
+    # once the site is fixed.
+    sf = app_db.get_sessionmaker()
+    feed_id = await wutil.seed_feed(sf, "https://old.example/rss")
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.url.host == "old.example":
+            return httpx.Response(301, headers={"Location": "https://new.example/login"})
+        return httpx.Response(503)
+
+    await poll_once(sf, settings=wutil.worker_settings(), transport=httpx.MockTransport(handler))
+
+    feed = await wutil.get_feed(sf, feed_id)
+    assert feed.feed_url == "https://old.example/rss"
+    assert feed.error_count == 1
+    assert "503" in (feed.last_error or "")
