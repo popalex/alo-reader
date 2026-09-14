@@ -72,15 +72,19 @@ class AuthMiddleware:
         # Public paths are gated too, and they are the ones that need it most: the
         # webhook reads an unbounded body and runs an HMAC verify plus DB writes, and
         # an icon read streams a blob, both unauthenticated. Caddy sets no rate limit,
-        # so this middleware is the only gate in front of them.
-        if not runtime.ip_limiter.allow(client_ip(request)):
+        # so this middleware is the only gate in front of them. They get their own,
+        # looser bucket: one page load fetches an icon per subscription, and sharing
+        # the API bucket would let a cold first load 429 its own images.
+        public = _is_public(scope["path"])
+        limiter = runtime.public_limiter if public else runtime.ip_limiter
+        if not limiter.allow(client_ip(request)):
             response = JSONResponse(
                 status_code=429,
                 content=error_envelope("rate_limited", "too many requests"),
             )
             await response(scope, receive, send)
             return
-        if _is_public(scope["path"]):
+        if public:
             await self.app(scope, receive, send)
             return
         try:

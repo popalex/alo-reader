@@ -5,7 +5,7 @@ and cached on ``app.state.auth_runtime``; tests swap it to pin a mode or inject
 a mocked JWKS transport.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import httpx
 from fastapi import FastAPI
@@ -21,12 +21,24 @@ from .pat import PatProvider
 from .provider import AuthedUser, AuthProvider, ChainProvider
 from .ratelimit import TokenBucket
 
+# Mirrors the Settings defaults; get_runtime overrides both from configuration.
+_PUBLIC_RPS_DEFAULT = 200.0
+_PUBLIC_BURST_DEFAULT = 600
+
 
 @dataclass
 class AuthRuntime:
     provider: AuthProvider
     limiter: TokenBucket  # per-user, post-auth
     ip_limiter: TokenBucket  # per-IP, pre-auth
+    # Per-IP, for the routes that take no authentication (icons, the webhook,
+    # /config). Separate and much looser, because one page load legitimately fetches
+    # an icon per subscription: on the shared bucket a cold first load would 429 its
+    # own images and then the SPA's API calls behind them. get_runtime passes the
+    # configured one; the default keeps hand-built runtimes (tests) honest.
+    public_limiter: TokenBucket = field(
+        default_factory=lambda: TokenBucket(_PUBLIC_RPS_DEFAULT, _PUBLIC_BURST_DEFAULT)
+    )
 
 
 def build_provider(
@@ -60,6 +72,9 @@ def get_runtime(app: FastAPI) -> AuthRuntime:
             provider=build_provider(settings.auth_mode),
             limiter=TokenBucket(settings.rate_limit_rps, settings.rate_limit_burst),
             ip_limiter=TokenBucket(settings.rate_limit_ip_rps, settings.rate_limit_ip_burst),
+            public_limiter=TokenBucket(
+                settings.rate_limit_public_rps, settings.rate_limit_public_burst
+            ),
         )
         app.state.auth_runtime = runtime
     return runtime
