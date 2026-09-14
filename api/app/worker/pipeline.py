@@ -22,6 +22,7 @@ from app import telemetry
 from app.config import Settings
 from app.ingest import compress_text, parse_feed, sanitize_and_cap, summarize
 from app.ingest.parse import ParsedFeed
+from app.logfmt import line
 from app.store import entries as entries_store
 from app.store import feeds as feeds_store
 from app.store import icons as icons_store
@@ -157,7 +158,7 @@ async def _maybe_fetch_favicon(
             )
             await icons_store.set_feed_icon(session, feed_id, icon.id)
     except Exception as exc:  # noqa: BLE001 — best-effort, log and move on
-        log.warning("favicon_fetch_failed feed_id=%s error=%r", feed_id, exc)
+        log.warning("%s", line("favicon_fetch_failed", feed_id=feed_id, error=repr(exc)))
 
 
 async def _apply_not_modified(

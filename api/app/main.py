@@ -19,6 +19,7 @@ from app.config import get_settings, validate_boot_config
 from app.db import get_engine, get_sessionmaker
 from app.errors import register_exception_handlers
 from app.log import RequestContextMiddleware
+from app.logfmt import line
 from app.routes.counts import router as counts_router
 from app.routes.discover import router as discover_router
 from app.routes.entries import router as entries_router
@@ -84,7 +85,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # INFO line at import time is dropped. Say it here instead, where it is visible,
     # because "is error reporting actually on?" is a question operators ask.
     if sentry.is_enabled():
-        log.info("sentry_enabled service=alo-api release=%s", APP_VERSION)
+        log.info("%s", line("sentry_enabled", service="alo-api", release=APP_VERSION))
     refresher = asyncio.create_task(_gauge_refresh_loop()) if telemetry.is_enabled() else None
     try:
         yield
