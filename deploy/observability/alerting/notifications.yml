@@ -26,6 +26,10 @@ contactPoints:
           # from an application you register there (call it alo-reader).
           userKey: ${ALO_PUSHOVER_USER_KEY}
           apiToken: ${ALO_PUSHOVER_API_TOKEN}
+          # Numbers, not strings. Quoted, Grafana passes them through to Pushover as
+          # something it rejects with a bare 400 Bad Request, which looks exactly like
+          # a credential problem and is not one. Cost me an afternoon.
+          #
           # 1 = high: red, and it ignores your quiet hours, which is the point of
           # sending it to a phone. Resolved messages come in at -1 so the all-clear
           # never wakes anyone.
@@ -33,8 +37,8 @@ contactPoints:
           # For 2 (emergency, retries until you acknowledge) set retry and expire in
           # seconds as well, e.g. retry: "60", expire: "3600". Overkill for a feed
           # reader; the right call for something that pages a rota.
-          priority: "1"
-          okPriority: "-1"
+          priority: 1
+          okPriority: -1
 
 policies:
   - orgId: 1
