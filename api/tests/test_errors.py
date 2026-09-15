@@ -106,3 +106,12 @@ async def test_an_out_of_range_folder_position_is_a_422_not_a_500(
         headers=pat_user.headers,
     )
     assert resp.status_code == 422
+
+
+async def test_405_keeps_its_allow_header(api_client: httpx.AsyncClient) -> None:
+    # Starlette raises the 405 with an Allow header; the envelope handler dropped it,
+    # so the response told the client the method was wrong without saying which ones
+    # are right.
+    resp = await api_client.delete("/api/v1/healthz")
+    assert resp.status_code == 405
+    assert "GET" in resp.headers.get("allow", "")
