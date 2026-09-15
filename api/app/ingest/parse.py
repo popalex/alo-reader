@@ -14,6 +14,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
+from urllib.parse import urlsplit
 
 import feedparser  # type: ignore[import-untyped]
 
@@ -58,6 +59,26 @@ def _to_utc(parsed: time.struct_time | None) -> datetime | None:
         return datetime.fromtimestamp(time.mktime(parsed) - time.timezone, tz=UTC)
     except ValueError, OverflowError, OSError:
         return None
+
+
+def _safe_url(value: object) -> str | None:
+    """A feed-supplied URL, or None unless it is http(s).
+
+    feedparser hands these through untouched, so an entry <link> can be
+    ``javascript:alert(document.cookie)`` or a ``data:text/html`` document. The SPA
+    renders it as an href, and React only refuses javascript: URLs in development
+    builds, so this is the one place it can be stopped. The content sanitizer applies
+    the same allowlist to hrefs inside the body.
+    """
+    if not isinstance(value, str) or not value.strip():
+        return None
+    url = value.strip()
+    scheme = urlsplit(url).scheme.lower()
+    if scheme in ("http", "https"):
+        return url
+    # A protocol-relative or relative URL carries no scheme of its own; it inherits
+    # the page's, which is https for the SPA, so it cannot smuggle javascript:.
+    return url if scheme == "" else None
 
 
 def _published_at(entry: dict[str, Any], now: datetime) -> datetime | None:
@@ -107,7 +128,7 @@ def _normalize_entry(entry: dict[str, Any], now: datetime) -> ParsedEntry:
     published_at = _published_at(entry, now)
     guid_hash, guid_source = _guid(entry, title, published_at)
     author = entry.get("author") or None
-    url = entry.get("link") or None
+    url = _safe_url(entry.get("link"))
     return ParsedEntry(
         guid_hash=guid_hash,
         guid_source=guid_source,
@@ -130,10 +151,10 @@ def parse_feed(raw: bytes, *, now: datetime | None = None) -> ParsedFeed:
     feed = d.get("feed", {})
     return ParsedFeed(
         title=title_to_text(feed.get("title", "")),
-        site_url=feed.get("link") or None,
+        site_url=_safe_url(feed.get("link")),
         version=d.get("version", "") or "",
         bozo=bool(d.get("bozo", False)),
         encoding=d.get("encoding") or None,
-        image_url=(feed.get("image") or {}).get("href") or None,
+        image_url=_safe_url((feed.get("image") or {}).get("href")),
         entries=[_normalize_entry(e, now) for e in d.get("entries", [])],
     )

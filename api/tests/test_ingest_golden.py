@@ -128,3 +128,26 @@ if __name__ == "__main__":
         _update_goldens()
     else:
         print("pass --update to regenerate golden files")
+
+
+def test_feed_supplied_urls_must_be_http() -> None:
+    # feedparser hands <link> through untouched, and the SPA renders entry.url as an
+    # href. React only refuses javascript: URLs in development builds, so a feed could
+    # run script in the app's origin the moment someone clicked "open original".
+    rss = b"""<?xml version="1.0"?><rss version="2.0"><channel><title>t</title>
+    <link>javascript:alert(1)</link>
+    <item><title>a</title><guid>g1</guid><link>javascript:alert(document.cookie)</link></item>
+    <item><title>b</title><guid>g2</guid><link>data:text/html,&lt;script&gt;x&lt;/script&gt;</link></item>
+    <item><title>c</title><guid>g3</guid><link>https://ok.example/post</link></item>
+    <item><title>d</title><guid>g4</guid><link>/relative/path</link></item>
+    </channel></rss>"""
+
+    parsed = parse_feed(rss)
+
+    assert parsed.site_url is None
+    assert [e.url for e in parsed.entries] == [
+        None,
+        None,
+        "https://ok.example/post",
+        "/relative/path",  # no scheme of its own; inherits the page's
+    ]
