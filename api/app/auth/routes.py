@@ -147,7 +147,9 @@ async def clerk_webhook(request: Request, session: Session) -> None:
         if user is not None:
             user.email = email
             await session.flush()
-        elif event_type == "user.created":
+        elif event_type == "user.created" and not await users_store.is_clerk_deleted(
+            session, clerk_user_id
+        ):
             await users_store.create(session, clerk_user_id=clerk_user_id, email=email)
         # A user.updated for a row we do not have is dropped rather than created.
         # svix retries for a day and does not guarantee order, so an update landing
@@ -156,12 +158,13 @@ async def clerk_webhook(request: Request, session: Session) -> None:
         # against it. A live user missing locally is handled where it belongs: the
         # JWT path auto-provisions on the next request.
         #
-        # A retried user.created landing after the delete still recreates the row.
-        # Telling that apart from a first delivery needs a tombstone table, and the
-        # blast radius does not justify one: the Clerk account is gone, so no JWT can
-        # be minted for it, and what survives is an empty local row with no data
-        # attached. The cascade already removed everything that mattered.
+        # A retried user.created landing after the delete is refused the same way,
+        # against the deleted_clerk_users tombstone: svix retries for a day without
+        # ordering guarantees, and Clerk never reuses a user id.
     elif event_type == "user.deleted":
+        # The tombstone goes down whether or not a row is here to remove: the delete
+        # may itself be a retry, or may arrive before the create it raced.
+        await users_store.mark_clerk_deleted(session, clerk_user_id)
         user = await users_store.get_by_clerk_id(session, clerk_user_id)
         if user is not None:
             # FK ON DELETE CASCADE removes tokens/folders/subscriptions/states.

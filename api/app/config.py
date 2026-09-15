@@ -179,6 +179,10 @@ class Settings(BaseSettings):
     # retention purge run periodically, jittered so N workers don't all fire at once.
     worker_maintenance_interval_s: float = 3600.0
     worker_maintenance_jitter_s: float = 300.0
+    # How long a deleted Clerk account's tombstone is kept, blocking a retried
+    # user.created from recreating the row. svix gives up after about a day; a week
+    # is slack, and the rows are two columns each.
+    clerk_tombstone_days: int = Field(default=7, gt=0)
     # Delete a feed with zero subscribers for longer than this (orphan GC grace).
     orphan_grace_days: int = 7
     # Purge read+unstarred entries older than this whose every subscriber has read
