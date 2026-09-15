@@ -25,6 +25,7 @@ from app.models import Feed, Subscription
 from app.store import entries as entries_store
 from app.store import feeds as feeds_store
 from app.store import folders as folders_store
+from app.store import icons as icons_store
 from app.store import subscriptions as subs_store
 from app.store import users as users_store
 
@@ -86,6 +87,16 @@ def _icon_url(icon_id: int | None, source_url: str | None) -> str | None:
     return f"/api/v1/icons/{icon_id}"
 
 
+async def _shape_one(session: AsyncSession, sub: Subscription, feed: Feed) -> SubscriptionResponse:
+    """Shape a single subscription, reading the icon's source URL for the ``?v=``.
+
+    Without it these handlers returned a bare /api/v1/icons/{id} while the list
+    endpoint returned the versioned form, and icons are served immutable for a year:
+    the browser would cache whatever bytes that id held at the time and keep them
+    after the icon changed."""
+    return _shape(sub, feed, await icons_store.source_url(session, feed.icon_id))
+
+
 def _shape(
     sub: Subscription, feed: Feed, icon_source_url: str | None = None
 ) -> SubscriptionResponse:
@@ -145,7 +156,7 @@ async def create_subscription(
         await session.flush()
     except IntegrityError:  # racing duplicate on the (user_id, feed_id) unique index
         raise ApiError(409, "conflict", "already subscribed to this feed") from None
-    return _shape(sub, feed)
+    return await _shape_one(session, sub, feed)
 
 
 @router.patch("/{sub_id}", response_model=SubscriptionResponse)
@@ -169,7 +180,7 @@ async def update_subscription(
         raise ApiError(404, "not_found", "subscription not found")
     feed = await feeds_store.get(session, sub.feed_id)
     assert feed is not None  # FK guarantees the feed exists
-    return _shape(sub, feed)
+    return await _shape_one(session, sub, feed)
 
 
 @router.delete("/{sub_id}", status_code=204)
