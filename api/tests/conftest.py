@@ -11,6 +11,7 @@ used as a CREATE DATABASE template, so every API test starts from a pristine
 empty schema and full isolation.
 """
 
+import base64
 import itertools
 import os
 from collections.abc import AsyncIterator, Callable, Iterator
@@ -36,7 +37,15 @@ os.environ.setdefault("AUTH_MODE", "none")
 # run under AUTH_MODE=clerk (the CI matrix does). Tests that exercise Clerk build
 # their own ClerkSettings; these only have to be present and well-formed.
 os.environ.setdefault("CLERK_ISSUER", "https://clerk.test.invalid")
-os.environ.setdefault("CLERK_WEBHOOK_SECRET", "whsec_dGVzdC1zZWNyZXQtZm9yLXRoZS1zdWl0ZQ==")
+# Built rather than written out: the literal form is a valid svix signing secret by
+# shape (whsec_ + base64), which is exactly what a secret scanner is meant to flag,
+# and it did. svix only needs something base64-decodable here — the suite signs its
+# own payloads with a per-test secret (see test_webhook_clerk.py) and never verifies
+# a real signature against this one.
+os.environ.setdefault(
+    "CLERK_WEBHOOK_SECRET",
+    "whsec_" + base64.b64encode(b"alo-reader-test-suite-not-a-secret").decode(),
+)
 os.environ.setdefault("CLERK_PUBLISHABLE_KEY", "pk_test_suite")
 
 from app import db as app_db  # noqa: E402
