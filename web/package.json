@@ -42,8 +42,8 @@
     "dompurify": "^3.4.15",
     "idb": "^8.0.3",
     "lucide-react": "^1.45.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
@@ -51,7 +51,7 @@
     "@playwright/test": "^1.63.0",
     "@size-limit/file": "^13.0.3",
     "@testing-library/react": "^16.3.3",
-    "@types/react": "^18.3.31",
+    "@types/react": "^19.3.0",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^6.1.1",
     "eslint": "^10.10.0",
