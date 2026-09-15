@@ -155,3 +155,38 @@ describe("useMarkStreamRead", () => {
     expect(search.pages[0].entries.every((e) => e.is_read)).toBe(true);
   });
 });
+
+describe("concurrent mutations", () => {
+  it("a failed rollback leaves a concurrent mutation's saved change alone", async () => {
+    // Overlapping calls are routine here: the scroll marker fires one per 500-id
+    // chunk while a click fires another. Restoring a whole-cache snapshot on failure
+    // undid whatever the other one had already saved.
+    const qc = seededClient();
+    const { result } = renderHook(() => useSetEntryState(), { wrapper: wrapper(qc) });
+
+    let failA: (err: Error) => void = () => {};
+    postEntryState.mockImplementationOnce(
+      () => new Promise((_res, rej) => (failA = rej as (err: Error) => void)),
+    );
+    postEntryState.mockResolvedValueOnce({ updated: 1 });
+
+    await act(async () => {
+      result.current.mutate({ ids: [1], read: true }); // A: in flight
+      result.current.mutate({ ids: [2], starred: true }); // B: succeeds meanwhile
+    });
+    await waitFor(() =>
+      expect(qc.getQueryData<EntriesData>(["entries", "all", null])!.pages[0].entries[1].is_starred).toBe(true),
+    );
+
+    await act(async () => {
+      failA(new ApiError(500, "internal", "boom"));
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(pushToast).toHaveBeenCalled());
+
+    const entries = qc.getQueryData<EntriesData>(["entries", "all", null])!.pages[0].entries;
+    expect(entries[0].is_read).toBe(false); // A rolled back
+    expect(entries[1].is_starred).toBe(true); // B survived
+    expect(qc.getQueryData<Counts>(queryKeys.counts)!.total_unread).toBe(5);
+  });
+});
