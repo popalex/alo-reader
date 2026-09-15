@@ -185,7 +185,10 @@ def _cap(cleaned: str) -> tuple[str, bool]:
             return candidate, True
         if budget <= MAX_CONTENT_BYTES // 2:
             break
-        budget -= overflow + 64  # drop the overrun plus a little slack for closing tags
+        # Floor the budget: on deeply nested input the re-clean can add more closing
+        # tags than the slack allows, and an unclamped subtraction goes negative,
+        # where raw[:budget] stops being a prefix and starts trimming from the end.
+        budget = max(budget - overflow - 64, MAX_CONTENT_BYTES // 2)
     # Last resort: hard-truncate the sanitized bytes to the ceiling. May leave a tag
     # unclosed, but the content is already allowlist-clean (no scripts/handlers), so
     # this is a cosmetic cut, not a safety one — the byte cap is now guaranteed.
@@ -209,12 +212,28 @@ def sanitize_html(raw_html: str) -> str:
     return sanitize_and_cap(raw_html)[0]
 
 
+# Tags that end a run of text. Stripping markup without putting something in its
+# place fuses the words either side: "<h1>Title</h1><p>Body" becomes "TitleBody", and
+# list items and table cells run together the same way. Only block-level boundaries
+# and <br> get the space — inserting one at every tag would break "un<b>break</b>able"
+# into three words.
+_BLOCK_BOUNDARY_RE = re.compile(
+    r"</?(?:br|hr|p|div|section|article|aside|header|footer|main|nav|blockquote|pre"
+    r"|figure|figcaption|address|dl|dt|dd|ul|ol|li|table|thead|tbody|tfoot|tr|td|th"
+    r"|h[1-6])\b[^>]*>",
+    re.IGNORECASE,
+)
+
+
 def _strip_to_text(raw_html: str) -> str:
     """Strip all markup and collapse whitespace, yielding plain text."""
     if not raw_html:
         return ""
+    # Mark the block boundaries before the tags disappear; _WS_RE collapses the
+    # doubled spaces this leaves behind.
+    spaced = _BLOCK_BOUNDARY_RE.sub(" ", raw_html)
     # tags=set() removes every tag but keeps text; drop scripted content wholesale.
-    stripped = nh3.clean(raw_html, tags=set(), clean_content_tags=_CLEAN_CONTENT_TAGS)
+    stripped = nh3.clean(spaced, tags=set(), clean_content_tags=_CLEAN_CONTENT_TAGS)
     # nh3 re-escapes entities; decode so callers get real text, then normalize WS.
     text = html.unescape(stripped)
     return _WS_RE.sub(" ", text).strip()

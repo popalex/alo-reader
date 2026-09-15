@@ -139,3 +139,22 @@ def test_empty_inputs() -> None:
     assert sanitize_html("") == ""
     assert title_to_text("") == ""
     assert summarize("") == ""
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("<h1>Title</h1><p>Body starts here</p>", "Title Body starts here"),
+        ("<ul><li>alpha</li><li>beta</li></ul>", "alpha beta"),
+        ("one<br>two", "one two"),
+        ("<table><tr><td>x</td><td>y</td></tr></table>", "x y"),
+        ("<p>A sentence.</p><p>Another one.</p>", "A sentence. Another one."),
+        # Inline tags must not gain a space, or words come apart.
+        ("un<b>break</b>able", "unbreakable"),
+        ("<p>a <em>word</em> inline</p>", "a word inline"),
+    ],
+)
+def test_summary_keeps_block_boundaries_apart(raw: str, expected: str) -> None:
+    # Stripping tags with nothing in their place fused the text either side, so most
+    # list previews began with the heading welded to the first word of the body.
+    assert summarize(raw) == expected

@@ -14,6 +14,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
+from urllib.parse import urlsplit
 
 import feedparser  # type: ignore[import-untyped]
 
@@ -50,6 +51,15 @@ class ParsedFeed:
     entries: list[ParsedEntry] = field(default_factory=list)
 
 
+# Body preference, best first. Anything unlisted ranks 0, so a feed that offers only
+# an unusual type still yields its single content element.
+_CONTENT_TYPE_RANK = {
+    "text/html": 3,
+    "application/xhtml+xml": 2,
+    "text/plain": 1,
+}
+
+
 def _to_utc(parsed: time.struct_time | None) -> datetime | None:
     """A feedparser ``*_parsed`` struct_time (already UTC) → aware UTC datetime."""
     if parsed is None:
@@ -60,21 +70,52 @@ def _to_utc(parsed: time.struct_time | None) -> datetime | None:
         return None
 
 
+def _safe_url(value: object) -> str | None:
+    """A feed-supplied URL, or None unless it is http(s).
+
+    feedparser hands these through untouched, so an entry <link> can be
+    ``javascript:alert(document.cookie)`` or a ``data:text/html`` document. The SPA
+    renders it as an href, and React only refuses javascript: URLs in development
+    builds, so this is the one place it can be stopped. The content sanitizer applies
+    the same allowlist to hrefs inside the body.
+    """
+    if not isinstance(value, str) or not value.strip():
+        return None
+    url = value.strip()
+    scheme = urlsplit(url).scheme.lower()
+    if scheme in ("http", "https"):
+        return url
+    # A protocol-relative or relative URL carries no scheme of its own; it inherits
+    # the page's, which is https for the SPA, so it cannot smuggle javascript:.
+    return url if scheme == "" else None
+
+
 def _published_at(entry: dict[str, Any], now: datetime) -> datetime | None:
-    dt = _to_utc(entry.get("published_parsed")) or _to_utc(entry.get("updated_parsed"))
-    if dt is None:
-        return None
-    if dt > now + _MAX_FUTURE:
-        return None
-    return dt
+    """First usable timestamp, preferring published over updated.
+
+    The future check runs per candidate: an entry dated 2099 used to short-circuit
+    the `or`, so a perfectly good `updated` was never consulted and the entry landed
+    with no date at all — which sorts it to the bottom and makes it the first thing
+    dropped when a feed exceeds WORKER_MAX_ENTRIES_PER_FETCH.
+    """
+    for key in ("published_parsed", "updated_parsed"):
+        dt = _to_utc(entry.get(key))
+        if dt is not None and dt <= now + _MAX_FUTURE:
+            return dt
+    return None
 
 
 def _content_html(entry: dict[str, Any]) -> str:
     """Best available body: Atom ``content`` first, else ``summary``/description."""
     contents = entry.get("content")
     if contents:
-        # feedparser gives a list of {'value', 'type', ...}; prefer text/html.
-        best = max(contents, key=lambda c: c.get("type") == "text/html")
+        # feedparser gives a list of {'value', 'type', ...}. Rank the types rather
+        # than testing for one: `max` over a boolean key returns the *first* element
+        # when nothing matches, and feedparser normalizes Atom type="xhtml" to
+        # application/xhtml+xml, which never equalled "text/html". An entry carrying
+        # a text teaser before its xhtml body therefore stored the teaser and threw
+        # the article away.
+        best = max(contents, key=lambda c: _CONTENT_TYPE_RANK.get(c.get("type", ""), 0))
         value = best.get("value", "")
     else:
         value = entry.get("summary", "")
@@ -96,9 +137,14 @@ def _guid(
     elif link:
         basis, source = link, "link"
     else:
-        # Synthetic: stable across re-fetches of the same entry.
+        # Synthetic: stable across re-fetches of the same entry, and distinct between
+        # entries. Title and date alone collide whenever a feed ships several
+        # untitled, undated items — and insert_batch's ON CONFLICT DO NOTHING then
+        # drops all but the first, permanently, because the hash repeats on every
+        # later fetch. The body is what tells them apart.
         stamp = published_at.isoformat() if published_at else ""
-        basis, source = f"{title}\x00{stamp}", "synthetic"
+        body = _content_html(entry)
+        basis, source = f"{title}\x00{stamp}\x00{body}", "synthetic"
     return hashlib.sha256(basis.encode("utf-8")).digest(), source
 
 
@@ -107,7 +153,7 @@ def _normalize_entry(entry: dict[str, Any], now: datetime) -> ParsedEntry:
     published_at = _published_at(entry, now)
     guid_hash, guid_source = _guid(entry, title, published_at)
     author = entry.get("author") or None
-    url = entry.get("link") or None
+    url = _safe_url(entry.get("link"))
     return ParsedEntry(
         guid_hash=guid_hash,
         guid_source=guid_source,
@@ -130,10 +176,10 @@ def parse_feed(raw: bytes, *, now: datetime | None = None) -> ParsedFeed:
     feed = d.get("feed", {})
     return ParsedFeed(
         title=title_to_text(feed.get("title", "")),
-        site_url=feed.get("link") or None,
+        site_url=_safe_url(feed.get("link")),
         version=d.get("version", "") or "",
         bozo=bool(d.get("bozo", False)),
         encoding=d.get("encoding") or None,
-        image_url=(feed.get("image") or {}).get("href") or None,
+        image_url=_safe_url((feed.get("image") or {}).get("href")),
         entries=[_normalize_entry(e, now) for e in d.get("entries", [])],
     )

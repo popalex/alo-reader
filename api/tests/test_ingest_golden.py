@@ -128,3 +128,74 @@ if __name__ == "__main__":
         _update_goldens()
     else:
         print("pass --update to regenerate golden files")
+
+
+def test_feed_supplied_urls_must_be_http() -> None:
+    # feedparser hands <link> through untouched, and the SPA renders entry.url as an
+    # href. React only refuses javascript: URLs in development builds, so a feed could
+    # run script in the app's origin the moment someone clicked "open original".
+    rss = b"""<?xml version="1.0"?><rss version="2.0"><channel><title>t</title>
+    <link>javascript:alert(1)</link>
+    <item><title>a</title><guid>g1</guid><link>javascript:alert(document.cookie)</link></item>
+    <item><title>b</title><guid>g2</guid><link>data:text/html,&lt;script&gt;x&lt;/script&gt;</link></item>
+    <item><title>c</title><guid>g3</guid><link>https://ok.example/post</link></item>
+    <item><title>d</title><guid>g4</guid><link>/relative/path</link></item>
+    </channel></rss>"""
+
+    parsed = parse_feed(rss)
+
+    assert parsed.site_url is None
+    assert [e.url for e in parsed.entries] == [
+        None,
+        None,
+        "https://ok.example/post",
+        "/relative/path",  # no scheme of its own; inherits the page's
+    ]
+
+
+def test_untitled_undated_entries_get_distinct_guids() -> None:
+    # Title plus date alone collide across items that have neither, and insert_batch's
+    # ON CONFLICT DO NOTHING then drops all but the first — permanently, since the
+    # hash repeats on every later fetch.
+    rss = b"""<?xml version="1.0"?><rss version="2.0"><channel><title>t</title>
+    <item><description>first body</description></item>
+    <item><description>second body</description></item>
+    <item><description>third body</description></item>
+    </channel></rss>"""
+
+    entries = parse_feed(rss).entries
+
+    assert len(entries) == 3
+    assert len({e.guid_hash for e in entries}) == 3
+    assert {e.guid_source for e in entries} == {"synthetic"}
+
+
+def test_xhtml_body_wins_over_a_text_teaser() -> None:
+    # max() over a boolean key returns the first element when nothing matches, and
+    # feedparser normalizes Atom type="xhtml" to application/xhtml+xml, which never
+    # equalled "text/html". The teaser was stored and the article thrown away.
+    atom = b"""<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">
+    <title>t</title><entry><title>a</title><id>u1</id>
+    <content type="text">TEASER ONLY</content>
+    <content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml">
+    <p>THE FULL ARTICLE BODY</p></div></content>
+    </entry></feed>"""
+
+    entry = parse_feed(atom).entries[0]
+
+    assert "THE FULL ARTICLE BODY" in entry.content_html
+
+
+def test_a_future_published_falls_back_to_updated() -> None:
+    # The future check ran after the `or`, so a bogus 2099 date short-circuited a
+    # perfectly good <updated> and the entry landed with no date — which sorts it last
+    # and makes it the first thing dropped when a feed exceeds the per-fetch cap.
+    atom = b"""<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">
+    <title>t</title><entry><title>a</title><id>u1</id>
+    <published>2099-01-01T00:00:00Z</published>
+    <updated>2025-06-30T10:00:00Z</updated>
+    </entry></feed>"""
+
+    entry = parse_feed(atom, now=datetime(2026, 1, 1, tzinfo=UTC)).entries[0]
+
+    assert entry.published_at == datetime(2025, 6, 30, 10, 0, tzinfo=UTC)
