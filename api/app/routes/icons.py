@@ -4,7 +4,7 @@
 from fastapi import APIRouter
 from fastapi.responses import Response
 
-from app.deps import Session
+from app.deps import RowId, Session
 from app.errors import ApiError
 from app.store import icons as icons_store
 
@@ -15,7 +15,7 @@ _CACHE_CONTROL = "public, max-age=31536000, immutable"
 
 
 @router.get("/icons/{icon_id}")
-async def get_icon(icon_id: int, session: Session) -> Response:
+async def get_icon(icon_id: RowId, session: Session) -> Response:
     icon = await icons_store.get(session, icon_id)
     if icon is None or icon.data is None:
         raise ApiError(404, "not_found", "icon not found")

@@ -6,11 +6,12 @@ user can see (in a subscribed feed); another tenant's id reads as 404.
 """
 
 from datetime import UTC, datetime, timedelta
+from typing import Annotated
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from app.deps import CurrentUser, Session
+from app.deps import CurrentUser, RowId, Session
 from app.errors import ApiError
 from app.store import entries as entries_store
 from app.store import entry_states as states_store
@@ -50,7 +51,9 @@ class EntryDetail(BaseModel):
 
 
 class StateRequest(BaseModel):
-    ids: list[int] = Field(min_length=1, max_length=MAX_STATE_IDS)
+    ids: list[Annotated[int, Field(ge=1, le=2**63 - 1)]] = Field(
+        min_length=1, max_length=MAX_STATE_IDS
+    )
     read: bool | None = None
     starred: bool | None = None
     changed_at: datetime | None = None
@@ -61,7 +64,7 @@ class UpdatedResponse(BaseModel):
 
 
 @router.get("/entries/{entry_id}", response_model=EntryDetail)
-async def get_entry(entry_id: int, user: CurrentUser, session: Session) -> EntryDetail:
+async def get_entry(entry_id: RowId, user: CurrentUser, session: Session) -> EntryDetail:
     row = await entries_store.get_for_user(session, user.id, entry_id)
     if row is None:
         raise ApiError(404, "not_found", "entry not found")

@@ -82,6 +82,11 @@ def register_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=exc.status_code,
             content=error_envelope(code, str(exc.detail)),
+            # Starlette attaches headers to some of these and they are part of the
+            # response's meaning: a 405 carries Allow, a 401 can carry
+            # WWW-Authenticate. Dropping them turns a correct answer into a confusing
+            # one.
+            headers=exc.headers,
         )
 
     @app.exception_handler(Exception)

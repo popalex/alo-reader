@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import telemetry
 from app.auth.ratelimit import Cooldown
 from app.config import get_settings
-from app.deps import CurrentUser, Session
+from app.deps import CurrentUser, RowId, Session
 from app.errors import ApiError
 from app.models import Feed, Subscription
 from app.store import entries as entries_store
@@ -150,7 +150,7 @@ async def create_subscription(
 
 @router.patch("/{sub_id}", response_model=SubscriptionResponse)
 async def update_subscription(
-    sub_id: int, body: UpdateSubscriptionRequest, user: CurrentUser, session: Session
+    sub_id: RowId, body: UpdateSubscriptionRequest, user: CurrentUser, session: Session
 ) -> SubscriptionResponse:
     fields = body.model_fields_set
     if "folder_id" in fields and body.folder_id is not None:
@@ -173,13 +173,15 @@ async def update_subscription(
 
 
 @router.delete("/{sub_id}", status_code=204)
-async def delete_subscription(sub_id: int, user: CurrentUser, session: Session) -> None:
+async def delete_subscription(sub_id: RowId, user: CurrentUser, session: Session) -> None:
     if not await subs_store.delete(session, user.id, sub_id):
         raise ApiError(404, "not_found", "subscription not found")
 
 
 @router.post("/{sub_id}/refresh", response_model=RefreshResponse, status_code=202)
-async def refresh_subscription(sub_id: int, user: CurrentUser, session: Session) -> RefreshResponse:
+async def refresh_subscription(
+    sub_id: RowId, user: CurrentUser, session: Session
+) -> RefreshResponse:
     sub = await subs_store.get(session, user.id, sub_id)
     if sub is None:
         raise ApiError(404, "not_found", "subscription not found")

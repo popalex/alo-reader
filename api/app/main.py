@@ -51,6 +51,7 @@ async def _gauge_refresh_loop() -> None:
     """Periodically read the DB-derived gauges and push them into the telemetry cache."""
     from app.store import metrics as metrics_store
 
+    failures = 0
     while True:
         try:
             async with get_sessionmaker()() as session:
@@ -63,8 +64,17 @@ async def _gauge_refresh_loop() -> None:
                 table_bytes={t.table: t.bytes for t in sizes},
                 table_rows={t.table: t.rows for t in sizes},
             )
+            if failures:
+                log.info("gauge_refresh_recovered after=%d", failures)
+            failures = 0
         except Exception:  # noqa: BLE001 — a gauge blip must not kill the loop
-            log.exception("gauge_refresh_failed")
+            failures += 1
+            # A database outage hits this loop every 15s. Logging a traceback each
+            # time is ~240 Sentry events an hour per replica for one fact, and it
+            # buries whatever else is happening. Report the first failure in full,
+            # then only on an exponential schedule until it recovers.
+            if failures == 1 or failures & (failures - 1) == 0:
+                log.exception("gauge_refresh_failed consecutive=%d", failures)
         await asyncio.sleep(_GAUGE_REFRESH_S)
 
 
@@ -95,6 +105,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             with suppress(asyncio.CancelledError):
                 await refresher
         telemetry.shutdown()
+        # Close the pool rather than letting SIGTERM drop up to DB_POOL_SIZE +
+        # DB_MAX_OVERFLOW sockets: Postgres logs each as an unexpected disconnect and
+        # holds the backend until it notices.
+        await get_engine().dispose()
 
 
 app = FastAPI(title="alo-reader", version=APP_VERSION, lifespan=lifespan)

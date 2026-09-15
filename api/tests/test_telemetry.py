@@ -90,3 +90,12 @@ def test_db_span_name_parses_op_and_table() -> None:
         == "SELECT feeds"
     )
     assert _db_span_name("SELECT pg_database_size(current_database())") is None
+
+
+def test_shutdown_leaves_is_enabled_honest() -> None:
+    # Every record helper checks is_enabled() before touching a provider, and
+    # configure_telemetry returns early while it is true. Leaving it set after
+    # shutdown means emits go to dead providers and the process cannot re-arm.
+    runtime = telemetry.TelemetryRuntime(enabled=True)
+    runtime.shutdown()
+    assert runtime.enabled is False

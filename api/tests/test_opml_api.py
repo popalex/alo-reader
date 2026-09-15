@@ -153,3 +153,80 @@ async def test_import_malformed_is_400(api_client: httpx.AsyncClient, pat_user: 
         OPML, files={"file": ("m.opml", b"<opml><body", "text/x-opml")}, headers=pat_user.headers
     )
     assert resp.status_code == 400
+
+
+async def test_import_rejects_a_utf16_entity_bomb(
+    api_client: httpx.AsyncClient, pat_user: PatUser
+) -> None:
+    # The old guard was a byte scan for b"<!ENTITY", and expat picks its encoding from
+    # the BOM or the declaration, so any non-UTF-8 document walked straight past it and
+    # then expanded normally. Inside the 1 MiB cap that reaches gigabytes.
+    bomb = (
+        '<?xml version="1.0" encoding="UTF-16"?>\n'
+        '<!DOCTYPE opml [ <!ENTITY a "aaaaaaaaaa">'
+        ' <!ENTITY b "&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;"> ]>\n'
+        '<opml version="2.0"><body>'
+        '<outline type="rss" text="&b;" xmlUrl="https://bomb.example/f"/>'
+        "</body></opml>"
+    ).encode("utf-16")
+
+    resp = await api_client.post(
+        "/api/v1/opml",
+        files={"file": ("bomb.opml", bomb, "text/x-opml")},
+        headers=pat_user.headers,
+    )
+
+    assert resp.status_code == 400
+    assert resp.json()["error"]["code"] == "invalid_request"
+
+
+async def test_import_of_deeply_nested_outlines_is_not_a_500(
+    api_client: httpx.AsyncClient, pat_user: PatUser
+) -> None:
+    # The parser recursed once per nesting level, so ~3000 nested outlines (an 84 KB
+    # file, well under the cap) raised RecursionError and surfaced as a 500.
+    depth = 3000
+    nested = (
+        b"<opml version='2.0'><body>"
+        + b"<outline text='f'>" * depth
+        + b"<outline type='rss' text='deep' xmlUrl='https://deep.example/f'/>"
+        + b"</outline>" * depth
+        + b"</body></opml>"
+    )
+
+    resp = await api_client.post(
+        "/api/v1/opml",
+        files={"file": ("deep.opml", nested, "text/x-opml")},
+        headers=pat_user.headers,
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["imported"] == 1
+
+
+async def test_reimport_at_quota_reports_skipped_not_failed(
+    api_client: httpx.AsyncClient, pat_user: PatUser
+) -> None:
+    # A user at their cap re-importing their own export used to get a report full of
+    # "quota exceeded" for feeds they were already subscribed to.
+    opml = (
+        b'<?xml version="1.0"?><opml version="2.0"><body>'
+        b'<outline type="rss" text="A" xmlUrl="https://quota-a.example/rss"/>'
+        b'<outline type="rss" text="B" xmlUrl="https://quota-b.example/rss"/>'
+        b"</body></opml>"
+    )
+    files = {"file": ("subs.opml", opml, "text/x-opml")}
+    first = await api_client.post("/api/v1/opml", files=files, headers=pat_user.headers)
+    assert first.json()["imported"] == 2
+
+    from sqlalchemy import update
+
+    from app.models import User
+
+    async with app_db.get_sessionmaker()() as s, s.begin():
+        await s.execute(update(User).where(User.id == pat_user.user_id).values(quota_subs=2))
+
+    again = await api_client.post("/api/v1/opml", files=files, headers=pat_user.headers)
+
+    body = again.json()
+    assert (body["imported"], body["skipped"], body["failed"]) == (0, 2, [])

@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from app.config import get_settings
 from app.deps import CurrentUser, Session
 from app.errors import ApiError
-from app.opml import OpmlFeed, build_opml, parse_opml
+from app.opml import OpmlEntityError, OpmlFeed, build_opml, parse_opml
 from app.routes.subscriptions import normalize_feed_url
 from app.store import entries as entries_store
 from app.store import feeds as feeds_store
@@ -71,12 +71,13 @@ async def import_opml(
     data = await file.read(cap + 1)
     if len(data) > cap:
         raise ApiError(422, "validation_error", f"OPML exceeds {cap} bytes")
-    # Reject entity declarations outright (billion-laughs / XXE guard, stdlib-only).
-    if b"<!ENTITY" in data.upper():
-        raise ApiError(400, "invalid_request", "OPML with entity declarations is not allowed")
     try:
         # ElementTree parse of up to opml_max_bytes is CPU-bound; keep it off the loop.
+        # parse_opml rejects a DTD before expat can expand anything (billion-laughs /
+        # XXE guard); the byte scan this replaces missed any non-UTF-8 encoding.
         parsed = await asyncio.to_thread(parse_opml, data)
+    except OpmlEntityError as exc:
+        raise ApiError(400, "invalid_request", str(exc)) from None
     except ElementTree.ParseError:
         raise ApiError(400, "invalid_request", "malformed OPML") from None
 
@@ -94,15 +95,17 @@ async def import_opml(
         except ApiError:
             failed.append(ImportFailure(url=item.xml_url, reason="invalid url"))
             continue
-        if count >= user.quota_subs:
-            failed.append(ImportFailure(url=url, reason="quota exceeded"))
-            continue
-
         # Seed a new feed's title from the OPML so imported feeds show a name before
-        # their first poll (an existing feed keeps its own title).
+        # their first poll (an existing feed keeps its own title). The upsert has no
+        # effect for a URL that already exists, so it is safe ahead of the quota check
+        # — and it has to be, or a user at quota re-importing their own export gets a
+        # report full of "quota exceeded" for feeds they are already subscribed to.
         feed = await feeds_store.upsert_by_url(session, feed_url=url, title=item.title)
         if await subs_store.get_by_feed(session, user.id, feed.id) is not None:
             skipped += 1
+            continue
+        if count >= user.quota_subs:
+            failed.append(ImportFailure(url=url, reason="quota exceeded"))
             continue
 
         folder_id: int | None = None

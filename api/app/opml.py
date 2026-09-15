@@ -8,6 +8,7 @@ its nearest named ancestor outline. Untrusted uploads are guarded by the caller
 from dataclasses import dataclass
 from typing import cast
 from xml.etree import ElementTree
+from xml.parsers import expat
 
 
 @dataclass(frozen=True)
@@ -38,17 +39,66 @@ def build_opml(title: str, groups: list[tuple[str | None, list[OpmlFeed]]]) -> b
     return cast(bytes, ElementTree.tostring(opml, encoding="utf-8", xml_declaration=True))
 
 
+class OpmlEntityError(ValueError):
+    """The document carries a DTD. Callers reject it rather than expand it."""
+
+
+class _NoDoctype(Exception):
+    """Internal: stop the pre-scan at the first element, the DTD is behind us."""
+
+
+def reject_dtd(data: bytes) -> None:
+    """Raise :class:`OpmlEntityError` if the document declares a DTD.
+
+    Expat decides the encoding from the BOM or the XML declaration, so this runs as
+    a real parse rather than a byte scan: a UTF-16 document sails straight past a
+    search for b"<!ENTITY" and then expands normally, and a nested-entity bomb inside
+    the 1 MiB upload cap expands to gigabytes. The scan stops at the first element,
+    which is past the DTD and before any content, so it costs a few hundred bytes of
+    parsing rather than a second pass over the document.
+
+    Malformed XML is left alone here; parse_opml raises the ParseError the caller
+    already handles.
+    """
+
+    def start_doctype(*_args: object) -> None:
+        raise OpmlEntityError("OPML with a document type declaration is not allowed")
+
+    def start_element(*_args: object) -> None:
+        raise _NoDoctype
+
+    parser = expat.ParserCreate()
+    parser.StartDoctypeDeclHandler = start_doctype
+    parser.StartElementHandler = start_element
+    try:
+        parser.Parse(data, True)
+    except _NoDoctype:
+        return
+    except expat.ExpatError:
+        return  # malformed: parse_opml raises ParseError, which the route reports as 400
+
+
 def parse_opml(data: bytes) -> list[OpmlFeed]:
     """Flatten an OPML document to a list of feeds, each tagged with its nearest
-    named folder. Raises ``ElementTree.ParseError`` on malformed XML."""
+    named folder.
+
+    Raises ``ElementTree.ParseError`` on malformed XML and :class:`OpmlEntityError`
+    on a document carrying a DTD (see :func:`reject_dtd`).
+    """
+    reject_dtd(data)
     root = ElementTree.fromstring(data)
     body = root.find("body")
     feeds: list[OpmlFeed] = []
     if body is None:
         return feeds
 
-    def walk(element: ElementTree.Element, folder: str | None) -> None:
-        for outline in element.findall("outline"):
+    # Iterative, with an explicit stack: a recursive walk blows the interpreter's
+    # stack at a few thousand nested outlines, which is a ~84 KB file, and the
+    # RecursionError surfaces as a 500 rather than a rejected upload.
+    stack: list[tuple[ElementTree.Element, str | None]] = [(body, None)]
+    while stack:
+        element, folder = stack.pop()
+        for outline in reversed(element.findall("outline")):
             xml_url = outline.get("xmlUrl")
             text = outline.get("text") or outline.get("title") or ""
             if xml_url:
@@ -62,7 +112,5 @@ def parse_opml(data: bytes) -> list[OpmlFeed]:
                 )
             else:
                 # A category/folder outline; its descendants inherit its name.
-                walk(outline, text or folder)
-
-    walk(body, None)
+                stack.append((outline, text or folder))
     return feeds

@@ -137,8 +137,11 @@ class Settings(BaseSettings):
     # Worker / poller (DESIGN.md §1.3). The claim loop wakes every
     # WORKER_POLL_INTERVAL_S, claims WORKER_CLAIM_BATCH due feeds under a
     # WORKER_LEASE_S lease, and fetches at most WORKER_MAX_CONCURRENCY at once.
-    worker_poll_interval_s: float = 5.0
-    worker_claim_batch: int = 50
+    worker_poll_interval_s: float = Field(default=5.0, gt=0)
+    # gt=0 throughout: both concurrency knobs become asyncio.Semaphore(0), which
+    # blocks forever, so the worker would hang silently holding its leases while the
+    # claim loop reports nothing wrong.
+    worker_claim_batch: int = Field(default=50, gt=0)
     # Lease must outlast the time to drain one claimed batch, or a slow batch loses
     # its lease mid-flight and another replica re-claims in-flight feeds (idempotent,
     # but wasteful). Spread across hosts that is ceil(batch/concurrency) x
@@ -148,7 +151,7 @@ class Settings(BaseSettings):
     # per-host delay), which no sane lease covers. Raise WORKER_LEASE_S, or lower
     # WORKER_CLAIM_BATCH, if you poll many feeds from a single platform.
     worker_lease_s: int = 300
-    worker_max_concurrency: int = 20
+    worker_max_concurrency: int = Field(default=20, gt=0)
     # Cap entries persisted from a single fetch, so a pathological feed advertising
     # thousands of items can't build one unbounded INSERT/transaction. The newest N by
     # publish date are kept (undated last). Well above any sane feed's item count.
@@ -156,7 +159,7 @@ class Settings(BaseSettings):
 
     # Politeness per origin host: at most this many concurrent fetches to one
     # host, and at least this long between successive fetches to it.
-    worker_per_host_concurrency: int = 1
+    worker_per_host_concurrency: int = Field(default=1, gt=0)
     worker_per_host_delay_s: float = 1.0
 
     # Fetch a feed's favicon on its first successful poll (WP-08). Best-effort.
