@@ -90,6 +90,16 @@ def _safe_url(value: object) -> str | None:
     return url if scheme == "" else None
 
 
+def _raw_get(entry: dict[str, Any], key: str) -> Any:
+    """Read a key without feedparser's deprecated updated → published fallback.
+
+    feedparser maps a missing ``updated_parsed`` onto ``published_parsed`` and warns
+    about it. That would make the fallback below re-read the very timestamp it is
+    trying to get away from, so ask the plain dict instead.
+    """
+    return dict.get(entry, key)
+
+
 def _published_at(entry: dict[str, Any], now: datetime) -> datetime | None:
     """First usable timestamp, preferring published over updated.
 
@@ -99,7 +109,7 @@ def _published_at(entry: dict[str, Any], now: datetime) -> datetime | None:
     dropped when a feed exceeds WORKER_MAX_ENTRIES_PER_FETCH.
     """
     for key in ("published_parsed", "updated_parsed"):
-        dt = _to_utc(entry.get(key))
+        dt = _to_utc(_raw_get(entry, key))
         if dt is not None and dt <= now + _MAX_FUTURE:
             return dt
     return None
