@@ -4,6 +4,7 @@
 // and last-writer-wins on changed_at (DESIGN §5), so replay order and duplicates
 // are non-issues — the queue's job is just "don't lose it, send it once."
 
+import { ApiError } from "../../api/client";
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 
 export interface OutboxItem {
@@ -60,18 +61,26 @@ export async function enqueue(item: OutboxItem): Promise<void> {
 let replaying = false;
 
 /** Drain the outbox through `post`, oldest-first, single-flight. Each item is
- *  removed only after a successful send (so failures retry, and nothing sends
- *  twice). Stops at the first failure — the next `online`/load tries again. */
-export async function replayQueue(post: (item: OutboxItem) => Promise<void>): Promise<void> {
-  if (replaying || !navigator.onLine) return;
+ *  removed only after the server has taken it (so nothing sends twice).
+ *
+ *  Returns how many items were dropped as unsendable. A transport failure stops the
+ *  drain and leaves everything queued for the next `online`/load, but a 4xx is the
+ *  server's final answer — an entry deleted while we were offline, say — and retrying
+ *  it forever would park it at the head of the queue and block every change behind it
+ *  on every reconnect, permanently. */
+export async function replayQueue(post: (item: OutboxItem) => Promise<void>): Promise<number> {
+  if (replaying || !navigator.onLine) return 0;
   replaying = true;
+  let dropped = 0;
   try {
     const d = await db();
     for (const item of await d.getAll("outbox")) {
       try {
         await post(item);
-      } catch {
-        break; // offline again / server error → leave it queued, retry later
+      } catch (err) {
+        const permanent = err instanceof ApiError && err.status >= 400 && err.status < 500;
+        if (!permanent) break; // offline again / server error → retry later
+        dropped += 1;
       }
       if (item.id !== undefined) await d.delete("outbox", item.id);
       await refreshQueuedCount();
@@ -79,4 +88,5 @@ export async function replayQueue(post: (item: OutboxItem) => Promise<void>): Pr
   } finally {
     replaying = false;
   }
+  return dropped;
 }

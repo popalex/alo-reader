@@ -56,10 +56,14 @@ export function usePendingFeedPolling(): void {
       ),
     [subsData],
   );
-  const pending = pendingIds.size > 0;
+  // Key the effect on WHICH feeds are pending, not merely whether any are. With a
+  // boolean, a feed added after the 90s safety cap cleared the interval never starts
+  // a new one — the boolean is still true — so its title, entries and unread count
+  // never arrive until the user reloads.
+  const pendingKey = useMemo(() => [...pendingIds].sort((a, b) => a - b).join(","), [pendingIds]);
 
   useEffect(() => {
-    if (!pending) return;
+    if (!pendingKey) return;
     const startedAt = Date.now();
     const id = window.setInterval(() => {
       if (Date.now() - startedAt > 90_000) {
@@ -70,7 +74,7 @@ export function usePendingFeedPolling(): void {
       void qc.invalidateQueries({ queryKey: queryKeys.counts });
     }, 2500);
     return () => window.clearInterval(id);
-  }, [pending, qc]);
+  }, [pendingKey, qc]);
 
   // Refetch entries once, only when a previously-pending feed gains its first
   // last_fetched_at (its articles just landed) — not on every poll.

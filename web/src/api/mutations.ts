@@ -28,7 +28,6 @@ import {
 import { queryKeys } from "./queries";
 
 type EntriesData = InfiniteData<StreamPage>;
-type EntriesSnapshot = Array<[readonly unknown[], EntriesData | undefined]>;
 
 function subIdForFeed(subs: Subscription[] | undefined, feedId: number): number | undefined {
   return subs?.find((s) => s.feed_id === feedId)?.id;
@@ -64,11 +63,6 @@ function adjustCounts(qc: QueryClient, perSubDelta: Map<number, number>, totalDe
   });
 }
 
-function restoreEntries(qc: QueryClient, snapshot: EntriesSnapshot | undefined): void {
-  if (!snapshot) return;
-  for (const [key, data] of snapshot) qc.setQueryData(key, data);
-}
-
 export function useSetEntryState() {
   const getToken = useTokenGetter();
   const qc = useQueryClient();
@@ -94,7 +88,6 @@ export function useSetEntryState() {
       await qc.cancelQueries({ queryKey: ["entries"] });
       await qc.cancelQueries({ queryKey: queryKeys.counts });
       const prevEntries = qc.getQueriesData<EntriesData>({ queryKey: ["entries"] });
-      const prevCounts = qc.getQueryData<Counts>(queryKeys.counts);
       const subs = qc.getQueryData<Subscription[]>(queryKeys.subscriptions);
 
       // Current read-state + feed for each id (to compute count deltas).
@@ -104,6 +97,20 @@ export function useSetEntryState() {
         for (const page of data.pages)
           for (const e of page.entries)
             if (!info.has(e.id)) info.set(e.id, { feedId: e.feed_id, wasRead: e.is_read });
+      }
+
+      // Remember what THESE ids looked like, not what the whole cache looked like.
+      // Overlapping mutations are normal (a scroll marker fires one per 500-id chunk
+      // while a click fires another), and restoring a global snapshot on failure
+      // would undo whatever a concurrent mutation had already saved, plus any page
+      // fetched in between.
+      const prevFlags = new Map<number, { is_read: boolean; is_starred: boolean }>();
+      for (const [, data] of prevEntries) {
+        if (!data) continue;
+        for (const page of data.pages)
+          for (const e of page.entries)
+            if (vars.ids.includes(e.id) && !prevFlags.has(e.id))
+              prevFlags.set(e.id, { is_read: e.is_read, is_starred: e.is_starred });
       }
 
       const patch: Partial<EntryListItem> = {};
@@ -123,6 +130,7 @@ export function useSetEntryState() {
         qc.setQueryData<EntryDetail>(["entry", id], (d) => (d ? { ...d, ...detailPatch } : d));
       }
 
+      let countDelta: { perSub: Map<number, number>; total: number } | undefined;
       if (vars.read !== undefined) {
         const perSub = new Map<number, number>();
         let total = 0;
@@ -136,18 +144,33 @@ export function useSetEntryState() {
           if (sid != null) perSub.set(sid, (perSub.get(sid) ?? 0) + delta);
         }
         adjustCounts(qc, perSub, total);
+        countDelta = { perSub, total };
       }
-      return { prevEntries, prevCounts, prevDetails };
+      return { prevFlags, prevDetails, countDelta };
     },
-    onError: (_err, _vars, ctx) => {
-      restoreEntries(qc, ctx?.prevEntries);
-      qc.setQueryData(queryKeys.counts, ctx?.prevCounts);
+    onError: (_err, vars, ctx) => {
+      // Undo exactly this mutation: the ids it patched, back to the values they had,
+      // and the count delta it applied, negated. A snapshot restore would take a
+      // concurrent mutation's saved change down with it.
+      for (const id of vars.ids) {
+        const prev = ctx?.prevFlags.get(id);
+        if (prev) patchEntries(qc, new Set([id]), prev);
+      }
+      if (ctx?.countDelta) {
+        const inverse = new Map<number, number>();
+        for (const [sid, delta] of ctx.countDelta.perSub) inverse.set(sid, -delta);
+        adjustCounts(qc, inverse, -ctx.countDelta.total);
+      }
       for (const [id, d] of ctx?.prevDetails ?? []) qc.setQueryData(["entry", id], d);
       pushToast("Couldn't save your change — it was rolled back.", "error");
     },
     onSettled: (_data, _err, vars) => {
-      // A star toggle can change membership of the starred stream.
-      if (vars.starred !== undefined) void qc.invalidateQueries({ queryKey: ["entries", "starred"] });
+      // A star toggle can change membership of the starred stream. Skip it while
+      // offline: the queries run networkMode "always" and the service worker answers
+      // /streams from cache, so the refetch would serve the pre-mutation page and
+      // visibly undo the optimistic patch while the real change sits in the outbox.
+      if (vars.starred !== undefined && navigator.onLine)
+        void qc.invalidateQueries({ queryKey: ["entries", "starred"] });
     },
   });
 }
@@ -163,15 +186,17 @@ export function useMarkStreamRead(stream: StreamDescriptor) {
       await qc.cancelQueries({ queryKey: ["entries"] });
       await qc.cancelQueries({ queryKey: queryKeys.counts });
       const prevEntries = qc.getQueriesData<EntriesData>({ queryKey: ["entries"] });
-      const prevCounts = qc.getQueryData<Counts>(queryKeys.counts);
       const subs = qc.getQueryData<Subscription[]>(queryKeys.subscriptions);
 
       const affected = new Set<number>();
       const perSub = new Map<number, number>();
       let total = 0;
-      // Loaded entries live under ["entries", path, status, q] — several variants
-      // (unread/all/search). Scan every cached variant of THIS stream rather than one
-      // exact-key lookup (the old 3-element key never matched, so nothing updated).
+      // useStreamEntries keys entries as ["entries", path, q ?? null] — one cache
+      // entry per search variant of a stream. Scan every variant of THIS stream (hence
+      // the key[1] check) rather than guessing one exact key.
+      //
+      // Whoever edits this positional lookup next: the key has three elements, not
+      // four. The comment here used to claim a `status` element that does not exist.
       for (const [key, data] of prevEntries) {
         if (key[1] !== path || !data) continue;
         for (const page of data.pages)
@@ -185,11 +210,17 @@ export function useMarkStreamRead(stream: StreamDescriptor) {
       }
       patchEntries(qc, affected, { is_read: true });
       adjustCounts(qc, perSub, total);
-      return { prevEntries, prevCounts };
+      return { affected, perSub, total };
     },
     onError: (_err, _vars, ctx) => {
-      restoreEntries(qc, ctx?.prevEntries);
-      qc.setQueryData(queryKeys.counts, ctx?.prevCounts);
+      // Undo only the entries this call flipped, and only the counts it moved. All of
+      // them were unread before, or they would not be in `affected`.
+      if (ctx) {
+        patchEntries(qc, ctx.affected, { is_read: false });
+        const inverse = new Map<number, number>();
+        for (const [sid, delta] of ctx.perSub) inverse.set(sid, -delta);
+        adjustCounts(qc, inverse, -ctx.total);
+      }
       pushToast("Couldn't mark all read — it was rolled back.", "error");
     },
     onSuccess: () => {

@@ -10,6 +10,10 @@ import { postEntryState } from "../../api/endpoints";
 import { useTokenGetter } from "../auth";
 import { queryKeys } from "../../api/queries";
 import { getQueuedCount, refreshQueuedCount, replayQueue, subscribeQueue } from "./queue";
+import { pushToast } from "../toast";
+
+/** How often to retry a stuck queue when no `online` event is coming. */
+const RETRY_INTERVAL_MS = 30_000;
 
 function subscribeOnline(cb: () => void): () => void {
   window.addEventListener("online", cb);
@@ -43,9 +47,17 @@ export function useOfflineReplay(): void {
   useEffect(() => {
     let cancelled = false;
     const drain = async () => {
-      await replayQueue(async (item) => {
+      const dropped = await replayQueue(async (item) => {
         await postEntryState(await getToken(), item);
       });
+      if (dropped > 0 && !cancelled) {
+        pushToast(
+          dropped === 1
+            ? "One offline change couldn't be saved and was discarded."
+            : `${dropped} offline changes couldn't be saved and were discarded.`,
+          "error",
+        );
+      }
       if (!cancelled) {
         await qc.invalidateQueries({ queryKey: queryKeys.counts });
         await qc.invalidateQueries({ queryKey: ["entries"] });
@@ -56,8 +68,16 @@ export function useOfflineReplay(): void {
     void drain(); // in case the queue survived a reload and we're already online
     const onOnline = () => void drain();
     window.addEventListener("online", onOnline);
+    // navigator.onLine means "an interface exists", not "the server is reachable", so
+    // the common failure (flaky wifi, server restarting) queues a change without ever
+    // firing an `online` event to drain it. Without this the badge sits at >= 1 and
+    // the change waits for a page reload.
+    const timer = window.setInterval(() => {
+      if (getQueuedCount() > 0) void drain();
+    }, RETRY_INTERVAL_MS);
     return () => {
       cancelled = true;
+      window.clearInterval(timer);
       window.removeEventListener("online", onOnline);
     };
   }, [getToken, qc]);
