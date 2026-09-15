@@ -58,3 +58,39 @@ describe("offline queue", () => {
     expect(seen).toEqual(["2026-01-01T10:00:00.000Z"]);
   });
 });
+
+describe("poison items", () => {
+  it("drops an item the server rejects and keeps draining", async () => {
+    // A 4xx is the server's final answer — an entry unsubscribed while we were
+    // offline, say. Retrying it forever parks it at the head of the queue and blocks
+    // every change behind it, on every reconnect, permanently.
+    const q = await import("../src/app/offline/queue");
+    const { ApiError } = await import("../src/api/client");
+    await q.enqueue({ ids: [1], read: true, changed_at: "t1" });
+    await q.enqueue({ ids: [2], read: true, changed_at: "t2" });
+    await q.enqueue({ ids: [3], read: true, changed_at: "t3" });
+
+    const sent: number[][] = [];
+    const dropped = await q.replayQueue(async (item) => {
+      sent.push(item.ids);
+      if (item.ids[0] === 2) throw new ApiError(404, "not_found", "entry not found");
+    });
+
+    expect(sent).toEqual([[1], [2], [3]]); // item 3 was not blocked by item 2
+    expect(dropped).toBe(1);
+    expect(q.getQueuedCount()).toBe(0);
+  });
+
+  it("still stops at a transport failure so nothing is lost", async () => {
+    const q = await import("../src/app/offline/queue");
+    await q.enqueue({ ids: [1], read: true, changed_at: "t1" });
+    await q.enqueue({ ids: [2], read: true, changed_at: "t2" });
+
+    const dropped = await q.replayQueue(async (item) => {
+      if (item.ids[0] === 2) throw new TypeError("Failed to fetch");
+    });
+
+    expect(dropped).toBe(0);
+    expect(q.getQueuedCount()).toBe(1); // retried on the next reconnect
+  });
+});
