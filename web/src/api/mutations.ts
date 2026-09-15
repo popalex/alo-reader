@@ -165,8 +165,12 @@ export function useSetEntryState() {
       pushToast("Couldn't save your change — it was rolled back.", "error");
     },
     onSettled: (_data, _err, vars) => {
-      // A star toggle can change membership of the starred stream.
-      if (vars.starred !== undefined) void qc.invalidateQueries({ queryKey: ["entries", "starred"] });
+      // A star toggle can change membership of the starred stream. Skip it while
+      // offline: the queries run networkMode "always" and the service worker answers
+      // /streams from cache, so the refetch would serve the pre-mutation page and
+      // visibly undo the optimistic patch while the real change sits in the outbox.
+      if (vars.starred !== undefined && navigator.onLine)
+        void qc.invalidateQueries({ queryKey: ["entries", "starred"] });
     },
   });
 }

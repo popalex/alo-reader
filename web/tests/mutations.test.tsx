@@ -189,4 +189,24 @@ describe("concurrent mutations", () => {
     expect(entries[1].is_starred).toBe(true); // B survived
     expect(qc.getQueryData<Counts>(queryKeys.counts)!.total_unread).toBe(5);
   });
+
+  it("does not invalidate the starred stream while offline", async () => {
+    // Queries run networkMode "always" and the service worker answers /streams from
+    // cache, so an invalidation offline refetches the pre-mutation page and visibly
+    // undoes the optimistic patch.
+    const online = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+    const qc = seededClient();
+    const invalidate = vi.spyOn(qc, "invalidateQueries");
+    const { result } = renderHook(() => useSetEntryState(), { wrapper: wrapper(qc) });
+
+    await act(async () => {
+      result.current.mutate({ ids: [1], starred: true });
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(
+      invalidate.mock.calls.filter((c) => JSON.stringify(c[0]?.queryKey) === '["entries","starred"]'),
+    ).toHaveLength(0);
+    online.mockRestore();
+  });
 });
