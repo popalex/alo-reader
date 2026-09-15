@@ -22,6 +22,7 @@ from app import telemetry
 from app.config import Settings
 from app.store import entries as entries_store
 from app.store import feeds as feeds_store
+from app.store import users as users_store
 from app.worker.log import emit as _log
 
 _DEFAULT_RNG = random.Random()
@@ -77,7 +78,15 @@ async def _run_maintenance(
                 break
     except Exception as exc:  # noqa: BLE001
         _log("retention_purge_failed", error=repr(exc))
-    _log("maintenance_swept", feeds_gc=gc, entries_purged=purged)
+    try:
+        async with session_factory() as session, session.begin():
+            tombstones = await users_store.purge_deletion_tombstones(
+                session, older_than=timedelta(days=settings.clerk_tombstone_days)
+            )
+    except Exception as exc:  # noqa: BLE001
+        tombstones = 0
+        _log("tombstone_purge_failed", error=repr(exc))
+    _log("maintenance_swept", feeds_gc=gc, entries_purged=purged, tombstones_purged=tombstones)
     return gc, purged
 
 

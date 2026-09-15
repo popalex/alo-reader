@@ -8,6 +8,7 @@ from app import db as app_db
 from app.models import Feed, User
 from app.store import entries as entries_store
 from app.store import feeds as feeds_store
+from app.store import icons as icons_store
 
 from .conftest import PatUser, make_pat_user
 
@@ -220,3 +221,32 @@ async def test_cross_tenant_subscription_is_404(
     else:
         resp = await api_client.patch(f"{SUBS}/{sub_id}", json={}, headers=h)
     assert resp.status_code == 404
+
+
+async def test_create_and_update_return_a_versioned_icon_url(
+    api_client: httpx.AsyncClient, pat_user: PatUser
+) -> None:
+    # Icons are served immutable for a year, so the ?v= hash is what lets a changed
+    # icon reach the browser. create/update returned the bare URL while list returned
+    # the versioned one, which is how a stale icon gets cached forever.
+    created = await api_client.post(
+        "/api/v1/subscriptions",
+        json={"feed_url": "https://icon.example/rss"},
+        headers=pat_user.headers,
+    )
+    sub_id = created.json()["id"]
+    async with app_db.get_sessionmaker()() as s, s.begin():
+        icon = await icons_store.get_or_create(
+            s, url="https://icon.example/favicon.png", mime="image/png", data=b"\x89PNG"
+        )
+        feed_id = created.json()["feed_id"]
+        await icons_store.set_feed_icon(s, feed_id, icon.id)
+
+    updated = await api_client.patch(
+        f"/api/v1/subscriptions/{sub_id}", json={"title": "renamed"}, headers=pat_user.headers
+    )
+    listed = await api_client.get("/api/v1/subscriptions", headers=pat_user.headers)
+
+    from_list = next(s["icon_url"] for s in listed.json() if s["id"] == sub_id)
+    assert "?v=" in updated.json()["icon_url"]
+    assert updated.json()["icon_url"] == from_list

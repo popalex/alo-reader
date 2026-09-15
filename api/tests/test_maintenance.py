@@ -19,6 +19,7 @@ from app.config import Settings
 from app.models import Entry, EntryState, Feed
 from app.store import entries as entries_store
 from app.store import feeds as feeds_store
+from app.store import users as users_store
 from app.worker.maintenance import next_wait, run_maintenance
 from tests import factories
 
@@ -328,3 +329,27 @@ def test_zero_purge_batch_size_is_rejected() -> None:
             auth_mode="none",
             retention_purge_batch_size=0,
         )
+
+
+async def test_maintenance_purges_expired_deletion_tombstones(api_db: str) -> None:
+    # Tombstones only have to outlive svix's retry window; past that they are rows
+    # with nothing left to protect.
+    sf = app_db.get_sessionmaker()
+    async with sf() as s, s.begin():
+        await users_store.mark_clerk_deleted(s, "recent_user")
+        await users_store.mark_clerk_deleted(s, "ancient_user")
+        await s.execute(
+            text(
+                "UPDATE deleted_clerk_users SET deleted_at = now() - interval '30 days' "
+                "WHERE clerk_user_id = 'ancient_user'"
+            )
+        )
+
+    settings = Settings(
+        database_url="postgresql+asyncpg://x/y", auth_mode="none", clerk_tombstone_days=7
+    )
+    await run_maintenance(sf, settings=settings)
+
+    async with sf() as s:
+        assert await users_store.is_clerk_deleted(s, "recent_user") is True
+        assert await users_store.is_clerk_deleted(s, "ancient_user") is False

@@ -260,3 +260,37 @@ async def test_update_after_delete_does_not_resurrect_the_account(
     assert late.status_code == 204  # acknowledged, so svix stops retrying
     async with app_db.get_sessionmaker()() as s:
         assert await users_store.get_by_clerk_id(s, "user_gone") is None
+
+
+async def test_a_retried_create_after_delete_does_not_resurrect_the_account(
+    api_client: httpx.AsyncClient, webhook_secret: str
+) -> None:
+    # svix retries for up to a day without ordering guarantees, so the first delivery
+    # of user.created can land after user.deleted. Clerk never reuses a user id, so
+    # the tombstone is enough to tell a late retry from a real signup.
+    await post_event(
+        api_client, webhook_secret, user_event("user.created", "user_zombie", "z@example.com")
+    )
+    await post_event(api_client, webhook_secret, user_event("user.deleted", "user_zombie"))
+
+    late = await post_event(
+        api_client, webhook_secret, user_event("user.created", "user_zombie", "z@example.com")
+    )
+
+    assert late.status_code == 204  # acknowledged, so svix stops retrying
+    async with app_db.get_sessionmaker()() as s:
+        assert await users_store.get_by_clerk_id(s, "user_zombie") is None
+
+
+async def test_delete_before_create_still_blocks_the_create(
+    api_client: httpx.AsyncClient, webhook_secret: str
+) -> None:
+    # The tombstone goes down even when there is no row to remove, because the delete
+    # may arrive before the create it raced.
+    await post_event(api_client, webhook_secret, user_event("user.deleted", "user_ghost"))
+    await post_event(
+        api_client, webhook_secret, user_event("user.created", "user_ghost", "g@example.com")
+    )
+
+    async with app_db.get_sessionmaker()() as s:
+        assert await users_store.get_by_clerk_id(s, "user_ghost") is None

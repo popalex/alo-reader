@@ -5,6 +5,7 @@ its nearest named ancestor outline. Untrusted uploads are guarded by the caller
 (size cap + entity-declaration rejection); ElementTree never fetches external refs.
 """
 
+import re
 from dataclasses import dataclass
 from typing import cast
 from xml.etree import ElementTree
@@ -19,21 +20,38 @@ class OpmlFeed:
     folder: str | None = None
 
 
+# XML 1.0 forbids the C0 controls except tab, newline and carriage return, and
+# ElementTree escapes none of them: a feed title carrying \x0c produced an export no
+# parser would read back, including our own import.
+_CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def _xml_safe(value: str) -> str:
+    return _CONTROL_CHARS.sub("", value)
+
+
 def build_opml(title: str, groups: list[tuple[str | None, list[OpmlFeed]]]) -> bytes:
     """Serialize grouped feeds to OPML 2.0. ``groups`` is an ordered list of
     ``(folder_name_or_None, feeds)``; the ``None`` group holds uncategorized feeds."""
     opml = ElementTree.Element("opml", version="2.0")
     head = ElementTree.SubElement(opml, "head")
-    ElementTree.SubElement(head, "title").text = title
+    ElementTree.SubElement(head, "title").text = _xml_safe(title)
     body = ElementTree.SubElement(opml, "body")
     for folder_name, feeds in groups:
         parent = body
         if folder_name is not None:
-            parent = ElementTree.SubElement(body, "outline", text=folder_name, title=folder_name)
+            safe_name = _xml_safe(folder_name)
+            parent = ElementTree.SubElement(body, "outline", text=safe_name, title=safe_name)
         for f in feeds:
-            attrs = {"type": "rss", "text": f.title, "title": f.title, "xmlUrl": f.xml_url}
+            safe_title = _xml_safe(f.title)
+            attrs = {
+                "type": "rss",
+                "text": safe_title,
+                "title": safe_title,
+                "xmlUrl": _xml_safe(f.xml_url),
+            }
             if f.html_url:
-                attrs["htmlUrl"] = f.html_url
+                attrs["htmlUrl"] = _xml_safe(f.html_url)
             ElementTree.SubElement(parent, "outline", attrs)
     # typeshed types this overload as Any; it is bytes for any encoding but "unicode".
     return cast(bytes, ElementTree.tostring(opml, encoding="utf-8", xml_declaration=True))

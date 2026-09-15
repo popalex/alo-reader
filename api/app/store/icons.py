@@ -11,6 +11,16 @@ async def get(session: AsyncSession, icon_id: int) -> Icon | None:
     return await session.get(Icon, icon_id)
 
 
+async def source_url(session: AsyncSession, icon_id: int | None) -> str | None:
+    """The icon's source URL, which the API hashes into the ``?v=`` cache buster.
+
+    A single-column read so a handler holding only a Feed can version its icon URL
+    the same way the list endpoint does."""
+    if icon_id is None:
+        return None
+    return await session.scalar(select(Icon.url).where(Icon.id == icon_id))
+
+
 async def get_or_create(session: AsyncSession, *, url: str, mime: str, data: bytes) -> Icon:
     """Return the existing icon for ``url`` or insert one. Icons are global and
     deduped by source URL, so many feeds can share one favicon row."""

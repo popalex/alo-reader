@@ -17,11 +17,35 @@ consequences are wired in deliberately below:
   ``telemetry.enable_log_export()`` attaches keeps shipping every line to Loki.
 """
 
+from __future__ import annotations
+
 import logging
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:  # the SDK is imported lazily in configure_sentry
+    from sentry_sdk.types import Event, Hint
 
 log = logging.getLogger("alo.sentry")
 
 _enabled = False
+
+
+def _scrub_query_string(event: Event, _hint: Hint) -> Event:
+    """Drop the request's query string before the event leaves the process.
+
+    send_default_pii=False does not cover it — verified against sentry-sdk 2.69.1,
+    where a 500 on /streams/all/entries?q=... arrives with
+    query_string='q=my+private+search+terms'. Search terms are the most personal
+    thing this API takes in a URL, and none of it helps group an error.
+    """
+    request: Any = event.get("request")
+    if isinstance(request, dict):
+        if request.get("query_string"):
+            request["query_string"] = "[scrubbed]"
+        url = request.get("url")
+        if isinstance(url, str) and "?" in url:
+            request["url"] = url.split("?", 1)[0]
+    return event
 
 
 def is_enabled() -> bool:
@@ -63,6 +87,7 @@ def configure_sentry(*, service_name: str, version: str) -> bool:
         integrations=[LoggingIntegration(level=logging.INFO, event_level=logging.ERROR)],
         # Which process an event came from. api and worker fail in different ways.
         server_name=service_name,
+        before_send=_scrub_query_string,
     )
     sentry_sdk.set_tag("service", service_name)
 

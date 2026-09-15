@@ -142,3 +142,21 @@ def test_records_still_reach_other_handlers_after_init(settings: Callable[..., S
         import sentry_sdk
 
         sentry_sdk.init(dsn="")
+
+
+def test_query_string_never_leaves_the_process() -> None:
+    # send_default_pii=False does not cover the query string: verified against
+    # sentry-sdk 2.69.1, a 500 on /streams/all/entries?q=... arrives carrying
+    # query_string='q=my+private+search+terms'. Search terms are the most personal
+    # thing this API takes in a URL.
+    event: Any = {
+        "request": {
+            "url": "https://reader.example/api/v1/streams/all/entries?q=private+terms",
+            "query_string": "q=private+terms&status=all",
+        }
+    }
+
+    scrubbed = sentry._scrub_query_string(event, {})
+
+    assert scrubbed["request"]["query_string"] == "[scrubbed]"
+    assert scrubbed["request"]["url"] == "https://reader.example/api/v1/streams/all/entries"

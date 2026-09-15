@@ -40,6 +40,23 @@ class User(Base):
     )
 
 
+class DeletedClerkUser(Base):
+    """Tombstone for a Clerk account we deleted locally.
+
+    svix retries for up to a day without ordering guarantees, so a user.created can
+    land after the user.deleted that removed the row. Clerk never reuses a user id, so
+    remembering the deletion is enough to tell a late retry from a real signup; the
+    worker's maintenance sweep drops tombstones past the retry window.
+    """
+
+    __tablename__ = "deleted_clerk_users"
+
+    clerk_user_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    deleted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+
 class ApiToken(Base):
     __tablename__ = "api_tokens"
 

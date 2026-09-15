@@ -115,3 +115,20 @@ async def test_405_keeps_its_allow_header(api_client: httpx.AsyncClient) -> None
     resp = await api_client.delete("/api/v1/healthz")
     assert resp.status_code == 405
     assert "GET" in resp.headers.get("allow", "")
+
+
+async def test_a_whitespace_request_id_is_replaced(api_client: httpx.AsyncClient) -> None:
+    # "   ".strip() is "", but the truthiness check ran before the strip, so the
+    # response carried an empty X-Request-ID and the logs said request_id="".
+    blank = await api_client.get("/api/v1/healthz", headers={"X-Request-ID": "   "})
+    assert blank.headers["x-request-id"].strip() != ""
+
+    # A sane inbound id is still honored, and a junk or oversized one is replaced.
+    kept = await api_client.get("/api/v1/healthz", headers={"X-Request-ID": "trace-abc.123"})
+    assert kept.headers["x-request-id"] == "trace-abc.123"
+
+    junk = await api_client.get("/api/v1/healthz", headers={"X-Request-ID": "a b\tc"})
+    assert junk.headers["x-request-id"] not in ("a b\tc", "")
+
+    oversized = await api_client.get("/api/v1/healthz", headers={"X-Request-ID": "x" * 500})
+    assert len(oversized.headers["x-request-id"]) < 500
