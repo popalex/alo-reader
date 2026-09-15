@@ -13,6 +13,7 @@ and parsing touches the network zero times.
 import hashlib
 import json
 import socket
+import warnings
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -199,3 +200,19 @@ def test_a_future_published_falls_back_to_updated() -> None:
     entry = parse_feed(atom, now=datetime(2026, 1, 1, tzinfo=UTC)).entries[0]
 
     assert entry.published_at == datetime(2025, 6, 30, 10, 0, tzinfo=UTC)
+
+
+def test_updated_fallback_does_not_reuse_the_published_timestamp() -> None:
+    # feedparser maps a missing updated_parsed onto published_parsed (with a
+    # DeprecationWarning), so a naive fallback re-reads the same future date it is
+    # trying to escape. With no real <updated>, there is nothing to fall back to.
+    atom = b"""<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">
+    <title>t</title><entry><title>a</title><id>u1</id>
+    <published>2099-01-01T00:00:00Z</published>
+    </entry></feed>"""
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        entry = parse_feed(atom, now=datetime(2026, 1, 1, tzinfo=UTC)).entries[0]
+
+    assert entry.published_at is None
