@@ -22,6 +22,7 @@ import { useOnline } from "../../app/offline/useOffline";
 import { useMobileNav } from "../layout/mobileNav";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { KeyboardHelp } from "../../keyboard/KeyboardHelp";
+import { useAnyModalOpen } from "../../keyboard/modalLock";
 import { useKeyboard, type KeyboardActions } from "../../keyboard/useKeyboard";
 import { safeExternalUrl } from "../../lib/url";
 import type { StreamDescriptor } from "../../lib/streams";
@@ -212,7 +213,11 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
     help: () => setHelpOpen(true),
   };
   // The global handler stands down while a modal owns the keyboard.
-  useKeyboard(actions, !helpOpen && !confirmOpen);
+  // Any modal anywhere owns the keyboard, not just this component's two: the
+  // sidebar's dialogs left every shortcut live underneath them, so `A` stacked a
+  // second confirm on the first and `g a` navigated the list behind the dialog.
+  const modalOpen = useAnyModalOpen();
+  useKeyboard(actions, !helpOpen && !modalOpen);
 
   const feedError =
     stream.kind === "feed"

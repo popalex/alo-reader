@@ -6,6 +6,7 @@
 
 import * as Dialog from "@radix-ui/react-dialog";
 
+import { useModalKeyboardLock } from "../keyboard/modalLock";
 import styles from "./ConfirmDialog.module.css";
 
 export function ConfirmDialog({
@@ -23,6 +24,7 @@ export function ConfirmDialog({
   confirmLabel: string;
   onConfirm: () => void;
 }) {
+  useModalKeyboardLock(open);
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>

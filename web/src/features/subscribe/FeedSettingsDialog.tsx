@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Loader2, Trash2 } from "lucide-react";
 
+import { useModalKeyboardLock } from "../../keyboard/modalLock";
 import { ApiError } from "../../api/client";
 import {
   createFolder,
@@ -32,6 +33,7 @@ export function FeedSettingsDialog({
   folders: Folder[];
   onDelete: (sub: Subscription) => void;
 }) {
+  useModalKeyboardLock(open);
   const getToken = useTokenGetter();
   const update = useUpdateSubscription();
 

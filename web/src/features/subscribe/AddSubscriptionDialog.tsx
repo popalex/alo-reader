@@ -9,6 +9,7 @@ import { useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { FileUp, Loader2, Plus, Search } from "lucide-react";
 
+import { useModalKeyboardLock } from "../../keyboard/modalLock";
 import { useTokenGetter } from "../../app/auth";
 import { traceUiAction } from "../../app/traceUiAction";
 import { ApiError } from "../../api/client";
@@ -36,6 +37,7 @@ export function AddSubscriptionDialog({
   onOpenChange: (open: boolean) => void;
   folders: Folder[];
 }) {
+  useModalKeyboardLock(open);
   const getToken = useTokenGetter();
   const create = useCreateSubscription();
   const importer = useImportOpml();
