@@ -50,6 +50,12 @@ function EmptyList({ starred }: { starred: boolean }) {
   );
 }
 
+// Offline warm-up: how many entry bodies to cache, when to start, and how far apart
+// to space the requests (see the effect below).
+const WARM_COUNT = 25;
+const WARM_DELAY_MS = 1500;
+const WARM_SPACING_MS = 250;
+
 export function EntryList({ stream, title }: { stream: StreamDescriptor; title: string }) {
   const [density, setDensity] = useDensity();
   const { cursorId, openId, setCursor, open, close } = useSelection();
@@ -117,15 +123,22 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
   // the infinite-query data: a reader who keeps reading gives `entries` a new
   // identity every few seconds, the cleanup clears the timer before it fires, and
   // the warm-up never happens for exactly the people it is for.
+  //
+  // Spaced out rather than fired at once. RATE_LIMIT_RPS defaults to 10 with a burst
+  // of 30, so 25 simultaneous GETs spend most of a user's budget on a background
+  // convenience and leave their actual clicks to be 429'd. This is a warm-up: it has
+  // no deadline.
   const topIdsKey = entries
-    .slice(0, 25)
+    .slice(0, WARM_COUNT)
     .map((e) => e.id)
     .join(",");
   useEffect(() => {
     if (!online || !topIdsKey) return;
     const ids = topIdsKey.split(",").map(Number);
-    const t = window.setTimeout(() => ids.forEach(prefetchEntry), 1500);
-    return () => window.clearTimeout(t);
+    const timers = ids.map((id, i) =>
+      window.setTimeout(() => prefetchEntry(id), WARM_DELAY_MS + i * WARM_SPACING_MS),
+    );
+    return () => timers.forEach(window.clearTimeout);
   }, [topIdsKey, online, prefetchEntry]);
 
   // Open an entry and mark it read (mark-read-on-open, WP-11). Memoized (stable
