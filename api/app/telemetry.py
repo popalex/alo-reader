@@ -100,6 +100,11 @@ class TelemetryRuntime:
                     provider.shutdown()
                 except Exception:  # noqa: BLE001 — best-effort flush on shutdown
                     logger.exception("failed to shut down an OpenTelemetry provider")
+        # The providers are dead, so is_enabled() has to stop claiming otherwise:
+        # every record helper checks it before touching them, and configure_telemetry
+        # returns early while it is true, which would leave the process unable to
+        # re-arm telemetry after a shutdown.
+        self.enabled = False
 
 
 _runtime = TelemetryRuntime()
