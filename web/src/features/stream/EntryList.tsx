@@ -112,12 +112,21 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
   // offline without being read first (WP-14). Deferred + cancellable so the burst
   // never competes with the initial load or the reconnect replay; prefetchQuery
   // skips already-fresh ids.
+  //
+  // Keyed on the ids rather than the array, because every optimistic patch rewrites
+  // the infinite-query data: a reader who keeps reading gives `entries` a new
+  // identity every few seconds, the cleanup clears the timer before it fires, and
+  // the warm-up never happens for exactly the people it is for.
+  const topIdsKey = entries
+    .slice(0, 25)
+    .map((e) => e.id)
+    .join(",");
   useEffect(() => {
-    if (!online || entries.length === 0) return;
-    const ids = entries.slice(0, 25).map((e) => e.id);
+    if (!online || !topIdsKey) return;
+    const ids = topIdsKey.split(",").map(Number);
     const t = window.setTimeout(() => ids.forEach(prefetchEntry), 1500);
     return () => window.clearTimeout(t);
-  }, [entries, online, prefetchEntry]);
+  }, [topIdsKey, online, prefetchEntry]);
 
   // Open an entry and mark it read (mark-read-on-open, WP-11). Memoized (stable
   // deps) so EntryRow's memo isn't defeated by a fresh handler each render.
@@ -204,7 +213,11 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
     markAllRead: () => {
       // Mark-all marks the whole base stream, so it's ambiguous while a search
       // filters the view — disabled then. It also can't be queued offline.
-      if (online && !searching && entries.length > 0) setConfirmOpen(true);
+      // Also gated on the in-flight mark-all: desktop's button is disabled then, and
+      // a second POST plus a second optimistic patch against the same stream is not
+      // something a keystroke should be able to start.
+      if (online && !searching && entries.length > 0 && !markStreamRead.isPending)
+        setConfirmOpen(true);
     },
     refresh,
     goAll: () => void navigate({ to: "/" }),
