@@ -168,3 +168,19 @@ def test_untitled_undated_entries_get_distinct_guids() -> None:
     assert len(entries) == 3
     assert len({e.guid_hash for e in entries}) == 3
     assert {e.guid_source for e in entries} == {"synthetic"}
+
+
+def test_xhtml_body_wins_over_a_text_teaser() -> None:
+    # max() over a boolean key returns the first element when nothing matches, and
+    # feedparser normalizes Atom type="xhtml" to application/xhtml+xml, which never
+    # equalled "text/html". The teaser was stored and the article thrown away.
+    atom = b"""<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">
+    <title>t</title><entry><title>a</title><id>u1</id>
+    <content type="text">TEASER ONLY</content>
+    <content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml">
+    <p>THE FULL ARTICLE BODY</p></div></content>
+    </entry></feed>"""
+
+    entry = parse_feed(atom).entries[0]
+
+    assert "THE FULL ARTICLE BODY" in entry.content_html
