@@ -9,6 +9,7 @@ import { useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { FileUp, Loader2, Plus, Search } from "lucide-react";
 
+import { useModalKeyboardLock } from "../../keyboard/modalLock";
 import { useTokenGetter } from "../../app/auth";
 import { traceUiAction } from "../../app/traceUiAction";
 import { ApiError } from "../../api/client";
@@ -36,6 +37,7 @@ export function AddSubscriptionDialog({
   onOpenChange: (open: boolean) => void;
   folders: Folder[];
 }) {
+  useModalKeyboardLock(open);
   const getToken = useTokenGetter();
   const create = useCreateSubscription();
   const importer = useImportOpml();
@@ -173,13 +175,22 @@ export function AddSubscriptionDialog({
               </button>
             </div>
 
-            <FolderSelect
-              folders={folders}
-              value={folderId}
-              onChange={setFolderId}
-              newName={newFolderName}
-              onNewNameChange={setNewFolderName}
-            />
+            {/* Inside the form, so Enter in the new-category input would submit it:
+                onFind clears the candidates, and the three feeds the user was one
+                click from adding vanish while discovery restarts. */}
+            <div
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.preventDefault();
+              }}
+            >
+              <FolderSelect
+                folders={folders}
+                value={folderId}
+                onChange={setFolderId}
+                newName={newFolderName}
+                onNewNameChange={setNewFolderName}
+              />
+            </div>
 
             {candidates && candidates.length > 0 && (
               <ul className={styles.candidates}>

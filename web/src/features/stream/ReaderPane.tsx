@@ -11,15 +11,17 @@ import DOMPurify from "dompurify";
 import { Check, ChevronLeft, Circle, ExternalLink, Star } from "lucide-react";
 
 import { useSetEntryState } from "../../api/mutations";
-import { useEntry } from "../../api/queries";
+import { useEntry, useSubscriptions } from "../../api/queries";
 import { useOnline } from "../../app/offline/useOffline";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { Favicon } from "../../components/Favicon";
 import { formatDateTime } from "../../lib/time";
+import { safeExternalUrl } from "../../lib/url";
 import { useSelection } from "./selection";
 import styles from "./ReaderPane.module.css";
 
 export function ReaderPane() {
+  const subs = useSubscriptions();
   const { openId, close } = useSelection();
   const query = useEntry(openId);
   const online = useOnline();
@@ -77,6 +79,12 @@ export function ReaderPane() {
   }
 
   const entry = query.data;
+  // Entries stored before the parser started rejecting them can still carry a
+  // javascript: or data: URL, and React only refuses those in development builds.
+  const safeUrl = safeExternalUrl(entry.url);
+  // EntryDetail carries no icon, so without this lookup the reader always drew the
+  // coloured initial while the list row beside it showed the real favicon.
+  const iconUrl = subs.data?.find((s) => s.feed_id === entry.feed_id)?.icon_url ?? undefined;
   const meta = [entry.author, entry.published_at ? formatDateTime(entry.published_at) : null]
     .filter(Boolean)
     .join(" · ");
@@ -108,8 +116,8 @@ export function ReaderPane() {
             {entry.is_read ? <Circle size={15} /> : <Check size={15} />}
             <span>{entry.is_read ? "Mark unread" : "Mark read"}</span>
           </button>
-          {entry.url ? (
-            <a className={styles.action} href={entry.url} target="_blank" rel="noopener noreferrer">
+          {safeUrl ? (
+            <a className={styles.action} href={safeUrl} target="_blank" rel="noopener noreferrer">
               <ExternalLink size={14} />
               <span>Open original</span>
             </a>
@@ -118,7 +126,7 @@ export function ReaderPane() {
       </div>
       <header className={styles.header}>
         <div className={styles.source}>
-          <Favicon title={entry.feed_title} />
+          <Favicon title={entry.feed_title} iconUrl={iconUrl} />
           <span>{entry.feed_title}</span>
         </div>
         <h1 className={styles.title}>{entry.title}</h1>

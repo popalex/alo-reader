@@ -37,11 +37,16 @@ export function useScrollReadMarker(
   entriesRef.current = entries;
   const virtualizerRef = useRef(virtualizer);
   virtualizerRef.current = virtualizer;
-  // Highest index already marked (exclusive). Persists across paging; resets
-  // when the list remounts per stream, or when resetKey changes.
-  const markedUpTo = useRef(0);
+  // Which entries have already been marked, by id rather than by position.
+  //
+  // An index watermark goes stale the moment the array shifts, and it shifts often:
+  // usePendingFeedPolling invalidates ["entries"] when a new feed lands, the offline
+  // replay drain invalidates it, mark-all-read invalidates it, and so does `r`. Every
+  // prepended entry then sits below the watermark and can never be marked read by
+  // scrolling — it stays unread forever.
+  const markedIds = useRef<Set<number>>(new Set());
   useEffect(() => {
-    markedUpTo.current = 0;
+    markedIds.current = new Set();
   }, [resetKey]);
 
   useEffect(() => {
@@ -55,24 +60,35 @@ export function useScrollReadMarker(
         const top = el.scrollTop;
         const items = virtualizerRef.current.getVirtualItems();
         const es = entriesRef.current;
+        // Nothing measured yet (a settle that lands between renders): a scroll
+        // position tells us nothing about which rows are above the fold.
+        if (items.length === 0) return;
 
         // First index whose bottom is still below the top edge = first visible;
         // everything before it has scrolled fully above.
-        let firstVisible = es.length;
+        //
+        // The fallback when no measured row reaches past the top is the last
+        // measured row, NOT es.length: defaulting to the end of the list means one
+        // odd settle marks every entry in the stream read, including thousands that
+        // were never rendered. Combined with an id set that keeps looking for new
+        // work, that turns into "the whole stream is read" rather than a single
+        // mistake.
+        let firstVisible = items[items.length - 1].index + 1;
         for (const it of items) {
           if (it.start + it.size > top) {
             firstVisible = it.index;
             break;
           }
         }
-        if (firstVisible <= markedUpTo.current) return;
-
         const ids: number[] = [];
-        for (let i = markedUpTo.current; i < firstVisible; i++) {
+        for (let i = 0; i < firstVisible; i++) {
           const e = es[i];
-          if (e && !e.is_read) ids.push(e.id);
+          if (e && !e.is_read && !markedIds.current.has(e.id)) {
+            ids.push(e.id);
+            markedIds.current.add(e.id);
+          }
         }
-        markedUpTo.current = firstVisible;
+        if (ids.length === 0) return;
 
         for (let i = 0; i < ids.length; i += CHUNK) {
           setStateRef.current.mutate({ ids: ids.slice(i, i + CHUNK), read: true });

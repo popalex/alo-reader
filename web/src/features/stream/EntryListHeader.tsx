@@ -95,7 +95,7 @@ export function EntryListHeader({
             <MobileActionsMenu
               onRefresh={onRefresh}
               onMarkAllRead={onMarkAllRead}
-              canMarkAllRead={canMarkAll}
+              canMarkAllRead={canMarkAll && !markPending}
             />
           </Suspense>
         )}

@@ -2,11 +2,12 @@
 // category, see its URL, or delete it — all via PATCH /subscriptions/{id} (backend
 // from WP-06). Same visual language as the add-feed dialog.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import * as Dialog from "@radix-ui/react-dialog";
 import { Loader2, Trash2 } from "lucide-react";
 
+import { useModalKeyboardLock } from "../../keyboard/modalLock";
 import { ApiError } from "../../api/client";
 import {
   createFolder,
@@ -32,6 +33,7 @@ export function FeedSettingsDialog({
   folders: Folder[];
   onDelete: (sub: Subscription) => void;
 }) {
+  useModalKeyboardLock(open);
   const getToken = useTokenGetter();
   const update = useUpdateSubscription();
 
@@ -39,6 +41,9 @@ export function FeedSettingsDialog({
   const [folderId, setFolderId] = useState("");
   const [newFolderName, setNewFolderName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  // In-flight (or resolved) creation for "+ New category…", keyed by name.
+  const createdFolder = useRef<{ name: string; id: Promise<number> } | null>(null);
 
   // Re-seed the form each time a feed's settings open.
   useEffect(() => {
@@ -54,6 +59,8 @@ export function FeedSettingsDialog({
   const current = sub;
 
   async function save() {
+    if (saving) return;
+    setSaving(true);
     setError(null);
     try {
       const patch: { id: number } & UpdateSubscriptionInput = { id: current.id };
@@ -71,7 +78,20 @@ export function FeedSettingsDialog({
           setError("Enter a name for the new category.");
           return;
         }
-        targetFolder = (await createFolder(await getToken(), name)).id;
+        // Cache the in-flight creation by name, the way AddSubscriptionDialog does:
+        // Save is only disabled once the PATCH is pending, so a second click during
+        // the create — or a retry after the PATCH fails — used to POST another folder
+        // with the same name and orphan the first.
+        if (createdFolder.current?.name !== name) {
+          const id = (async () => (await createFolder(await getToken(), name)).id)();
+          createdFolder.current = { name, id };
+        }
+        try {
+          targetFolder = await createdFolder.current.id;
+        } catch (err) {
+          createdFolder.current = null; // let a retry re-attempt the create
+          throw err;
+        }
       } else {
         targetFolder = folderId ? Number(folderId) : null;
       }
@@ -83,6 +103,8 @@ export function FeedSettingsDialog({
       onOpenChange(false);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't save the feed's settings.");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -149,10 +171,10 @@ export function FeedSettingsDialog({
               <button
                 type="button"
                 className={styles.save}
-                disabled={update.isPending}
+                disabled={saving || update.isPending}
                 onClick={() => void save()}
               >
-                {update.isPending ? <Loader2 size={14} className={styles.spin} /> : null}
+                {saving || update.isPending ? <Loader2 size={14} className={styles.spin} /> : null}
                 <span>Save</span>
               </button>
             </div>

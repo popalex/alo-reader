@@ -24,6 +24,15 @@ function isTextTarget(target: EventTarget | null): boolean {
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable;
 }
 
+// Controls the browser activates with Enter or Space. Clicking them IS the default
+// action of that keydown, so preventing it is the same as breaking the control.
+const ACTIVATABLE = "button, a[href], summary, [role='button'], [role='link'], [role='menuitem']";
+
+function isActivationKeyOnControl(e: KeyboardEvent): boolean {
+  if (e.key !== "Enter" && e.key !== " ") return false;
+  return e.target instanceof HTMLElement && e.target.closest(ACTIVATABLE) !== null;
+}
+
 export function useKeyboard(actions: KeyboardActions, enabled = true): void {
   const actionsRef = useRef(actions);
   actionsRef.current = actions;
@@ -50,6 +59,11 @@ export function useKeyboard(actions: KeyboardActions, enabled = true): void {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (isTextTarget(e.target)) return;
+      // Enter is bound to "open", and run() preventDefaults everything, so without
+      // this a focused button or link could not be activated by keyboard at all:
+      // Tab to Subscribe, press Enter, and the reader opened an article instead of
+      // the dialog. Entry rows are role="listitem", so they still get Enter.
+      if (isActivationKeyOnControl(e)) return;
 
       // Resolving a pending chord: the previous key was a prefix (e.g. "g").
       if (chord) {

@@ -22,7 +22,9 @@ import { useOnline } from "../../app/offline/useOffline";
 import { useMobileNav } from "../layout/mobileNav";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { KeyboardHelp } from "../../keyboard/KeyboardHelp";
+import { useAnyModalOpen } from "../../keyboard/modalLock";
 import { useKeyboard, type KeyboardActions } from "../../keyboard/useKeyboard";
+import { safeExternalUrl } from "../../lib/url";
 import type { StreamDescriptor } from "../../lib/streams";
 import { markUiEvent } from "../../app/traceUiAction";
 import { useIsMobile } from "../../lib/useMediaQuery";
@@ -47,6 +49,12 @@ function EmptyList({ starred }: { starred: boolean }) {
     </div>
   );
 }
+
+// Offline warm-up: how many entry bodies to cache, when to start, and how far apart
+// to space the requests (see the effect below).
+const WARM_COUNT = 25;
+const WARM_DELAY_MS = 1500;
+const WARM_SPACING_MS = 250;
 
 export function EntryList({ stream, title }: { stream: StreamDescriptor; title: string }) {
   const [density, setDensity] = useDensity();
@@ -110,12 +118,28 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
   // offline without being read first (WP-14). Deferred + cancellable so the burst
   // never competes with the initial load or the reconnect replay; prefetchQuery
   // skips already-fresh ids.
+  //
+  // Keyed on the ids rather than the array, because every optimistic patch rewrites
+  // the infinite-query data: a reader who keeps reading gives `entries` a new
+  // identity every few seconds, the cleanup clears the timer before it fires, and
+  // the warm-up never happens for exactly the people it is for.
+  //
+  // Spaced out rather than fired at once. RATE_LIMIT_RPS defaults to 10 with a burst
+  // of 30, so 25 simultaneous GETs spend most of a user's budget on a background
+  // convenience and leave their actual clicks to be 429'd. This is a warm-up: it has
+  // no deadline.
+  const topIdsKey = entries
+    .slice(0, WARM_COUNT)
+    .map((e) => e.id)
+    .join(",");
   useEffect(() => {
-    if (!online || entries.length === 0) return;
-    const ids = entries.slice(0, 25).map((e) => e.id);
-    const t = window.setTimeout(() => ids.forEach(prefetchEntry), 1500);
-    return () => window.clearTimeout(t);
-  }, [entries, online, prefetchEntry]);
+    if (!online || !topIdsKey) return;
+    const ids = topIdsKey.split(",").map(Number);
+    const timers = ids.map((id, i) =>
+      window.setTimeout(() => prefetchEntry(id), WARM_DELAY_MS + i * WARM_SPACING_MS),
+    );
+    return () => timers.forEach(window.clearTimeout);
+  }, [topIdsKey, online, prefetchEntry]);
 
   // Open an entry and mark it read (mark-read-on-open, WP-11). Memoized (stable
   // deps) so EntryRow's memo isn't defeated by a fresh handler each render.
@@ -186,7 +210,10 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
     },
     openOriginal: () => {
       const e = entries[cursorIndex];
-      if (e?.url) window.open(e.url, "_blank", "noopener,noreferrer");
+      // window.open on a javascript: URL runs it in a document that inherits this
+      // origin, so the guard matters here as much as on the href.
+      const url = safeExternalUrl(e?.url);
+      if (url) window.open(url, "_blank", "noopener,noreferrer");
     },
     toggleRead: () => {
       const e = entries[cursorIndex];
@@ -199,7 +226,11 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
     markAllRead: () => {
       // Mark-all marks the whole base stream, so it's ambiguous while a search
       // filters the view — disabled then. It also can't be queued offline.
-      if (online && !searching && entries.length > 0) setConfirmOpen(true);
+      // Also gated on the in-flight mark-all: desktop's button is disabled then, and
+      // a second POST plus a second optimistic patch against the same stream is not
+      // something a keystroke should be able to start.
+      if (online && !searching && entries.length > 0 && !markStreamRead.isPending)
+        setConfirmOpen(true);
     },
     refresh,
     goAll: () => void navigate({ to: "/" }),
@@ -208,7 +239,11 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
     help: () => setHelpOpen(true),
   };
   // The global handler stands down while a modal owns the keyboard.
-  useKeyboard(actions, !helpOpen && !confirmOpen);
+  // Any modal anywhere owns the keyboard, not just this component's two: the
+  // sidebar's dialogs left every shortcut live underneath them, so `A` stacked a
+  // second confirm on the first and `g a` navigated the list behind the dialog.
+  const modalOpen = useAnyModalOpen();
+  useKeyboard(actions, !helpOpen && !modalOpen);
 
   const feedError =
     stream.kind === "feed"
