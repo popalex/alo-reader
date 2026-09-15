@@ -174,3 +174,51 @@ jobs:
       - run: docker build -f deploy/Dockerfile.api --build-arg APP_VERSION="0.0.0+${GITHUB_SHA::7}" -t alo-reader-api .
       - run: docker build -f deploy/Dockerfile.caddy -t alo-reader-caddy .
       - run: docker build -f deploy/Dockerfile.postgres -t alo-reader-postgres deploy
+
+  e2e:
+    # The only check that exercises the real app: compose stack (AUTH_MODE=none) +
+    # seeded data + Playwright against the Caddy-served SPA. It lived in the nightly
+    # until a PR whose every other check was green shipped a regression it would have
+    # caught — a warm-up burst that rate-limited the API — so it gates PRs now and
+    # still runs nightly against main for environment drift.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - run: corepack enable && corepack prepare pnpm@latest --activate
+      - run: pnpm -C web install
+      - name: Install Playwright Chromium
+        run: pnpm -C web exec playwright install --with-deps chromium
+      - name: make e2e
+        run: make e2e
+      - name: Upload Playwright traces
+        # trace: "on-first-retry" — without this the only record of a flake dies
+        # with the runner.
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-traces
+          path: web/test-results/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  lighthouse:
+    # Performance budget (>= 90) on the built SPA. Cheap, and a budget regression is
+    # easiest to fix in the PR that caused it.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - run: corepack enable && corepack prepare pnpm@latest --activate
+      - run: pnpm -C web install
+      - name: Install Chromium for Lighthouse
+        # Populates ~/.cache/ms-playwright so lighthouse.sh finds a Chrome.
+        run: pnpm -C web exec playwright install --with-deps chromium
+      - name: make lighthouse
+        run: make lighthouse
