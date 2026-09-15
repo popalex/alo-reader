@@ -1,7 +1,11 @@
 name: Nightly
 
-# The heavy full-stack gates (a compose stack + a real browser), too slow for
-# every PR. They run on a nightly schedule and on demand from the Actions tab.
+# What does not belong on a PR: the 5M-entry search benchmark (minutes of seeding),
+# the dependency-update report (a check against time, not against a diff), and e2e
+# a second time against main, where it catches environment drift a PR cannot.
+#
+# e2e and Lighthouse also run per-PR in ci.yml — e2e moved there after a PR with
+# every other check green shipped a regression only it caught.
 on:
   schedule:
     - cron: "0 3 * * *" # 03:00 UTC daily
@@ -14,8 +18,8 @@ concurrency:
 
 jobs:
   e2e:
-    # make e2e: build+run the compose stack (AUTH_MODE=none) with the fixture
-    # feed, seed data, and drive the Caddy-served SPA with Playwright.
+    # Same gate as the per-PR one in ci.yml, run against main on a schedule: a
+    # green PR proves the diff, this proves the environment has not drifted under it.
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -39,23 +43,6 @@ jobs:
           path: web/test-results/
           retention-days: 14
           if-no-files-found: ignore
-
-  lighthouse:
-    # make lighthouse: serve the build via Caddy and gate performance >= 90.
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "24"
-      - run: corepack enable && corepack prepare pnpm@latest --activate
-      - run: pnpm -C web install
-      - name: Install Chromium for Lighthouse
-        # Populates ~/.cache/ms-playwright so lighthouse.sh finds a Chrome.
-        run: pnpm -C web exec playwright install --with-deps chromium
-      - name: make lighthouse
-        run: make lighthouse
 
   python-deps:
     # What Python dependencies could be upgraded. Reports only: it never edits a
