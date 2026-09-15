@@ -68,8 +68,8 @@ def reject_dtd(data: bytes) -> None:
         raise _NoDoctype
 
     parser = expat.ParserCreate()
-    parser.StartDoctypeDeclHandler = start_doctype  # type: ignore[assignment]
-    parser.StartElementHandler = start_element  # type: ignore[assignment]
+    parser.StartDoctypeDeclHandler = start_doctype
+    parser.StartElementHandler = start_element
     try:
         parser.Parse(data, True)
     except _NoDoctype:

@@ -35,6 +35,15 @@
 	# client through X-Forwarded-For.
 	@api path /api/*
 	handle @api {
+		# Cap the request body at the edge. The app's own OPML cap (OPML_MAX_BYTES,
+		# 1 MiB) is checked after Starlette's multipart parser has already read the
+		# upload and spooled anything large to a temp file, so without this an
+		# authenticated user could fill the container's disk with one request and
+		# never reach the check. 8 MiB leaves room for a large OPML plus multipart
+		# framing while staying far below anything that hurts.
+		request_body {
+			max_size 8MB
+		}
 		reverse_proxy api:8000 {
 			header_up X-Real-IP {http.request.client_ip}
 		}
