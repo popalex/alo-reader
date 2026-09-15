@@ -258,7 +258,17 @@ export function Sidebar() {
         })()}
         confirmLabel="Delete"
         onConfirm={() => {
-          if (pendingDeleteFolder) deleteFolder.mutate(pendingDeleteFolder.id);
+          if (!pendingDeleteFolder) return;
+          const { id } = pendingDeleteFolder;
+          deleteFolder.mutate(id, {
+            // Same reason the feed delete does this: the route outlives the sidebar
+            // row, and /streams/folder/<gone> is a valid path that simply returns
+            // nothing, so the user would be left staring at an empty list with no
+            // explanation.
+            onSuccess: () => {
+              if (pathname === `/folder/${id}`) void navigate({ to: "/" });
+            },
+          });
         }}
       />
 
