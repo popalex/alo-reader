@@ -184,3 +184,18 @@ def test_xhtml_body_wins_over_a_text_teaser() -> None:
     entry = parse_feed(atom).entries[0]
 
     assert "THE FULL ARTICLE BODY" in entry.content_html
+
+
+def test_a_future_published_falls_back_to_updated() -> None:
+    # The future check ran after the `or`, so a bogus 2099 date short-circuited a
+    # perfectly good <updated> and the entry landed with no date — which sorts it last
+    # and makes it the first thing dropped when a feed exceeds the per-fetch cap.
+    atom = b"""<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">
+    <title>t</title><entry><title>a</title><id>u1</id>
+    <published>2099-01-01T00:00:00Z</published>
+    <updated>2025-06-30T10:00:00Z</updated>
+    </entry></feed>"""
+
+    entry = parse_feed(atom, now=datetime(2026, 1, 1, tzinfo=UTC)).entries[0]
+
+    assert entry.published_at == datetime(2025, 6, 30, 10, 0, tzinfo=UTC)
