@@ -230,3 +230,34 @@ async def test_reimport_at_quota_reports_skipped_not_failed(
 
     body = again.json()
     assert (body["imported"], body["skipped"], body["failed"]) == (0, 2, [])
+
+
+async def test_export_survives_a_control_character_in_a_title(
+    api_client: httpx.AsyncClient, pat_user: PatUser
+) -> None:
+    # XML 1.0 forbids the C0 controls and ElementTree escapes none of them, so a title
+    # carrying \x0c produced an export no parser would read back — including our own
+    # import endpoint.
+    created = await api_client.post(
+        "/api/v1/subscriptions",
+        json={"feed_url": "https://ctrl.example/rss"},
+        headers=pat_user.headers,
+    )
+    # create ignores a title; the rename is what puts the control character in.
+    renamed = await api_client.patch(
+        f"/api/v1/subscriptions/{created.json()['id']}",
+        json={"title_override": "Ti\x0ctle"},
+        headers=pat_user.headers,
+    )
+    assert renamed.status_code == 200 and "\x0c" in renamed.json()["title"]
+
+    export = await api_client.get("/api/v1/opml", headers=pat_user.headers)
+    assert export.status_code == 200
+
+    reimport = await api_client.post(
+        "/api/v1/opml",
+        files={"file": ("out.opml", export.content, "text/x-opml")},
+        headers=pat_user.headers,
+    )
+    assert reimport.status_code == 200
+    assert reimport.json()["skipped"] == 1  # parsed cleanly, already subscribed
