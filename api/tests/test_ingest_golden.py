@@ -151,3 +151,20 @@ def test_feed_supplied_urls_must_be_http() -> None:
         "https://ok.example/post",
         "/relative/path",  # no scheme of its own; inherits the page's
     ]
+
+
+def test_untitled_undated_entries_get_distinct_guids() -> None:
+    # Title plus date alone collide across items that have neither, and insert_batch's
+    # ON CONFLICT DO NOTHING then drops all but the first — permanently, since the
+    # hash repeats on every later fetch.
+    rss = b"""<?xml version="1.0"?><rss version="2.0"><channel><title>t</title>
+    <item><description>first body</description></item>
+    <item><description>second body</description></item>
+    <item><description>third body</description></item>
+    </channel></rss>"""
+
+    entries = parse_feed(rss).entries
+
+    assert len(entries) == 3
+    assert len({e.guid_hash for e in entries}) == 3
+    assert {e.guid_source for e in entries} == {"synthetic"}
