@@ -23,6 +23,7 @@ import { useMobileNav } from "../layout/mobileNav";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { KeyboardHelp } from "../../keyboard/KeyboardHelp";
 import { useKeyboard, type KeyboardActions } from "../../keyboard/useKeyboard";
+import { safeExternalUrl } from "../../lib/url";
 import type { StreamDescriptor } from "../../lib/streams";
 import { markUiEvent } from "../../app/traceUiAction";
 import { useIsMobile } from "../../lib/useMediaQuery";
@@ -186,7 +187,10 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
     },
     openOriginal: () => {
       const e = entries[cursorIndex];
-      if (e?.url) window.open(e.url, "_blank", "noopener,noreferrer");
+      // window.open on a javascript: URL runs it in a document that inherits this
+      // origin, so the guard matters here as much as on the href.
+      const url = safeExternalUrl(e?.url);
+      if (url) window.open(url, "_blank", "noopener,noreferrer");
     },
     toggleRead: () => {
       const e = entries[cursorIndex];

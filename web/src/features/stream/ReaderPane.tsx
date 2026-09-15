@@ -16,6 +16,7 @@ import { useOnline } from "../../app/offline/useOffline";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { Favicon } from "../../components/Favicon";
 import { formatDateTime } from "../../lib/time";
+import { safeExternalUrl } from "../../lib/url";
 import { useSelection } from "./selection";
 import styles from "./ReaderPane.module.css";
 
@@ -77,6 +78,9 @@ export function ReaderPane() {
   }
 
   const entry = query.data;
+  // Entries stored before the parser started rejecting them can still carry a
+  // javascript: or data: URL, and React only refuses those in development builds.
+  const safeUrl = safeExternalUrl(entry.url);
   const meta = [entry.author, entry.published_at ? formatDateTime(entry.published_at) : null]
     .filter(Boolean)
     .join(" · ");
@@ -108,8 +112,8 @@ export function ReaderPane() {
             {entry.is_read ? <Circle size={15} /> : <Check size={15} />}
             <span>{entry.is_read ? "Mark unread" : "Mark read"}</span>
           </button>
-          {entry.url ? (
-            <a className={styles.action} href={entry.url} target="_blank" rel="noopener noreferrer">
+          {safeUrl ? (
+            <a className={styles.action} href={safeUrl} target="_blank" rel="noopener noreferrer">
               <ExternalLink size={14} />
               <span>Open original</span>
             </a>
