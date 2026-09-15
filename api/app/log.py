@@ -7,6 +7,7 @@ a client error can be correlated with the server log line.
 """
 
 import logging
+import re
 import uuid
 
 from starlette.datastructures import MutableHeaders
@@ -16,6 +17,27 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 log = logging.getLogger("alo.api")
 
 _HEADER = "x-request-id"
+
+
+# An inbound id is echoed on the response and written into logs, so it is bounded
+# and restricted to the shape ids actually come in: a hex uuid, a ULID, a trace id.
+_MAX_REQUEST_ID = 128
+_REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]+$")
+
+
+def _clean_request_id(value: str | None) -> str | None:
+    """An acceptable inbound request id, or None to generate a fresh one.
+
+    A whitespace-only header used to strip to "", which is falsy only *after* the
+    truthiness check that guarded it, so the response carried an empty
+    X-Request-ID and the logs said request_id="".
+    """
+    if value is None:
+        return None
+    candidate = value.strip()
+    if not candidate or len(candidate) > _MAX_REQUEST_ID:
+        return None
+    return candidate if _REQUEST_ID_RE.match(candidate) else None
 
 
 def request_id(request: Request) -> str:
@@ -33,8 +55,7 @@ class RequestContextMiddleware:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
-        inbound = Request(scope).headers.get(_HEADER)
-        rid = inbound.strip() if inbound else uuid.uuid4().hex
+        rid = _clean_request_id(Request(scope).headers.get(_HEADER)) or uuid.uuid4().hex
         scope.setdefault("state", {})["request_id"] = rid
 
         async def send_with_id(message: Message) -> None:
