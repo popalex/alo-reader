@@ -37,11 +37,16 @@ export function useScrollReadMarker(
   entriesRef.current = entries;
   const virtualizerRef = useRef(virtualizer);
   virtualizerRef.current = virtualizer;
-  // Highest index already marked (exclusive). Persists across paging; resets
-  // when the list remounts per stream, or when resetKey changes.
-  const markedUpTo = useRef(0);
+  // Which entries have already been marked, by id rather than by position.
+  //
+  // An index watermark goes stale the moment the array shifts, and it shifts often:
+  // usePendingFeedPolling invalidates ["entries"] when a new feed lands, the offline
+  // replay drain invalidates it, mark-all-read invalidates it, and so does `r`. Every
+  // prepended entry then sits below the watermark and can never be marked read by
+  // scrolling — it stays unread forever.
+  const markedIds = useRef<Set<number>>(new Set());
   useEffect(() => {
-    markedUpTo.current = 0;
+    markedIds.current = new Set();
   }, [resetKey]);
 
   useEffect(() => {
@@ -65,14 +70,15 @@ export function useScrollReadMarker(
             break;
           }
         }
-        if (firstVisible <= markedUpTo.current) return;
-
         const ids: number[] = [];
-        for (let i = markedUpTo.current; i < firstVisible; i++) {
+        for (let i = 0; i < firstVisible; i++) {
           const e = es[i];
-          if (e && !e.is_read) ids.push(e.id);
+          if (e && !e.is_read && !markedIds.current.has(e.id)) {
+            ids.push(e.id);
+            markedIds.current.add(e.id);
+          }
         }
-        markedUpTo.current = firstVisible;
+        if (ids.length === 0) return;
 
         for (let i = 0; i < ids.length; i += CHUNK) {
           setStateRef.current.mutate({ ids: ids.slice(i, i + CHUNK), read: true });
