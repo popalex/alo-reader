@@ -60,10 +60,20 @@ export function useScrollReadMarker(
         const top = el.scrollTop;
         const items = virtualizerRef.current.getVirtualItems();
         const es = entriesRef.current;
+        // Nothing measured yet (a settle that lands between renders): a scroll
+        // position tells us nothing about which rows are above the fold.
+        if (items.length === 0) return;
 
         // First index whose bottom is still below the top edge = first visible;
         // everything before it has scrolled fully above.
-        let firstVisible = es.length;
+        //
+        // The fallback when no measured row reaches past the top is the last
+        // measured row, NOT es.length: defaulting to the end of the list means one
+        // odd settle marks every entry in the stream read, including thousands that
+        // were never rendered. Combined with an id set that keeps looking for new
+        // work, that turns into "the whole stream is read" rather than a single
+        // mistake.
+        let firstVisible = items[items.length - 1].index + 1;
         for (const it of items) {
           if (it.start + it.size > top) {
             firstVisible = it.index;
