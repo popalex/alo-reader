@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.deps import CurrentUser, Session
 from app.errors import ApiError
@@ -49,7 +49,7 @@ class StreamPage(BaseModel):
 class MarkReadRequest(BaseModel):
     # Omit to mark the whole stream ("mark all read"); provide to bound the action to
     # id <= max_entry_id (leaves items that arrived mid-action unread).
-    max_entry_id: int | None = None
+    max_entry_id: Annotated[int, Field(ge=1, le=2**63 - 1)] | None = None
 
 
 class UpdatedResponse(BaseModel):

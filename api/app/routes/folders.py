@@ -1,13 +1,18 @@
 """Folder CRUD (DESIGN.md §5). All endpoints are tenant-scoped: another user's
 folder id is indistinguishable from a missing one (404, never 403)."""
 
+from typing import Annotated
+
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from app.deps import CurrentUser, Session
+from app.deps import CurrentUser, RowId, Session
 from app.errors import ApiError
 from app.models import Folder
 from app.store import folders as folders_store
+
+_INT32_MIN = -(2**31)
+_INT32_MAX = 2**31 - 1
 
 router = APIRouter(prefix="/folders", tags=["folders"])
 
@@ -20,12 +25,14 @@ class FolderResponse(BaseModel):
 
 class CreateFolderRequest(BaseModel):
     name: str = Field(min_length=1, max_length=200)
-    position: int = 0
+    # Folder.position is an int4 column: unbounded here, 3000000000 is a DataError
+    # at flush time and a 500 instead of a 422.
+    position: Annotated[int, Field(ge=_INT32_MIN, le=_INT32_MAX)] = 0
 
 
 class UpdateFolderRequest(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
-    position: int | None = None
+    position: Annotated[int, Field(ge=_INT32_MIN, le=_INT32_MAX)] | None = None
 
 
 def _shape(folder: Folder) -> FolderResponse:
@@ -47,7 +54,7 @@ async def create_folder(
 
 @router.patch("/{folder_id}", response_model=FolderResponse)
 async def update_folder(
-    folder_id: int, body: UpdateFolderRequest, user: CurrentUser, session: Session
+    folder_id: RowId, body: UpdateFolderRequest, user: CurrentUser, session: Session
 ) -> FolderResponse:
     folder = await folders_store.update(
         session, user.id, folder_id, name=body.name, position=body.position
@@ -58,7 +65,7 @@ async def update_folder(
 
 
 @router.delete("/{folder_id}", status_code=204)
-async def delete_folder(folder_id: int, user: CurrentUser, session: Session) -> None:
+async def delete_folder(folder_id: RowId, user: CurrentUser, session: Session) -> None:
     # Non-destructive: the subscriptions.folder_id FK is ON DELETE SET NULL, so a
     # deleted category's feeds simply fall back to Uncategorized.
     if not await folders_store.delete(session, user.id, folder_id):

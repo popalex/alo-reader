@@ -7,6 +7,8 @@ from fastapi import FastAPI
 
 from app.errors import register_exception_handlers
 
+from .conftest import PatUser
+
 
 async def test_unhandled_exception_returns_envelope_without_leaking() -> None:
     test_app = FastAPI()
@@ -74,3 +76,33 @@ async def test_unhandled_500_carries_the_request_id() -> None:
 async def test_request_id_is_propagated(api_client: httpx.AsyncClient, rid: str) -> None:
     resp = await api_client.get("/api/v1/healthz", headers={"X-Request-ID": rid})
     assert resp.headers.get("x-request-id") == rid
+
+
+async def test_an_out_of_range_id_is_a_422_not_a_500(
+    api_client: httpx.AsyncClient, pat_user: PatUser
+) -> None:
+    # Ids are bigints; FastAPI's plain int is unbounded, so an oversized one reached
+    # asyncpg and came back as "value out of int64 range" — a 500, and on the public
+    # /icons route an unauthenticated one.
+    huge = 2**63
+    icon = await api_client.get(f"/api/v1/icons/{huge}")
+    entry = await api_client.get(f"/api/v1/entries/{huge}", headers=pat_user.headers)
+    state = await api_client.post(
+        "/api/v1/entries/state", json={"ids": [huge], "read": True}, headers=pat_user.headers
+    )
+
+    assert icon.status_code == 422
+    assert entry.status_code == 422
+    assert state.status_code == 422
+
+
+async def test_an_out_of_range_folder_position_is_a_422_not_a_500(
+    api_client: httpx.AsyncClient, pat_user: PatUser
+) -> None:
+    # Folder.position is an int4 column.
+    resp = await api_client.post(
+        "/api/v1/folders",
+        json={"name": "overflow", "position": 3_000_000_000},
+        headers=pat_user.headers,
+    )
+    assert resp.status_code == 422
