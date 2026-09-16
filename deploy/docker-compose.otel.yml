@@ -120,17 +120,24 @@ services:
       PROMETHEUS_EXTRA_ARGS: >-
         --storage.tsdb.retention.time=${PROM_RETENTION:-15d}
         --storage.tsdb.retention.size=${PROM_RETENTION_SIZE:-1GB}
+      # Both burst knobs are pinned at their own defaults (Loki 6 MB, Tempo 20 MB) so
+      # this changes nothing until an operator lowers one. They are here because they
+      # are invisible otherwise: a burst is admitted on top of the rate, and Tempo's
+      # 20 MB against a 500 KB/s rate is 40 seconds of allowance in one go.
+      #
       # Loki needs all three: the compactor deletes nothing unless retention is
       # enabled, refuses to start with retention enabled and no delete-request store,
       # and honours -store.retention rather than the legacy table-manager period
       # (which belongs to the old index scheme and is documented as destructive).
       LOKI_EXTRA_ARGS: >-
         -distributor.ingestion-rate-limit-mb=${LOKI_INGEST_RATE_MB:-2}
+        -distributor.ingestion-burst-size-mb=${LOKI_INGEST_BURST_MB:-6}
         -compactor.retention-enabled
         -compactor.delete-request-store=filesystem
         -store.retention=${LOKI_RETENTION:-72h}
       TEMPO_EXTRA_ARGS: >-
         -distributor.ingestion-rate-limit-bytes=${TEMPO_INGEST_RATE_BYTES:-500000}
+        -distributor.ingestion-burst-size-bytes=${TEMPO_INGEST_BURST_BYTES:-20000000}
         -ingester.max-bytes-per-trace=${TEMPO_MAX_TRACE_BYTES:-5000000}
         -compactor.compaction.compaction.block-retention=${TEMPO_RETENTION:-48h}
         -backend-scheduler.provider.work.compaction.compaction.block-retention=${TEMPO_RETENTION:-48h}

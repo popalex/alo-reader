@@ -146,11 +146,21 @@ scratch space, and it is deliberately far below the defaults: the defaults are s
 normal traffic never trips them, and this is sized so a flood cannot outrun the disk.
 Pick one — you cannot have both from one number.
 
-Two details that bite if you go this low. Loki's rate flag takes a float (`0.008` reads
-back from `/config` verbatim), but its burst allowance is separate and defaults to 6 MB,
-which sits on top of whatever rate you set. And a rate this far under your real traffic
-means dropped telemetry rather than a slow disk, so check for ingestion rejections in
-the Loki and Tempo logs before assuming the numbers are free.
+**Bursts sit on top of every rate above.** Both stores admit a burst before the rate
+limiter applies, and both defaults are large next to a tightened rate — Loki 6 MB,
+Tempo **20 MB**, which against a 500 KB/s rate is 40 seconds of allowance in one go.
+They are set explicitly in the overlay at those same defaults, so nothing changes until
+you lower them, and a real budget lowers them with the rate:
+
+```
+LOKI_INGEST_BURST_MB=1
+TEMPO_INGEST_BURST_BYTES=1000000
+```
+
+Two more details that bite if you go this low. Loki's rate flag takes a float (`0.008`
+reads back from `/config` verbatim). And a rate this far under your real traffic means
+dropped telemetry rather than a slow disk, so check for ingestion rejections in the Loki
+and Tempo logs before assuming the numbers are free.
 
 ## Notes
 
