@@ -154,6 +154,13 @@ take_backup() (
 	mv "$partial" "$final" || { rm -f "$partial"; die "could not finalize $final"; }
 	log "wrote $final ($(du -h "$final" | cut -f1))"
 
+	# Publish here, not after the work below. The dump is verified and renamed, which
+	# is the whole of what the freshness alert measures — and push_remote blocks on an
+	# rclone copy that can hang for as long as the network lets it. Waiting for that
+	# would leave yesterday's timestamp standing while a good backup sits on the
+	# volume: the alert firing about a problem that no longer exists.
+	write_metrics "$(date -u +%s)" 1
+
 	prune_local
 	if [ -n "$BACKUP_RCLONE_REMOTE" ]; then
 		push_remote "$final"
