@@ -3,8 +3,11 @@
 FROM node:24-slim AS build
 WORKDIR /web
 RUN corepack enable
-COPY web/package.json web/pnpm-workspace.yaml ./
-RUN pnpm install
+# The lockfile comes too: without it pnpm resolves fresh from the registry, so the
+# bundle CI publishes is built from a different dependency tree than the one every
+# other job tested with --frozen-lockfile.
+COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
 COPY web/ ./
 RUN pnpm build
 
