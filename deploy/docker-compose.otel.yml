@@ -114,9 +114,10 @@ services:
       #
       # This is the second line of defence, not the first. /otlp and /grafana are
       # loopback-only (deploy/Caddyfile): reach them with `ssh -L` or `tailscale
-      # serve`, not by widening the allow-list. These limits are what stops an
-      # internal runaway — a worker stuck in a logging loop, a feed producing a span
-      # per item — from quietly filling the disk the alert floor watches.
+      # serve`, not by widening the allow-list. An internal runaway — a worker stuck in
+      # a logging loop, a feed producing a span per item — is slowed by these limits,
+      # not stopped: at 2 MB/s Loki still reaches ~500 GB inside its retention window.
+      # The disk alert (docs/ALERTS.md) is what actually catches that.
       # Prometheus is the only one with a size-based policy at all, and its own --help
       # scopes it to blocks: it deletes the oldest ones when a compaction finds the
       # total passed, and it cannot delete the head. Leave headroom above the number.
@@ -125,17 +126,26 @@ services:
       PROMETHEUS_EXTRA_ARGS: >-
         --storage.tsdb.retention.time=${PROM_RETENTION:-15d}
         --storage.tsdb.retention.size=${PROM_RETENTION_SIZE:-1GB}
+      # Both burst knobs are pinned at their own defaults (Loki 6 MB, Tempo 20 MB) so
+      # this changes nothing until an operator lowers one — and lowering one is rarely
+      # right. The burst is also the largest single push the store accepts, and nothing
+      # here caps a push by size, so a burst trimmed to match a lowered rate rejects
+      # whole batches while average throughput is nowhere near the limit. They are
+      # spelled out because a limit you cannot see is one you cannot reason about.
+      #
       # Loki needs all three: the compactor deletes nothing unless retention is
       # enabled, refuses to start with retention enabled and no delete-request store,
       # and honours -store.retention rather than the legacy table-manager period
       # (which belongs to the old index scheme and is documented as destructive).
       LOKI_EXTRA_ARGS: >-
         -distributor.ingestion-rate-limit-mb=${LOKI_INGEST_RATE_MB:-2}
+        -distributor.ingestion-burst-size-mb=${LOKI_INGEST_BURST_MB:-6}
         -compactor.retention-enabled
         -compactor.delete-request-store=filesystem
         -store.retention=${LOKI_RETENTION:-72h}
       TEMPO_EXTRA_ARGS: >-
         -distributor.ingestion-rate-limit-bytes=${TEMPO_INGEST_RATE_BYTES:-500000}
+        -distributor.ingestion-burst-size-bytes=${TEMPO_INGEST_BURST_BYTES:-20000000}
         -ingester.max-bytes-per-trace=${TEMPO_MAX_TRACE_BYTES:-5000000}
         -compactor.compaction.compaction.block-retention=${TEMPO_RETENTION:-48h}
         -backend-scheduler.provider.work.compaction.compaction.block-retention=${TEMPO_RETENTION:-48h}

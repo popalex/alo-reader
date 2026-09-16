@@ -132,9 +132,70 @@ from remote users is the one feature that genuinely needs a public `/otlp`; if y
 want it, size these limits against your actual disk first and accept that the endpoint
 is unauthenticated.
 
-To resize: worst case = rate x retention. A 20 GB disk with 5 GB for telemetry and
-48h of traces wants `TEMPO_INGEST_RATE_BYTES` at roughly 5e9 / 172800 = 30 KB/s if you
-want the bound to be real rather than generous.
+To resize, budget **per store** — they share one volume, so a number that makes only
+Tempo's bound real still leaves Loki's ~500 GB standing beside it. Split the allowance
+first, then divide each share by its retention window:
+
+```
+rate = share / retention_seconds, rounded DOWN
+
+Tempo  2 GB over 48h  ->  2e9 / 172800          = 11574 B/s  -> TEMPO_INGEST_RATE_BYTES=11000
+Loki   2 GB over 72h  ->  2e9 / 259200 / 2^20   = 0.0073 MiB -> LOKI_INGEST_RATE_MB=0.007
+Prometheus            ->  its own size cap                   -> PROM_RETENTION_SIZE=512MB
+```
+
+Round down, and mind the unit: Loki's `_MB` flag is MiB (`1048576`), so `0.008` would
+have been 2.17 GB against a 2 GB share, and `12000` B/s would have been 2.07 GB against
+the same. Both are now under.
+
+Those numbers are a **nominal allocation, not a ceiling**. They leave out the burst
+allowances below, compaction lag between "expired" and "deleted", Prometheus's head, and
+the scratch space compactors need while they work. What they buy is proportion — each
+store gets a share instead of one store's bound being real and the rest unbounded — and
+they are deliberately far below the defaults, which are sized so normal traffic never
+trips them. **The disk alert is the backstop, not this arithmetic.**
+
+**The burst allowances are not part of this arithmetic, and must not be scaled with the
+rate.** Both stores admit a burst on top of the rate — Loki 6 MB, Tempo 20 MB by default,
+now set explicitly in the overlay at those same values — but the burst is also **the
+largest single push either store will accept**. Undersize it and a compliant batch is
+rejected outright, while average throughput sits far below the rate limit. Dropped
+telemetry, from a limit you set to protect a disk.
+
+And the push that reaches the store is not ours to bound. Alloy's
+`otelcol.processor.batch` batches by item count and timeout with `send_batch_max_size`
+unset, so it emits no size limit of its own — and even capping it there is not enough,
+because the `otel-lgtm` image runs its **own** collector in front of the stores, whose
+config is a bare `batch:` with defaults:
+
+```yaml
+# /otel-lgtm/otelcol-config.yaml, inside the image
+processors:
+  batch:
+```
+
+That processor re-batches whatever Alloy sends before exporting to Tempo, Loki and
+Prometheus, so a cap on our side can be recombined into a larger store-facing push.
+
+The earlier hops do have limits, and they are worth knowing when you are diagnosing a
+rejected export rather than sizing a disk — they just do not decide what the store sees:
+
+| Hop | Limit |
+| --- | --- |
+| browser → Caddy `/otlp/v1/traces` | `request_body max_size 1MB` (`deploy/Caddyfile`) |
+| api / worker → Alloy, OTLP gRPC | the receiver's default max receive size, 4 MiB |
+| Alloy → otel-lgtm → the stores | re-batched, no size cap |
+
+Bounding the store-facing push reliably means controlling that last hop, which means
+building your own image or running the stores separately.
+
+So: **leave the bursts at the defaults** unless you are doing exactly that. They are
+spelled out in the overlay to be visible, not to be tuned.
+
+One more thing at these rates: Loki's flag takes a float and reads back verbatim
+(`0.007` appears as `ingestion_rate_mb: 0.007` in `/config`), and a rate far under your
+real traffic drops telemetry rather than filling the disk slowly. Check the Loki and
+Tempo logs for ingestion rejections before assuming the numbers are free.
 
 ## Notes
 
