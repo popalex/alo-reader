@@ -121,9 +121,11 @@ services:
         --storage.tsdb.retention.time=${PROM_RETENTION:-15d}
         --storage.tsdb.retention.size=${PROM_RETENTION_SIZE:-1GB}
       # Both burst knobs are pinned at their own defaults (Loki 6 MB, Tempo 20 MB) so
-      # this changes nothing until an operator lowers one. They are here because they
-      # are invisible otherwise: a burst is admitted on top of the rate, and Tempo's
-      # 20 MB against a 500 KB/s rate is 40 seconds of allowance in one go.
+      # this changes nothing until an operator lowers one — and lowering one is rarely
+      # right. The burst is also the largest single push the store accepts, and nothing
+      # here caps a push by size, so a burst trimmed to match a lowered rate rejects
+      # whole batches while average throughput is nowhere near the limit. They are
+      # spelled out because a limit you cannot see is one you cannot reason about.
       #
       # Loki needs all three: the compactor deletes nothing unless retention is
       # enabled, refuses to start with retention enabled and no delete-request store,

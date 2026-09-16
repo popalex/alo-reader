@@ -146,21 +146,34 @@ scratch space, and it is deliberately far below the defaults: the defaults are s
 normal traffic never trips them, and this is sized so a flood cannot outrun the disk.
 Pick one — you cannot have both from one number.
 
-**Bursts sit on top of every rate above.** Both stores admit a burst before the rate
-limiter applies, and both defaults are large next to a tightened rate — Loki 6 MB,
-Tempo **20 MB**, which against a 500 KB/s rate is 40 seconds of allowance in one go.
-They are set explicitly in the overlay at those same defaults, so nothing changes until
-you lower them, and a real budget lowers them with the rate:
+**The burst allowances are not part of this arithmetic, and must not be scaled with the
+rate.** Both stores admit a burst on top of the rate — Loki 6 MB, Tempo 20 MB by default,
+now set explicitly in the overlay at those same values — but the burst is also **the
+largest single push either store will accept**. Undersize it and a compliant batch is
+rejected outright, while average throughput sits far below the rate limit. Dropped
+telemetry, from a limit you set to protect a disk.
 
-```
-LOKI_INGEST_BURST_MB=1
-TEMPO_INGEST_BURST_BYTES=1000000
+Nothing in this stack caps a push by size: `otelcol.processor.batch` in
+[`alloy/config.alloy`](alloy/config.alloy) batches by item count and timeout, and its
+`send_batch_max_size` defaults to unlimited. So the order is: bound the batch first,
+then keep the burst comfortably above what that batch can weigh.
+
+```alloy
+otelcol.processor.batch "applications" {
+  send_batch_size     = 2000   // flush at this many items
+  send_batch_max_size = 2000   // and never emit a push larger than this
+  ...
+}
 ```
 
-Two more details that bite if you go this low. Loki's rate flag takes a float (`0.008`
-reads back from `/config` verbatim). And a rate this far under your real traffic means
-dropped telemetry rather than a slow disk, so check for ingestion rejections in the Loki
-and Tempo logs before assuming the numbers are free.
+Span and log sizes vary enough that the only honest way to pick the burst is to measure:
+watch one flush and leave several times its size. The default 20 MB is generous on
+purpose for exactly this reason.
+
+Two more details at these rates. Loki's rate flag takes a float (`0.008` reads back from
+`/config` verbatim). And a rate far under your real traffic drops telemetry rather than
+filling the disk slowly, so check the Loki and Tempo logs for ingestion rejections
+before assuming the numbers are free.
 
 ## Notes
 
