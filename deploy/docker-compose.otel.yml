@@ -98,20 +98,42 @@ services:
       # production; every link in an alert notification is built from it.
       GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:${GRAFANA_PORT:-3001}/grafana/}
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
-      # Bound the RATE at which an OTLP flood can cost you, and expire what lands.
-      # Not a storage bound: 2 MB/s against 72h retention is ~518 GB before the first
-      # blocks expire, so on a small disk this slows an abuser down rather than
-      # stopping one. The actual protection today is that /otlp is loopback-only
-      # (deploy/Caddyfile); sizing these from a real disk budget is open work.
+      # Storage budget for the telemetry stack. None of the three takes a disk quota:
+      # Loki and Tempo throttle ingestion and expire on a schedule, so their bound is
+      # rate x retention (hundreds of gigabytes at these defaults, if something floods
+      # them for the full window), and Prometheus deletes its oldest blocks once the
+      # size is passed. The numbers below make the *expected* footprint trivial — tens
+      # of megabytes for one instance — and a flood slow. They do not cap the disk.
+      # deploy/observability/README.md has the arithmetic and how to resize.
       #
-      # Caddy cannot rate limit here — rate_limit is a plugin, not in the standard
-      # image — and /otlp takes no authentication, which is why the route stays shut.
+      # This is the second line of defence, not the first. /otlp and /grafana are
+      # loopback-only (deploy/Caddyfile): reach them with `ssh -L` or `tailscale
+      # serve`, not by widening the allow-list. These limits are what stops an
+      # internal runaway — a worker stuck in a logging loop, a feed producing a span
+      # per item — from quietly filling the disk the alert floor watches.
+      # Prometheus is the only one with a size-based policy at all, and its own --help
+      # scopes it to blocks: it deletes the oldest ones when a compaction finds the
+      # total passed, and it cannot delete the head. Leave headroom above the number.
+      # Both flags are deprecated in Prometheus 3.11 in favour of config-file fields
+      # and still honoured — the image gives us an args hook, not a config file.
+      PROMETHEUS_EXTRA_ARGS: >-
+        --storage.tsdb.retention.time=${PROM_RETENTION:-15d}
+        --storage.tsdb.retention.size=${PROM_RETENTION_SIZE:-1GB}
+      # Loki needs all three: the compactor deletes nothing unless retention is
+      # enabled, refuses to start with retention enabled and no delete-request store,
+      # and honours -store.retention rather than the legacy table-manager period
+      # (which belongs to the old index scheme and is documented as destructive).
+      LOKI_EXTRA_ARGS: >-
+        -distributor.ingestion-rate-limit-mb=${LOKI_INGEST_RATE_MB:-2}
+        -compactor.retention-enabled
+        -compactor.delete-request-store=filesystem
+        -store.retention=${LOKI_RETENTION:-72h}
       TEMPO_EXTRA_ARGS: >-
-        -distributor.ingestion-rate-limit-bytes=${TEMPO_INGEST_RATE_BYTES:-2000000}
+        -distributor.ingestion-rate-limit-bytes=${TEMPO_INGEST_RATE_BYTES:-500000}
         -ingester.max-bytes-per-trace=${TEMPO_MAX_TRACE_BYTES:-5000000}
-        -compactor.compaction.compaction.block-retention=${TEMPO_RETENTION:-72h}
-        -backend-scheduler.provider.work.compaction.compaction.block-retention=${TEMPO_RETENTION:-72h}
-        -backend-worker.compaction.compaction.block-retention=${TEMPO_RETENTION:-72h}
+        -compactor.compaction.compaction.block-retention=${TEMPO_RETENTION:-48h}
+        -backend-scheduler.provider.work.compaction.compaction.block-retention=${TEMPO_RETENTION:-48h}
+        -backend-worker.compaction.compaction.block-retention=${TEMPO_RETENTION:-48h}
       # Pushover credentials for the alert floor (see alerting/notifications.yml).
       # Unset means the contact point still provisions and alerts still show in
       # Grafana; only delivery fails, and Grafana logs Pushover's own rejection.

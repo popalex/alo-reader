@@ -31,11 +31,12 @@
 	# samples that pin the worker-lag alert at 0 while the worker is dead.
 	#
 	# A per-request cap bounds one payload, not the total, and Caddy cannot rate limit
-	# here (rate_limit is a plugin, not in the standard image). So the total is bounded
-	# at the other end instead — Tempo runs with an ingestion rate limit and a 72h
-	# block retention (TEMPO_* in docker-compose.otel.yml) — and the route itself is an
-	# allow-list like /grafana: loopback by default, so browser spans from real users
-	# need ALO_OTLP_ALLOW_IPS widened deliberately.
+	# here (rate_limit is a plugin, not in the standard image). So the far end slows a
+	# flood instead — Tempo caps its ingestion rate and expires blocks on the TEMPO_*
+	# schedule in docker-compose.otel.yml, which bounds rate x retention rather than
+	# disk (see deploy/observability/README.md) — and the route itself is an allow-list
+	# like /grafana: loopback by default, so browser spans from real users need
+	# ALO_OTLP_ALLOW_IPS widened deliberately.
 	handle_path /otlp/v1/traces {
 		@otlp_denied not remote_ip {$ALO_OTLP_ALLOW_IPS:127.0.0.1/32 ::1}
 		respond @otlp_denied 403
@@ -71,7 +72,15 @@
 	# login guards it (anonymous access is off). Harmless without the overlay: upstream
 	# resolved per-request.
 	#
-	# Reachable from loopback only unless ALO_GRAFANA_ALLOW_IPS says otherwise. The
+	# Reachable from loopback only unless ALO_GRAFANA_ALLOW_IPS says otherwise. Caddy
+	# runs in a container, so "loopback" means a peer inside it — a request the host
+	# makes to the published port arrives from the docker bridge gateway and does not
+	# match. That is deliberate: get at Grafana on its own loopback-published port
+	# (`ssh -L 3001:127.0.0.1:3001`), not through here. A non-matching request falls
+	# through to the SPA and gets index.html, so a denial looks like a 200 rather than
+	# the 403 /otlp returns — the route has to stay invisible to anyone scanning.
+	#
+	# The
 	# admin password is applied when Grafana FIRST creates its user, so anyone who ran
 	# `make otel-up` once before editing .env has admin/admin forever and setting the
 	# variable afterwards changes nothing — which is a fine thing to have on a private
