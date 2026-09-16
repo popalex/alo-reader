@@ -47,9 +47,21 @@ prometheus.exporter.unix "host" {
   procfs_path = "/host/proc"
   sysfs_path  = "/host/sys"
 
-  // Filesystems only. The full default set adds ~40 collectors (cpu, netdev, hwmon,
-  // thermal…) that nothing here alerts on or charts.
-  set_collectors = ["filesystem"]
+  // Filesystems and the textfile reader. The full default set adds ~40 collectors
+  // (cpu, netdev, hwmon, thermal…) that nothing here alerts on or charts.
+  set_collectors = ["filesystem", "textfile"]
+
+  // Backup freshness. The sidecar is a separate container writing to a volume, with no
+  // OTLP client of its own and nothing to scrape, so it publishes node_exporter
+  // textfile metrics onto that volume (deploy/backup.sh) and this reads them from a
+  // read-only mount. Same trick as the filesystem collector above: one more collector
+  // on the bridge that already exists, rather than a second write path.
+  //
+  // node_textfile_scrape_error comes along free and is worth knowing about — it goes to
+  // 1 if the file is ever malformed, which is why the sidecar writes-then-renames.
+  textfile {
+    directory = "/backups/metrics"
+  }
 }
 
 prometheus.scrape "host" {
