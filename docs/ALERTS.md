@@ -16,6 +16,11 @@ Grafana loads them from a file, so they cannot be edited in the UI and they come
 identically after every container recreate. To change a threshold, edit the evaluator
 params in that file and recreate the `otel-lgtm` container.
 
+Recreate it, specifically. `POST /api/admin/provisioning/alerting/reload` answers `200`
+and updates what the provisioning API reports, but the running rule keeps its old
+definition — so an edit "applied" that way looks live in the API and evaluates on the
+values you thought you replaced.
+
 ## Before any of this works
 
 Telemetry is off by default. `make up` runs the app with no collector, no Grafana and
