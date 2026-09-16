@@ -19,6 +19,16 @@ BACKUP_ZSTD_LEVEL="${BACKUP_ZSTD_LEVEL:-10}"
 BACKUP_RCLONE_REMOTE="${BACKUP_RCLONE_REMOTE:-}"
 
 log() { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) backup: $*"; }
+# Aborts the enclosing subshell, not the process. take_backup and cmd_restore are
+# defined with ( ) bodies precisely so this stays local to one attempt: `exit` from a
+# { } function body ends the whole script, which made the `take_backup || log
+# WARNING` guards in cmd_loop dead code — a failed dump exited 1, restart:
+# unless-stopped brought the container straight back, and the retry failed the same
+# way, a restart loop that buries the one line saying what broke.
+#
+# `return 1` would be worse than either: it only returns from die, so the caller
+# carries on past the failure (mv of a file that was never renamed, du of a file that
+# is not there) before reporting anything.
 die() { log "ERROR: $*"; exit 1; }
 
 # Seconds until the next BACKUP_SCHEDULE_UTC. awk does the arithmetic because
@@ -35,7 +45,7 @@ seconds_until_schedule() {
 		}'
 }
 
-take_backup() {
+take_backup() (
 	stamp=$(date -u +%Y%m%dT%H%M%SZ)
 	final="$BACKUP_DIR/alo-$stamp.dump.zst"
 	partial="$final.partial"
@@ -73,7 +83,7 @@ take_backup() {
 		push_remote "$final"
 	fi
 	return 0
-}
+)
 
 prune_local() {
 	# -delete is not in every busybox build; -exec rm is.
