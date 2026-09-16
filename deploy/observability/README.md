@@ -134,17 +134,23 @@ Tempo's bound real still leaves Loki's ~500 GB standing beside it. Split the all
 first, then divide each share by its retention window:
 
 ```
-rate = share / retention_seconds
+rate = share / retention_seconds, rounded DOWN
 
-Tempo  2 GB over 48h  ->  2e9 / 172800  ~=  12 KB/s   TEMPO_INGEST_RATE_BYTES=12000
-Loki   2 GB over 72h  ->  2e9 / 259200  ~=   8 KB/s   LOKI_INGEST_RATE_MB=0.008
-Prometheus             ->  its own cap            PROM_RETENTION_SIZE=512MB
+Tempo  2 GB over 48h  ->  2e9 / 172800          = 11574 B/s  -> TEMPO_INGEST_RATE_BYTES=11000
+Loki   2 GB over 72h  ->  2e9 / 259200 / 2^20   = 0.0073 MiB -> LOKI_INGEST_RATE_MB=0.007
+Prometheus            ->  its own size cap                   -> PROM_RETENTION_SIZE=512MB
 ```
 
-That is a 5 GB allowance with headroom for Prometheus's head block and the compactors'
-scratch space, and it is deliberately far below the defaults: the defaults are sized so
-normal traffic never trips them, and this is sized so a flood cannot outrun the disk.
-Pick one — you cannot have both from one number.
+Round down, and mind the unit: Loki's `_MB` flag is MiB (`1048576`), so `0.008` would
+have been 2.17 GB against a 2 GB share, and `12000` B/s would have been 2.07 GB against
+the same. Both are now under.
+
+Those numbers are a **nominal allocation, not a ceiling**. They leave out the burst
+allowances below, compaction lag between "expired" and "deleted", Prometheus's head, and
+the scratch space compactors need while they work. What they buy is proportion — each
+store gets a share instead of one store's bound being real and the rest unbounded — and
+they are deliberately far below the defaults, which are sized so normal traffic never
+trips them. **The disk alert is the backstop, not this arithmetic.**
 
 **The burst allowances are not part of this arithmetic, and must not be scaled with the
 rate.** Both stores admit a burst on top of the rate — Loki 6 MB, Tempo 20 MB by default,
@@ -153,27 +159,30 @@ largest single push either store will accept**. Undersize it and a compliant bat
 rejected outright, while average throughput sits far below the rate limit. Dropped
 telemetry, from a limit you set to protect a disk.
 
-Nothing in this stack caps a push by size: `otelcol.processor.batch` in
-[`alloy/config.alloy`](alloy/config.alloy) batches by item count and timeout, and its
-`send_batch_max_size` defaults to unlimited. So the order is: bound the batch first,
-then keep the burst comfortably above what that batch can weigh.
+And the push that reaches the store is not ours to bound. Alloy's
+`otelcol.processor.batch` batches by item count and timeout with `send_batch_max_size`
+unset, so it emits no size limit of its own — and even capping it there is not enough,
+because the `otel-lgtm` image runs its **own** collector in front of the stores, whose
+config is a bare `batch:` with defaults:
 
-```alloy
-otelcol.processor.batch "applications" {
-  send_batch_size     = 2000   // flush at this many items
-  send_batch_max_size = 2000   // and never emit a push larger than this
-  ...
-}
+```yaml
+# /otel-lgtm/otelcol-config.yaml, inside the image
+processors:
+  batch:
 ```
 
-Span and log sizes vary enough that the only honest way to pick the burst is to measure:
-watch one flush and leave several times its size. The default 20 MB is generous on
-purpose for exactly this reason.
+That processor re-batches whatever Alloy sends before exporting to Tempo, Loki and
+Prometheus, so a cap on our side can be recombined into a larger store-facing push.
+Bounding the burst reliably means controlling that path too, which means building your
+own image or running the stores separately.
 
-Two more details at these rates. Loki's rate flag takes a float (`0.008` reads back from
-`/config` verbatim). And a rate far under your real traffic drops telemetry rather than
-filling the disk slowly, so check the Loki and Tempo logs for ingestion rejections
-before assuming the numbers are free.
+So: **leave the bursts at the defaults** unless you are doing exactly that. They are
+spelled out in the overlay to be visible, not to be tuned.
+
+One more thing at these rates: Loki's flag takes a float and reads back verbatim
+(`0.007` appears as `ingestion_rate_mb: 0.007` in `/config`), and a rate far under your
+real traffic drops telemetry rather than filling the disk slowly. Check the Loki and
+Tempo logs for ingestion rejections before assuming the numbers are free.
 
 ## Notes
 
