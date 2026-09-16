@@ -24,7 +24,15 @@
 	# overlay runs and /config reports otel_enabled). handle_path strips /otlp so
 	# /otlp/v1/traces reaches the collector as /v1/traces. Harmless without the
 	# overlay — nothing posts here and the upstream is resolved per-request.
-	handle_path /otlp/* {
+	#
+	# Traces only, and capped. This is an unauthenticated write endpoint on a public
+	# address: /otlp/* would also expose /v1/logs and /v1/metrics, so anyone could
+	# fill Loki and Tempo until the disk goes, or write alo_worker_lag_seconds
+	# samples that pin the worker-lag alert at 0 while the worker is dead.
+	handle_path /otlp/v1/traces {
+		request_body {
+			max_size 1MB
+		}
 		reverse_proxy otel-collector:4318
 	}
 
