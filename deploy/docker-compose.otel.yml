@@ -98,17 +98,24 @@ services:
       # production; every link in an alert notification is built from it.
       GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:${GRAFANA_PORT:-3001}/grafana/}
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
-      # Storage budget for the telemetry stack. See deploy/observability/README.md
-      # for the arithmetic; the short version is that only Prometheus can be given a
-      # hard size cap, so the other two are bounded by rate x retention and the
-      # numbers below are chosen to fit a ~5 GB worst case on a 20 GB host.
+      # Storage budget for the telemetry stack. None of the three takes a disk quota:
+      # Loki and Tempo throttle ingestion and expire on a schedule, so their bound is
+      # rate x retention (hundreds of gigabytes at these defaults, if something floods
+      # them for the full window), and Prometheus deletes its oldest blocks once the
+      # size is passed. The numbers below make the *expected* footprint trivial — tens
+      # of megabytes for one instance — and a flood slow. They do not cap the disk.
+      # deploy/observability/README.md has the arithmetic and how to resize.
       #
       # This is the second line of defence, not the first. /otlp and /grafana are
       # loopback-only (deploy/Caddyfile): reach them with `ssh -L` or `tailscale
       # serve`, not by widening the allow-list. These limits are what stops an
       # internal runaway — a worker stuck in a logging loop, a feed producing a span
       # per item — from quietly filling the disk the alert floor watches.
-      # Prometheus is the only store here that takes a hard size cap; use it.
+      # Prometheus is the only one with a size-based policy at all, and its own --help
+      # scopes it to blocks: it deletes the oldest ones when a compaction finds the
+      # total passed, and it cannot delete the head. Leave headroom above the number.
+      # Both flags are deprecated in Prometheus 3.11 in favour of config-file fields
+      # and still honoured — the image gives us an args hook, not a config file.
       PROMETHEUS_EXTRA_ARGS: >-
         --storage.tsdb.retention.time=${PROM_RETENTION:-15d}
         --storage.tsdb.retention.size=${PROM_RETENTION_SIZE:-1GB}
