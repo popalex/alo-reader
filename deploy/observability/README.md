@@ -173,8 +173,18 @@ processors:
 
 That processor re-batches whatever Alloy sends before exporting to Tempo, Loki and
 Prometheus, so a cap on our side can be recombined into a larger store-facing push.
-Bounding the burst reliably means controlling that path too, which means building your
-own image or running the stores separately.
+
+The earlier hops do have limits, and they are worth knowing when you are diagnosing a
+rejected export rather than sizing a disk — they just do not decide what the store sees:
+
+| Hop | Limit |
+| --- | --- |
+| browser → Caddy `/otlp/v1/traces` | `request_body max_size 1MB` (`deploy/Caddyfile`) |
+| api / worker → Alloy, OTLP gRPC | the receiver's default max receive size, 4 MiB |
+| Alloy → otel-lgtm → the stores | re-batched, no size cap |
+
+Bounding the store-facing push reliably means controlling that last hop, which means
+building your own image or running the stores separately.
 
 So: **leave the bursts at the defaults** unless you are doing exactly that. They are
 spelled out in the overlay to be visible, not to be tuned.
