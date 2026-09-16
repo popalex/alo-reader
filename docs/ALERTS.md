@@ -22,7 +22,8 @@ no alert evaluation at all. The alerts exist only under the OTel overlay:
 
 ```sh
 make otel-up          # app + collector + Grafana, alerts provisioned
-# Grafana at http://localhost:3001 (loopback only), Alerting > Alert rules > alo-reader
+# Grafana at http://localhost:3001/grafana/ (loopback only; the sub-path is required)
+# then Alerting > Alert rules > alo-reader
 ```
 
 Two of the three read metrics the app exports itself. The disk numbers come from the

@@ -1,0 +1,22 @@
+# The build context is the repo root, so without this every `docker build` ships the
+# host's node_modules, .venv and .git to the daemon — several hundred megabytes — and
+# Dockerfile.caddy's `COPY web/ ./` drops the host's resolved node_modules on top of
+# the tree pnpm just installed inside the image. On a machine whose host platform
+# differs from the image's, that alone breaks the build on esbuild/rollup binaries.
+.git
+.venv
+**/node_modules
+**/__pycache__
+**/*.pyc
+web/dist
+web/dev-dist
+web/test-results
+web/playwright-report
+*.bundle
+
+# Every env-file variant, anywhere. A developer's .env.local or .env.production.local
+# would otherwise reach the daemon and be baked into the build stage's cache by
+# `COPY web/ ./`. Nothing in an image build needs one.
+**/.env
+**/.env.*
+**/*.local

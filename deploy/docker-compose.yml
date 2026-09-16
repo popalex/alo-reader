@@ -11,8 +11,19 @@
 # `environment:` entries win over env_file, which is what keeps the compose-level
 # defaults working on a machine with no .env at all.
 
+# Log rotation, applied to every service below. Docker's json-file driver defaults to
+# unbounded, and these logs share the disk the alert floor watches: a busy worker
+# writing a line per fetch will trip the 15%-free disk alert with nothing else wrong,
+# and docs/ALERTS.md sends you looking at logs first for exactly that reason.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   caddy:
+    logging: *default-logging
     build:
       context: ..
       dockerfile: deploy/Dockerfile.caddy
@@ -22,6 +33,20 @@ services:
       # and CI want. Set it to a hostname you control and Caddy issues and renews a
       # Let's Encrypt certificate on first request (see deploy/Caddyfile).
       ALO_SITE_ADDRESS: ${ALO_SITE_ADDRESS:-:80}
+      # The Clerk frontend API origin the CSP must allow. clerk-js is loaded from
+      # the host encoded in your publishable key, so a pk_live_ key needs your own
+      # clerk.<domain> here or the CSP blocks login outright (see deploy/Caddyfile).
+      #
+      # Falls back to CLERK_ISSUER, which is the same origin and which every existing
+      # clerk-mode deployment already sets. Without that fallback this fix would only
+      # reach operators who read the changelog: everyone else pulls, runs `make up`,
+      # gets the development wildcard again, and stays broken.
+      ALO_CLERK_ORIGIN: ${ALO_CLERK_ORIGIN:-${CLERK_ISSUER:-https://*.clerk.accounts.dev}}
+      # Who may reach /grafana through the public address. Loopback only by default.
+      ALO_GRAFANA_ALLOW_IPS: ${ALO_GRAFANA_ALLOW_IPS:-127.0.0.1/32 ::1}
+      # Who may post browser traces to /otlp. Also loopback only by default: it is an
+      # unauthenticated write endpoint and nothing in front of it can rate limit.
+      ALO_OTLP_ALLOW_IPS: ${ALO_OTLP_ALLOW_IPS:-127.0.0.1/32 ::1}
     ports:
       - "80:80"
       # Only listened on once ALO_SITE_ADDRESS names a host, but published either
@@ -44,6 +69,7 @@ services:
   # it to finish (service_completed_successfully), so schema is always current
   # before they boot — and with N replicas this runs exactly once, not per-replica.
   migrate:
+    logging: *default-logging
     build:
       context: ..
       dockerfile: deploy/Dockerfile.api
@@ -68,6 +94,7 @@ services:
         condition: service_healthy
 
   api:
+    logging: *default-logging
     build:
       context: ..
       dockerfile: deploy/Dockerfile.api
@@ -115,6 +142,7 @@ services:
         condition: service_completed_successfully
 
   worker:
+    logging: *default-logging
     build:
       context: ..
       dockerfile: deploy/Dockerfile.api
@@ -150,6 +178,7 @@ services:
   # backups are your problem, so this is part of the stack rather than a runbook
   # step. scripts/restore.sh is the other half.
   backup:
+    logging: *default-logging
     build:
       context: ..
       dockerfile: deploy/Dockerfile.backup
@@ -180,7 +209,13 @@ services:
         condition: service_healthy
 
   postgres:
+    logging: *default-logging
     # Postgres 18 + RUM extension (search's index-ordered FTS; see Dockerfile).
+    # restart, like the services that depend on it: depends_on is honoured at `up`
+    # time only, so without this a host reboot brings back api, worker, caddy and
+    # backup against a database that never starts, and nothing recovers until
+    # somebody notices and SSHes in.
+    restart: unless-stopped
     build:
       context: ..
       dockerfile: deploy/Dockerfile.postgres

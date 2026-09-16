@@ -8,14 +8,19 @@ WORKDIR /app
 
 COPY api/pyproject.toml ./pyproject.toml
 COPY api/requirements.txt api/requirements-otel.txt ./
-COPY api/app ./app
 # Dependencies come from the lockfiles, never from pyproject's ranges, so an image
 # built today resolves exactly what CI tested. Default build is the lean image; the
 # OTel compose overlay sets PIP_REQUIREMENTS to add the OpenTelemetry SDK +
 # instrumentation on top.
+#
+# This layer depends on the lockfiles alone. The source is copied *after* it, or
+# every one-line change to app/ would re-download and reinstall the whole
+# requirement set — the OTel SDK included — before anything could be rebuilt.
 ARG PIP_REQUIREMENTS="-r requirements.txt"
-RUN pip install --no-cache-dir ${PIP_REQUIREMENTS} \
-    && pip install --no-cache-dir --no-deps .
+RUN pip install --no-cache-dir ${PIP_REQUIREMENTS}
+
+COPY api/app ./app
+RUN pip install --no-cache-dir --no-deps .
 
 # Alembic config + migration scripts: needed by the `migrate` command so the
 # image can bring a database up to head on its own.

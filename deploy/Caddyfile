@@ -24,7 +24,24 @@
 	# overlay runs and /config reports otel_enabled). handle_path strips /otlp so
 	# /otlp/v1/traces reaches the collector as /v1/traces. Harmless without the
 	# overlay — nothing posts here and the upstream is resolved per-request.
-	handle_path /otlp/* {
+	#
+	# Traces only, capped, and closed by default. This is an unauthenticated write
+	# endpoint: /otlp/* would also expose /v1/logs and /v1/metrics, so anyone could
+	# fill Loki and Tempo until the disk goes, or write alo_worker_lag_seconds
+	# samples that pin the worker-lag alert at 0 while the worker is dead.
+	#
+	# A per-request cap bounds one payload, not the total, and Caddy cannot rate limit
+	# here (rate_limit is a plugin, not in the standard image). So the total is bounded
+	# at the other end instead — Tempo runs with an ingestion rate limit and a 72h
+	# block retention (TEMPO_* in docker-compose.otel.yml) — and the route itself is an
+	# allow-list like /grafana: loopback by default, so browser spans from real users
+	# need ALO_OTLP_ALLOW_IPS widened deliberately.
+	handle_path /otlp/v1/traces {
+		@otlp_denied not remote_ip {$ALO_OTLP_ALLOW_IPS:127.0.0.1/32 ::1}
+		respond @otlp_denied 403
+		request_body {
+			max_size 1MB
+		}
 		reverse_proxy otel-collector:4318
 	}
 
@@ -49,11 +66,22 @@
 		}
 	}
 
-	# Grafana (OTel overlay only), served under /grafana over the internal network — the
-	# host port is loopback-only, so this is the only way in from outside. The prefix is
-	# passed through (Grafana runs with serve_from_sub_path) and Grafana's own login guards
-	# it (anonymous access is off). Harmless without the overlay: upstream resolved per-request.
-	handle /grafana* {
+	# Grafana (OTel overlay only), served under /grafana over the internal network. The
+	# prefix is passed through (Grafana runs with serve_from_sub_path) and Grafana's own
+	# login guards it (anonymous access is off). Harmless without the overlay: upstream
+	# resolved per-request.
+	#
+	# Reachable from loopback only unless ALO_GRAFANA_ALLOW_IPS says otherwise. The
+	# admin password is applied when Grafana FIRST creates its user, so anyone who ran
+	# `make otel-up` once before editing .env has admin/admin forever and setting the
+	# variable afterwards changes nothing — which is a fine thing to have on a private
+	# network and a terrible one to publish. Widen this to your VPN/office CIDR when
+	# you actually want remote access.
+	@grafana {
+		path /grafana*
+		remote_ip {$ALO_GRAFANA_ALLOW_IPS:127.0.0.1/32 ::1}
+	}
+	handle @grafana {
 		reverse_proxy otel-lgtm:3000
 	}
 
@@ -62,8 +90,16 @@
 		# XSS wall after ingest sanitization; it allows 'self' plus what Clerk and
 		# rendered feed images legitimately need (scripts stay 'self' — the build uses
 		# external/bundled scripts, not inline). HSTS matters once WP-16 wires TLS.
+		#
+		# ALO_CLERK_ORIGIN is not decoration. clerk-js is loaded from the frontend API
+		# host encoded in the publishable key: a pk_test_ key resolves to
+		# *.clerk.accounts.dev, but a production pk_live_ key resolves to the
+		# customer's own clerk.<their-domain>. Pinning the development domain means
+		# login works in dev and is dead in production, with the CSP blocking both the
+		# script and the Frontend API calls. Set it to your Clerk frontend API origin
+		# whenever AUTH_MODE=clerk with a live key.
 		header {
-			Content-Security-Policy "default-src 'self'; script-src 'self' https://*.clerk.accounts.dev https://challenges.cloudflare.com; connect-src 'self' https://*.clerk.accounts.dev; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src https://*.clerk.accounts.dev https://challenges.cloudflare.com; worker-src 'self' blob:; manifest-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+			Content-Security-Policy "default-src 'self'; script-src 'self' {$ALO_CLERK_ORIGIN:https://*.clerk.accounts.dev} https://challenges.cloudflare.com; connect-src 'self' {$ALO_CLERK_ORIGIN:https://*.clerk.accounts.dev}; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src {$ALO_CLERK_ORIGIN:https://*.clerk.accounts.dev} https://challenges.cloudflare.com; worker-src 'self' blob:; manifest-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 			X-Content-Type-Options "nosniff"
 			X-Frame-Options "DENY"
 			Referrer-Policy "no-referrer"
