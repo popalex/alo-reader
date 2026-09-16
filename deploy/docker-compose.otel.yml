@@ -72,6 +72,12 @@ services:
       - /:/host/root:ro,rslave
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
+      # The backups volume, read-only, for the freshness metrics the sidecar writes to
+      # /backups/metrics (deploy/backup.sh). The sidecar has no OTLP client and nothing
+      # to scrape, so the textfile collector is how "when did a backup last succeed"
+      # reaches Prometheus and the Backup freshness alert. Read-only is enough and is
+      # the point: the collector must never be able to touch a backup.
+      - backups:/backups:ro
 
   otel-lgtm:
     logging:

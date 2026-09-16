@@ -17,6 +17,13 @@ BACKUP_SCHEDULE_UTC="${BACKUP_SCHEDULE_UTC:-03:30}"
 BACKUP_ON_START="${BACKUP_ON_START:-false}"
 BACKUP_ZSTD_LEVEL="${BACKUP_ZSTD_LEVEL:-10}"
 BACKUP_RCLONE_REMOTE="${BACKUP_RCLONE_REMOTE:-}"
+# node_exporter textfile format. The collector's unix exporter reads this directory
+# (deploy/observability/alloy/config.alloy) and the "Backup freshness" rule alerts on
+# it (deploy/observability/alerting/alo-floor.yml). Lives on the backups volume because
+# that volume is already the state: the newest dump's mtime *is* the answer, so a
+# restarted sidecar, or one that lost its memory, recomputes it instead of resetting it.
+BACKUP_METRICS_DIR="${BACKUP_METRICS_DIR:-$BACKUP_DIR/metrics}"
+BACKUP_METRICS_FILE="$BACKUP_METRICS_DIR/alo_backup.prom"
 
 log() { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) backup: $*"; }
 # Exits the current shell. That is deliberately two different things depending on who
@@ -47,6 +54,65 @@ seconds_until_schedule() {
 			if (delta <= 0) delta += 86400
 			print delta
 		}'
+}
+
+# Value of one metric in the file we wrote last time, or 0. Used only for the things
+# the volume cannot answer on its own (was the last attempt a failure, and when).
+prev_metric() {
+	[ -f "$BACKUP_METRICS_FILE" ] || { echo 0; return 0; }
+	awk -v name="$1" '$1 == name { v = $2 } END { print (v == "" ? "0" : v) }' \
+		"$BACKUP_METRICS_FILE"
+}
+
+# Publish the freshness metrics. $1/$2 are this attempt's unix time and 1|0, or "-" to
+# keep whatever the last write recorded (used at start-up, which is not an attempt).
+#
+# Written to a temporary file and renamed, because the exporter reads this directory on
+# its own schedule and a half-written file is a scrape error, not a missing sample.
+write_metrics() {
+	attempt_ts="$1"
+	attempt_ok="$2"
+	if [ "$attempt_ts" = "-" ]; then
+		attempt_ts=$(prev_metric alo_backup_last_attempt_timestamp_seconds)
+	fi
+	if [ "$attempt_ok" = "-" ]; then
+		attempt_ok=$(prev_metric alo_backup_last_attempt_success)
+	fi
+
+	newest=$(ls -1t "$BACKUP_DIR"/alo-*.dump.zst 2>/dev/null | head -1 || true)
+	if [ -n "$newest" ]; then
+		success_ts=$(stat -c %Y "$newest")
+		success_bytes=$(stat -c %s "$newest")
+	else
+		# Nothing on the volume: a fresh install, or every dump has aged past
+		# BACKUP_RETENTION_DAYS because backups stopped that long ago. Carry the last
+		# published timestamp so the second case keeps ageing instead of silently
+		# resetting the alert; on a fresh install there is nothing to carry, so the
+		# clock starts now and the first scheduled run has one interval to land.
+		success_ts=$(prev_metric alo_backup_last_success_timestamp_seconds)
+		success_bytes=0
+		if [ "$success_ts" = "0" ]; then
+			success_ts=$(date -u +%s)
+			log "no backups on the volume yet; freshness clock starts now"
+		fi
+	fi
+
+	mkdir -p "$BACKUP_METRICS_DIR"
+	cat >"$BACKUP_METRICS_FILE.tmp" <<EOF
+# HELP alo_backup_last_success_timestamp_seconds Unix time of the newest verified backup on the volume.
+# TYPE alo_backup_last_success_timestamp_seconds gauge
+alo_backup_last_success_timestamp_seconds $success_ts
+# HELP alo_backup_last_success_bytes Compressed size of that backup, 0 if none is on the volume.
+# TYPE alo_backup_last_success_bytes gauge
+alo_backup_last_success_bytes $success_bytes
+# HELP alo_backup_last_attempt_timestamp_seconds Unix time of the last attempt, successful or not.
+# TYPE alo_backup_last_attempt_timestamp_seconds gauge
+alo_backup_last_attempt_timestamp_seconds $attempt_ts
+# HELP alo_backup_last_attempt_success 1 if that attempt produced a verified backup. 0 alongside a zero timestamp means no attempt yet, not a failure.
+# TYPE alo_backup_last_attempt_success gauge
+alo_backup_last_attempt_success $attempt_ok
+EOF
+	mv "$BACKUP_METRICS_FILE.tmp" "$BACKUP_METRICS_FILE"
 }
 
 take_backup() (
@@ -88,12 +154,31 @@ take_backup() (
 	mv "$partial" "$final" || { rm -f "$partial"; die "could not finalize $final"; }
 	log "wrote $final ($(du -h "$final" | cut -f1))"
 
+	# Publish here, not after the work below. The dump is verified and renamed, which
+	# is the whole of what the freshness alert measures — and push_remote blocks on an
+	# rclone copy that can hang for as long as the network lets it. Waiting for that
+	# would leave yesterday's timestamp standing while a good backup sits on the
+	# volume: the alert firing about a problem that no longer exists.
+	write_metrics "$(date -u +%s)" 1
+
 	prune_local
 	if [ -n "$BACKUP_RCLONE_REMOTE" ]; then
 		push_remote "$final"
 	fi
 	return 0
 )
+
+# take_backup plus the metric write, so every exit path publishes an outcome — the
+# failing sidecar is the case the freshness alert exists for, and it is the one that
+# would otherwise leave yesterday's numbers standing with nothing marking them stale.
+attempt_backup() {
+	if take_backup; then
+		write_metrics "$(date -u +%s)" 1
+		return 0
+	fi
+	write_metrics "$(date -u +%s)" 0
+	return 1
+}
 
 prune_local() {
 	# -delete is not in every busybox build; -exec rm is.
@@ -152,8 +237,12 @@ cmd_loop() {
 		log "off-box target: $BACKUP_RCLONE_REMOTE"
 	fi
 
+	# Publish before the first sleep, so a stack that has just come up already has a
+	# freshness number instead of NoData for the rest of the day.
+	write_metrics - -
+
 	if [ "$BACKUP_ON_START" = "true" ]; then
-		take_backup || log "WARNING: start-up backup failed; staying up for the next scheduled run"
+		attempt_backup || log "WARNING: start-up backup failed; staying up for the next scheduled run"
 	fi
 
 	while true; do
@@ -162,13 +251,13 @@ cmd_loop() {
 		sleep "$wait_s"
 		# A failure must not take the sidecar down: tomorrow's run should still
 		# happen, and restart loops make the logs useless.
-		take_backup || log "WARNING: scheduled backup failed; will retry at the next schedule"
+		attempt_backup || log "WARNING: scheduled backup failed; will retry at the next schedule"
 	done
 }
 
 case "${1:-loop}" in
 	loop) cmd_loop ;;
-	once) take_backup ;;
+	once) attempt_backup ;;
 	list) cmd_list ;;
 	restore) shift; cmd_restore "$@" ;;
 	*) echo "usage: backup [loop|once|list|restore <file>]" >&2; exit 64 ;;

@@ -1,4 +1,4 @@
-# The alert floor: the three alarms a self-hosted alo-reader should have before it
+# The alert floor: the four alarms a self-hosted alo-reader should have before it
 # carries anyone's reading. Provisioned into Grafana's "alo-reader" folder by the OTel
 # compose overlay, which mounts this file into Grafana's alerting provisioning dir.
 #
@@ -109,6 +109,59 @@ groups:
                 - evaluator:
                     type: gt
                     params: [5]
+
+      # ── Backup freshness ─────────────────────────────────────────────────────
+      # Age of the newest verified backup on the volume. The sidecar publishes the
+      # timestamp as a node_exporter textfile (deploy/backup.sh) and the collector's
+      # unix exporter reads it; nothing here depends on the sidecar being alive to
+      # answer, which is the whole point — a dead sidecar stops refreshing the file
+      # and the age keeps climbing on its own.
+      #
+      # 26h, not 24: the schedule is daily (BACKUP_SCHEDULE_UTC), and a dump of a
+      # large database plus its two integrity checks can run well past the hour it
+      # started in. 26 clears that without letting a second missed night pass unseen.
+      #
+      # NoData alerts. No metric means no evidence that anything is backing this
+      # instance up — an unmounted volume, a collector that cannot read it, a sidecar
+      # that never started. Operationally that is the same state as a stale backup,
+      # and it is the state that quietly persists for months.
+      - uid: alo-backup-stale
+        title: Backup freshness
+        condition: THRESHOLD
+        for: 10m
+        labels:
+          severity: page
+          service: alo-backup
+        annotations:
+          summary: No verified database backup in over a day
+          description: >-
+            The newest verified backup on the volume is more than 26 hours old, so at
+            least one nightly run has not produced a usable dump.
+            See docs/ALERTS.md#backup-freshness.
+        noDataState: Alerting
+        execErrState: Alerting
+        data:
+          - refId: QUERY
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              refId: QUERY
+              expr: time() - max(alo_backup_last_success_timestamp_seconds)
+              instant: true
+              intervalMs: 60000
+              maxDataPoints: 43200
+          - refId: THRESHOLD
+            datasourceUid: __expr__
+            model:
+              refId: THRESHOLD
+              type: threshold
+              expression: QUERY
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [93600]
 
       # ── Disk ─────────────────────────────────────────────────────────────────
       # Free space on the least free real filesystem, in percent. Pseudo and boot

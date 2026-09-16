@@ -1,6 +1,6 @@
 # Alerts
 
-Three alarms, provisioned into Grafana with the OpenTelemetry overlay. They are the
+Four alarms, provisioned into Grafana with the OpenTelemetry overlay. They are the
 floor for a self-hosted instance: the failures that silently break the product rather
 than announce themselves.
 
@@ -8,12 +8,18 @@ than announce themselves.
 | --- | --- | --- | --- |
 | Worker lag | oldest due feed unclaimed > 300s | 10m | feeds are going stale |
 | API 5xx rate | over 5% of responses are 5xx | 10m | readers are losing requests |
+| Backup freshness | newest verified backup > 26h old | 10m | a nightly run is not producing dumps |
 | Disk free | least free real filesystem < 15% | 15m | Postgres is about to stop writing |
 
 Rules live in [`deploy/observability/alerting/alo-floor.yml`](../deploy/observability/alerting/alo-floor.yml).
 Grafana loads them from a file, so they cannot be edited in the UI and they come back
 identically after every container recreate. To change a threshold, edit the evaluator
 params in that file and recreate the `otel-lgtm` container.
+
+Recreate it, specifically. `POST /api/admin/provisioning/alerting/reload` answers `200`
+and updates what the provisioning API reports, but the running rule keeps its old
+definition — so an edit "applied" that way looks live in the API and evaluates on the
+values you thought you replaced.
 
 ## Before any of this works
 
@@ -147,6 +153,61 @@ No traffic means no ratio, and this rule treats that as fine rather than as an o
 4. The common causes are the database being unreachable (check `postgres` health and
    the pool settings) and a migration that has not been applied to a new image.
 
+## Backup freshness
+
+```promql
+time() - max(alo_backup_last_success_timestamp_seconds)
+```
+
+How long ago the newest verified dump on the backups volume was written. The sidecar
+publishes four gauges as a node_exporter textfile on that volume
+(`/backups/metrics/alo_backup.prom`), which the collector reads through a read-only
+mount:
+
+| Metric | Answers |
+| --- | --- |
+| `alo_backup_last_success_timestamp_seconds` | when a dump last passed both integrity checks |
+| `alo_backup_last_success_bytes` | how big it was — a sudden collapse is its own signal |
+| `alo_backup_last_attempt_timestamp_seconds` | whether the sidecar is still trying |
+| `alo_backup_last_attempt_success` | whether that attempt worked |
+
+The success timestamp is read from the newest `alo-*.dump.zst` on the volume rather
+than remembered, so a restarted sidecar recomputes it instead of resetting the clock,
+and a dump that was written but never verified never counts.
+
+**Why 26 hours.** The schedule is daily. A large database plus `zstd -t` and
+`pg_restore -l` can finish well after the hour it started in, and 26h absorbs that
+without letting a second missed night pass unnoticed.
+
+**Why it alerts on no data.** Every other rule here can be missing for an innocent
+reason. This one cannot: no metric means nothing is demonstrably backing this instance
+up — the volume is not mounted into the collector, the sidecar never started, the
+overlay is running without the base stack. That is the same operational state as a
+stale backup and it is the one that persists for months unnoticed.
+
+A fresh install has no dump to measure, so the sidecar starts the clock at its own
+first boot and logs `no backups on the volume yet; freshness clock starts now`. The
+first scheduled run therefore has a full interval to land before anything fires.
+
+**When it fires:**
+
+1. `docker compose logs backup --tail=50`. A failed run logs `ERROR:` with the reason
+   and stays up for the next schedule — the sidecar deliberately does not exit, so a
+   restart loop cannot bury the one line that explains it.
+2. `docker compose exec backup backup list` shows what is actually on the volume,
+   newest first. Compare with `alo_backup_last_attempt_*`: an attempt timestamp that
+   keeps moving while the success timestamp does not means it is running and failing,
+   not that it stopped running.
+3. The two usual causes are disk (`pg_dump` cannot write, and the Disk free alert is
+   probably firing too) and a version skew — the sidecar image's `pg_dump` refuses to
+   dump a server newer than itself, which is what happens if Postgres is upgraded and
+   `Dockerfile.backup` is not.
+4. Force one and watch it: `docker compose exec backup backup once`. It exits non-zero
+   on failure and publishes the outcome either way.
+5. If the metric is missing rather than stale, the fault is the path, not the backup:
+   confirm `backups:/backups:ro` is on the `otel-collector` service and that
+   `node_textfile_scrape_error` is 0 — a 1 means the file exists but did not parse.
+
 ## Disk
 
 ```promql
@@ -179,11 +240,11 @@ healthy disk.
 
 ## What is deliberately not here
 
-- **Backup freshness.** The one gap I would close next. The sidecar verifies every dump
-  (`zstd -t` plus `pg_restore -l`) and refuses to publish a broken one, but it exports
-  no metric, so a sidecar that has been failing for a week is invisible here. Until it
-  does, check `ls -l` on the backups volume when you touch the box, and read
-  [`deploy/BACKUP.md`](../deploy/BACKUP.md).
+- **Off-box backup copies.** [Backup freshness](#backup-freshness) measures the volume
+  on this host. If `BACKUP_RCLONE_REMOTE` is set, a failing `rclone copy` only logs a warning —
+  the local backup is still good, so nothing here fires. A host that dies takes the
+  backups with it, which is the case the remote copy exists for, so check the remote
+  by hand when you touch the box (`rclone ls <remote>`).
 - **Certificate expiry.** Caddy renews on its own and the failure mode is loud.
 - **Per-host fetch failures.** Feeds break constantly. That is a dashboard, not a page.
 - **DB growth rate.** The disk alert catches the consequence, and a rate alert on a
