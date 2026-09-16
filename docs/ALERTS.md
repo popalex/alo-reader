@@ -240,8 +240,8 @@ healthy disk.
 
 ## What is deliberately not here
 
-- **Off-box backup copies.** The freshness alert below measures the volume on this
-  host. If `BACKUP_RCLONE_REMOTE` is set, a failing `rclone copy` only logs a warning —
+- **Off-box backup copies.** [Backup freshness](#backup-freshness) measures the volume
+  on this host. If `BACKUP_RCLONE_REMOTE` is set, a failing `rclone copy` only logs a warning —
   the local backup is still good, so nothing here fires. A host that dies takes the
   backups with it, which is the case the remote copy exists for, so check the remote
   by hand when you touch the box (`rclone ls <remote>`).
