@@ -63,6 +63,43 @@ The disk numbers are the reason the collector mounts `/`, `/proc` and `/sys` rea
 Postgres has no SQL for free space, so the unix exporter's filesystem collector runs in
 Alloy and its metrics ride the same OTLP pipeline as everything else.
 
+## Disk budget, and why it is shaped like this
+
+The telemetry stack writes to the same disk the alert floor watches, so it has to be
+bounded. Only one of the three stores takes a hard size cap:
+
+| Store | Bound | Default | Worst case |
+| --- | --- | --- | --- |
+| Prometheus | **size cap** (`--storage.tsdb.retention.size`) | 1 GB / 15d | 1 GB |
+| Loki | rate x retention | 2 MB/s, 72h | ~500 GB |
+| Tempo | rate x retention | 500 KB/s, 48h | ~86 GB |
+
+The worst cases are what a *sustained flood at the limit* would reach, not what the
+stack uses: a single instance's real traffic sits in the tens of megabytes. Both
+worst cases exceed a small host's disk, which is the honest statement — a rate limit
+slows an abuser, it does not stop one, and Loki and Tempo expose no storage quota to
+set instead.
+
+So the numbers are chosen to make the *expected* footprint trivial and the *pathological*
+one slow, while the real protection stays where it belongs: **nothing untrusted can
+reach these endpoints.** `/otlp` and `/grafana` are loopback-only in `deploy/Caddyfile`.
+Reach them from your laptop with a tunnel rather than by widening the allow-list:
+
+```sh
+ssh -N -L 3001:127.0.0.1:3001 you@your-host    # Grafana at http://localhost:3001/grafana/
+tailscale serve --bg 3001                       # or over your tailnet
+```
+
+Widening `ALO_GRAFANA_ALLOW_IPS` / `ALO_OTLP_ALLOW_IPS` is for a private CIDR you
+control (a tailnet is `100.64.0.0/10`), not for the public internet. Browser tracing
+from remote users is the one feature that genuinely needs a public `/otlp`; if you
+want it, size these limits against your actual disk first and accept that the endpoint
+is unauthenticated.
+
+To resize: worst case = rate x retention. A 20 GB disk with 5 GB for telemetry and
+48h of traces wants `TEMPO_INGEST_RATE_BYTES` at roughly 5e9 / 172800 = 30 KB/s if you
+want the bound to be real rather than generous.
+
 ## Notes
 
 - **Edge / CDN**: the browser posts to `/otlp` same-origin through Caddy (the app never
