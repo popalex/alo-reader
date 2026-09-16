@@ -28,6 +28,9 @@ services:
       ALO_CLERK_ORIGIN: ${ALO_CLERK_ORIGIN:-https://*.clerk.accounts.dev}
       # Who may reach /grafana through the public address. Loopback only by default.
       ALO_GRAFANA_ALLOW_IPS: ${ALO_GRAFANA_ALLOW_IPS:-127.0.0.1/32 ::1}
+      # Who may post browser traces to /otlp. Also loopback only by default: it is an
+      # unauthenticated write endpoint and nothing in front of it can rate limit.
+      ALO_OTLP_ALLOW_IPS: ${ALO_OTLP_ALLOW_IPS:-127.0.0.1/32 ::1}
     ports:
       - "80:80"
       # Only listened on once ALO_SITE_ADDRESS names a host, but published either

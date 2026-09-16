@@ -19,12 +19,16 @@ BACKUP_ZSTD_LEVEL="${BACKUP_ZSTD_LEVEL:-10}"
 BACKUP_RCLONE_REMOTE="${BACKUP_RCLONE_REMOTE:-}"
 
 log() { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) backup: $*"; }
-# Aborts the enclosing subshell, not the process. take_backup and cmd_restore are
-# defined with ( ) bodies precisely so this stays local to one attempt: `exit` from a
-# { } function body ends the whole script, which made the `take_backup || log
-# WARNING` guards in cmd_loop dead code — a failed dump exited 1, restart:
-# unless-stopped brought the container straight back, and the retry failed the same
-# way, a restart loop that buries the one line saying what broke.
+# Exits the current shell. That is deliberately two different things depending on who
+# calls it: take_backup has a ( ) body, so die aborts one attempt and the caller sees a
+# non-zero return; cmd_restore has a { } body, so die ends the process, which is what a
+# one-shot restore command should do.
+#
+# take_backup's subshell is the fix for a real bug: `exit` from a { } body ends the
+# whole script, which made the `take_backup || log WARNING` guards in cmd_loop dead
+# code — a failed dump exited 1, restart: unless-stopped brought the container straight
+# back, and the retry failed the same way, a restart loop that buries the one line
+# saying what broke.
 #
 # `return 1` would be worse than either: it only returns from die, so the caller
 # carries on past the failure (mv of a file that was never renamed, du of a file that

@@ -12,5 +12,11 @@ web/dist
 web/dev-dist
 web/test-results
 web/playwright-report
-.env
 *.bundle
+
+# Every env-file variant, anywhere. A developer's .env.local or .env.production.local
+# would otherwise reach the daemon and be baked into the build stage's cache by
+# `COPY web/ ./`. Nothing in an image build needs one.
+**/.env
+**/.env.*
+**/*.local
