@@ -108,9 +108,10 @@ services:
       #
       # This is the second line of defence, not the first. /otlp and /grafana are
       # loopback-only (deploy/Caddyfile): reach them with `ssh -L` or `tailscale
-      # serve`, not by widening the allow-list. These limits are what stops an
-      # internal runaway — a worker stuck in a logging loop, a feed producing a span
-      # per item — from quietly filling the disk the alert floor watches.
+      # serve`, not by widening the allow-list. An internal runaway — a worker stuck in
+      # a logging loop, a feed producing a span per item — is slowed by these limits,
+      # not stopped: at 2 MB/s Loki still reaches ~500 GB inside its retention window.
+      # The disk alert (docs/ALERTS.md) is what actually catches that.
       # Prometheus is the only one with a size-based policy at all, and its own --help
       # scopes it to blocks: it deletes the oldest ones when a compaction finds the
       # total passed, and it cannot delete the head. Leave headroom above the number.

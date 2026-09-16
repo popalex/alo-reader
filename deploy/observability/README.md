@@ -129,9 +129,28 @@ from remote users is the one feature that genuinely needs a public `/otlp`; if y
 want it, size these limits against your actual disk first and accept that the endpoint
 is unauthenticated.
 
-To resize: worst case = rate x retention. A 20 GB disk with 5 GB for telemetry and
-48h of traces wants `TEMPO_INGEST_RATE_BYTES` at roughly 5e9 / 172800 = 30 KB/s if you
-want the bound to be real rather than generous.
+To resize, budget **per store** — they share one volume, so a number that makes only
+Tempo's bound real still leaves Loki's ~500 GB standing beside it. Split the allowance
+first, then divide each share by its retention window:
+
+```
+rate = share / retention_seconds
+
+Tempo  2 GB over 48h  ->  2e9 / 172800  ~=  12 KB/s   TEMPO_INGEST_RATE_BYTES=12000
+Loki   2 GB over 72h  ->  2e9 / 259200  ~=   8 KB/s   LOKI_INGEST_RATE_MB=0.008
+Prometheus             ->  its own cap            PROM_RETENTION_SIZE=512MB
+```
+
+That is a 5 GB allowance with headroom for Prometheus's head block and the compactors'
+scratch space, and it is deliberately far below the defaults: the defaults are sized so
+normal traffic never trips them, and this is sized so a flood cannot outrun the disk.
+Pick one — you cannot have both from one number.
+
+Two details that bite if you go this low. Loki's rate flag takes a float (`0.008` reads
+back from `/config` verbatim), but its burst allowance is separate and defaults to 6 MB,
+which sits on top of whatever rate you set. And a rate this far under your real traffic
+means dropped telemetry rather than a slow disk, so check for ingestion rejections in
+the Loki and Tempo logs before assuming the numbers are free.
 
 ## Notes
 
