@@ -79,7 +79,13 @@ take_backup() (
 
 	# Rename last, so a crash mid-dump leaves a .partial rather than something
 	# that looks restorable.
-	mv "$partial" "$final"
+	#
+	# Checked explicitly, not left to set -e: take_backup is called as
+	# `take_backup || log ...`, and POSIX shells suppress errexit for the whole of a
+	# command on the left of ||, subshell included. A failed rename would otherwise
+	# fall straight through to the success line and report a backup that does not
+	# exist — the one failure mode worse than no backup at all.
+	mv "$partial" "$final" || { rm -f "$partial"; die "could not finalize $final"; }
 	log "wrote $final ($(du -h "$final" | cut -f1))"
 
 	prune_local

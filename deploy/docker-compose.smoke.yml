@@ -6,6 +6,11 @@
 
 services:
   feedfixture:
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     image: nginx:alpine
     volumes:
       - ../scripts/smoke_feed.xml:/usr/share/nginx/html/rss.xml:ro

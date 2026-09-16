@@ -7,6 +7,9 @@
 # The browser SPA learns OTEL is on from /api/v1/config and posts its spans to the
 # same-origin /otlp path, which the base Caddyfile proxies to the collector.
 
+# Log rotation for the services this overlay adds. The base file's x-logging anchor
+# cannot reach across files, and these two are the noisiest containers in the stack —
+# sitting on the same disk the alert floor watches.
 services:
   api:
     build:
@@ -46,6 +49,11 @@ services:
         condition: service_started
 
   otel-collector:
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     image: grafana/alloy:v1.17.0
     restart: unless-stopped
     command:
@@ -66,6 +74,11 @@ services:
       - /sys:/host/sys:ro
 
   otel-lgtm:
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     image: grafana/otel-lgtm:0.28.0
     restart: unless-stopped
     environment:
@@ -85,12 +98,14 @@ services:
       # production; every link in an alert notification is built from it.
       GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:${GRAFANA_PORT:-3001}/grafana/}
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
-      # Bound what an OTLP flood can cost, since the ingress in front of it cannot:
-      # Caddy's rate_limit is a plugin, not in the standard image, and /otlp takes no
-      # authentication. A per-request cap limits one payload; these limit the rate and
-      # the total. Tuned for one small instance's browser traces, deliberately: if you
-      # widen ALO_OTLP_ALLOW_IPS to accept spans from real users, this is what stops a
-      # flood from filling the disk rather than merely slowing it down.
+      # Bound the RATE at which an OTLP flood can cost you, and expire what lands.
+      # Not a storage bound: 2 MB/s against 72h retention is ~518 GB before the first
+      # blocks expire, so on a small disk this slows an abuser down rather than
+      # stopping one. The actual protection today is that /otlp is loopback-only
+      # (deploy/Caddyfile); sizing these from a real disk budget is open work.
+      #
+      # Caddy cannot rate limit here — rate_limit is a plugin, not in the standard
+      # image — and /otlp takes no authentication, which is why the route stays shut.
       TEMPO_EXTRA_ARGS: >-
         -distributor.ingestion-rate-limit-bytes=${TEMPO_INGEST_RATE_BYTES:-2000000}
         -ingester.max-bytes-per-trace=${TEMPO_MAX_TRACE_BYTES:-5000000}
