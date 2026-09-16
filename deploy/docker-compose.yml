@@ -185,6 +185,11 @@ services:
 
   postgres:
     # Postgres 18 + RUM extension (search's index-ordered FTS; see Dockerfile).
+    # restart, like the services that depend on it: depends_on is honoured at `up`
+    # time only, so without this a host reboot brings back api, worker, caddy and
+    # backup against a database that never starts, and nothing recovers until
+    # somebody notices and SSHes in.
+    restart: unless-stopped
     build:
       context: ..
       dockerfile: deploy/Dockerfile.postgres
