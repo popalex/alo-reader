@@ -85,6 +85,18 @@ services:
       # production; every link in an alert notification is built from it.
       GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:${GRAFANA_PORT:-3001}/grafana/}
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      # Bound what an OTLP flood can cost, since the ingress in front of it cannot:
+      # Caddy's rate_limit is a plugin, not in the standard image, and /otlp takes no
+      # authentication. A per-request cap limits one payload; these limit the rate and
+      # the total. Tuned for one small instance's browser traces, deliberately: if you
+      # widen ALO_OTLP_ALLOW_IPS to accept spans from real users, this is what stops a
+      # flood from filling the disk rather than merely slowing it down.
+      TEMPO_EXTRA_ARGS: >-
+        -distributor.ingestion-rate-limit-bytes=${TEMPO_INGEST_RATE_BYTES:-2000000}
+        -ingester.max-bytes-per-trace=${TEMPO_MAX_TRACE_BYTES:-5000000}
+        -compactor.compaction.compaction.block-retention=${TEMPO_RETENTION:-72h}
+        -backend-scheduler.provider.work.compaction.compaction.block-retention=${TEMPO_RETENTION:-72h}
+        -backend-worker.compaction.compaction.block-retention=${TEMPO_RETENTION:-72h}
       # Pushover credentials for the alert floor (see alerting/notifications.yml).
       # Unset means the contact point still provisions and alerts still show in
       # Grafana; only delivery fails, and Grafana logs Pushover's own rejection.
