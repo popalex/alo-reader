@@ -62,8 +62,16 @@
 		# XSS wall after ingest sanitization; it allows 'self' plus what Clerk and
 		# rendered feed images legitimately need (scripts stay 'self' — the build uses
 		# external/bundled scripts, not inline). HSTS matters once WP-16 wires TLS.
+		#
+		# ALO_CLERK_ORIGIN is not decoration. clerk-js is loaded from the frontend API
+		# host encoded in the publishable key: a pk_test_ key resolves to
+		# *.clerk.accounts.dev, but a production pk_live_ key resolves to the
+		# customer's own clerk.<their-domain>. Pinning the development domain means
+		# login works in dev and is dead in production, with the CSP blocking both the
+		# script and the Frontend API calls. Set it to your Clerk frontend API origin
+		# whenever AUTH_MODE=clerk with a live key.
 		header {
-			Content-Security-Policy "default-src 'self'; script-src 'self' https://*.clerk.accounts.dev https://challenges.cloudflare.com; connect-src 'self' https://*.clerk.accounts.dev; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src https://*.clerk.accounts.dev https://challenges.cloudflare.com; worker-src 'self' blob:; manifest-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+			Content-Security-Policy "default-src 'self'; script-src 'self' {$ALO_CLERK_ORIGIN:https://*.clerk.accounts.dev} https://challenges.cloudflare.com; connect-src 'self' {$ALO_CLERK_ORIGIN:https://*.clerk.accounts.dev}; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src {$ALO_CLERK_ORIGIN:https://*.clerk.accounts.dev} https://challenges.cloudflare.com; worker-src 'self' blob:; manifest-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 			X-Content-Type-Options "nosniff"
 			X-Frame-Options "DENY"
 			Referrer-Policy "no-referrer"

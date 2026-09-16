@@ -22,6 +22,10 @@ services:
       # and CI want. Set it to a hostname you control and Caddy issues and renews a
       # Let's Encrypt certificate on first request (see deploy/Caddyfile).
       ALO_SITE_ADDRESS: ${ALO_SITE_ADDRESS:-:80}
+      # The Clerk frontend API origin the CSP must allow. clerk-js is loaded from
+      # the host encoded in your publishable key, so a pk_live_ key needs your own
+      # clerk.<domain> here or the CSP blocks login outright (see deploy/Caddyfile).
+      ALO_CLERK_ORIGIN: ${ALO_CLERK_ORIGIN:-https://*.clerk.accounts.dev}
     ports:
       - "80:80"
       # Only listened on once ALO_SITE_ADDRESS names a host, but published either
