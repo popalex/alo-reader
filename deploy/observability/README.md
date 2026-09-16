@@ -8,7 +8,8 @@ Tempo, Prometheus/Mimir). It's **off by default**; the OTel compose overlay turn
 
 ```sh
 make otel-up      # full stack + collector + otel-lgtm (builds api/worker with .[otel])
-# open Grafana at http://localhost:3001  (GRAFANA_PORT)
+# open Grafana at http://localhost:3001/grafana/  (GRAFANA_PORT; the sub-path is
+# required — Grafana runs with serve_from_sub_path so Caddy's /grafana route works)
 make otel-down
 ```
 

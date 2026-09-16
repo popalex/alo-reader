@@ -78,7 +78,12 @@ services:
       # Served under /grafana behind Caddy, so Grafana must know its sub-path or assets and
       # redirects break. ROOT_URL defaults to the dev origin (Caddy on :3000); point it at
       # your external URL in prod (e.g. https://example.com/grafana/).
-      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3000/grafana/}
+      # The published loopback port, not :3000 — that is the dev overlay's Caddy, so
+      # `make otel-up` (base + otel, no dev) served links to a port nothing listens
+      # on. The /grafana sub-path has to stay: it is how Caddy's route works, and it
+      # is why bare http://localhost:3001 404s. Point this at your external URL in
+      # production; every link in an alert notification is built from it.
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:${GRAFANA_PORT:-3001}/grafana/}
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
       # Pushover credentials for the alert floor (see alerting/notifications.yml).
       # Unset means the contact point still provisions and alerts still show in
