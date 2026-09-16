@@ -64,6 +64,33 @@ retention. rclone reads its entire configuration from `RCLONE_CONFIG_*` variable
 in `.env`, so there is no config file to mount. A failed remote copy warns and
 keeps the local backup rather than failing the run.
 
+## Is it still working?
+
+The sidecar publishes what it knows to `/backups/metrics/alo_backup.prom` in
+node_exporter textfile format, on every attempt and once at start-up:
+
+```
+alo_backup_last_success_timestamp_seconds   when a dump last passed both checks
+alo_backup_last_success_bytes               how big it was
+alo_backup_last_attempt_timestamp_seconds   whether it is still trying
+alo_backup_last_attempt_success             whether that attempt worked
+```
+
+The success timestamp is the newest `alo-*.dump.zst` on the volume rather than a
+remembered value, so a restarted sidecar recomputes it and an unverified dump never
+counts. With the OTel overlay running, the collector reads that file through a
+read-only mount and the **Backup freshness** alert pages when it passes 26 hours —
+see [`docs/ALERTS.md`](../docs/ALERTS.md#backup-freshness). Without the overlay the
+file is still written, so `cat` it on the volume:
+
+```sh
+docker compose -f deploy/docker-compose.yml exec backup cat /backups/metrics/alo_backup.prom
+```
+
+This covers the local volume only. A failing `rclone copy` warns and keeps the local
+backup, which is the right call for the run and means the off-box copy has no alarm of
+its own: check the remote by hand.
+
 ## Restore
 
 ```sh

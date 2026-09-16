@@ -47,9 +47,9 @@ a new `*.json` there to add one.
 
 ## Alerts
 
-`alerting/alo-floor.yml` provisions three rules into the same folder: worker lag, API
-5xx rate, and host disk free. They are file-provisioned, so the Grafana UI shows them
-read-only and they survive every container recreate.
+`alerting/alo-floor.yml` provisions four rules into the same folder: worker lag, API
+5xx rate, backup freshness, and host disk free. They are file-provisioned, so the
+Grafana UI shows them read-only and they survive every container recreate.
 
 `alerting/notifications.yml` is where they go: a Pushover contact point taking its
 credentials from `ALO_PUSHOVER_USER_KEY` / `ALO_PUSHOVER_API_TOKEN`, plus the policy
@@ -61,7 +61,10 @@ reasoning, a runbook per alert and how to swap the channel:
 
 The disk numbers are the reason the collector mounts `/`, `/proc` and `/sys` read-only:
 Postgres has no SQL for free space, so the unix exporter's filesystem collector runs in
-Alloy and its metrics ride the same OTLP pipeline as everything else.
+Alloy and its metrics ride the same OTLP pipeline as everything else. Backup freshness
+arrives the same way — the sidecar has no OTLP client and no port to scrape, so it
+writes node_exporter textfile metrics onto the backups volume and the collector reads
+that volume read-only.
 
 ## Disk budget, and why it is shaped like this
 
