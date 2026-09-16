@@ -26,6 +26,8 @@ services:
       # the host encoded in your publishable key, so a pk_live_ key needs your own
       # clerk.<domain> here or the CSP blocks login outright (see deploy/Caddyfile).
       ALO_CLERK_ORIGIN: ${ALO_CLERK_ORIGIN:-https://*.clerk.accounts.dev}
+      # Who may reach /grafana through the public address. Loopback only by default.
+      ALO_GRAFANA_ALLOW_IPS: ${ALO_GRAFANA_ALLOW_IPS:-127.0.0.1/32 ::1}
     ports:
       - "80:80"
       # Only listened on once ALO_SITE_ADDRESS names a host, but published either
