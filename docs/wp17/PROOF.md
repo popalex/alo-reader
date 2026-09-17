@@ -68,7 +68,7 @@ cross-tenant read and an XXE bypass — evidence the claim is maintained, not de
 
 Do not write these, in any phrasing:
 
-- **"Open source."** There is **no LICENSE file in the repo.** "Self-hostable" is true and provable (`make up`, `AUTH_MODE=none`); "open source" is not a thing you can say until a license is chosen and committed.
+- ~~"Open source"~~ — **now available.** The project is **AGPL-3.0-or-later** as of `1047a7e` (`LICENSE`, 662 lines, verbatim). Say "open source" freely; "free software" is also accurate and is what the FSF would call it. Two things follow for the pages: the footer needs a **Source** link, because AGPL section 13 requires a network-served instance to offer its source to its users, and the self-host claim can now carry the licence name, which is what a self-hoster actually wants to know.
 - **"Free forever."** Billing is in DESIGN.md's post-1.0 backlog. The available claim is **"free while in beta"**, and saying it that way is more trustworthy than the alternative.
 - **"Your data never leaves our server."** Clerk holds identity by design.
 - **"No tracking"**, unqualified. True of third-party analytics; the honest version names Sentry-if-enabled and self-hosted telemetry.
