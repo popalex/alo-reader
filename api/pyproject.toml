@@ -2,6 +2,10 @@
 name = "alo-reader-api"
 version = "0.0.0"
 description = "alo-reader API (FastAPI) and worker"
+# AGPL-3.0-or-later: the deployment this is written for is a hosted service, and
+# that is the only copyleft that reaches one — a modified alo-reader run as a
+# service has to publish its changes (AGPL section 13). See LICENSE at the repo root.
+license = "AGPL-3.0-or-later"
 requires-python = "==3.14.*"
 dependencies = [
     "fastapi>=0.115",
