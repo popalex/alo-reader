@@ -6,6 +6,8 @@ recommendations, no engagement mechanics. Fast, calm, keyboard-driven.
 See [`DESIGN.md`](DESIGN.md) for design decisions and [`MILESTONES.md`](MILESTONES.md)
 for the implementation plan.
 
+Licensed under the [GNU AGPL v3 or later](LICENSE).
+
 ## Layout
 
 - `api/` — FastAPI app + worker (one image, two commands). Python 3.14, managed
@@ -130,3 +132,24 @@ Entirely environment-based; nothing is hardcoded. `DATABASE_URL` is the single D
 connection knob. `.env.example` documents every setting the app reads, with its
 default. The compose stack reads the repo-root `.env`, and so do non-Docker runs
 via python-dotenv; real environment variables win over both.
+
+## License
+
+Copyright (C) 2026 Alex Popescu.
+
+alo-reader is free software under the **GNU Affero General Public License, version 3
+or later** — see [`LICENSE`](LICENSE). You can run it, read it, change it and share it;
+if you distribute a modified version, or **run one as a service other people use**, the
+changes have to be available to them under the same licence. That last part is AGPL
+section 13, and it is the reason this licence and not the GPL: the deployment this is
+written for is a hosted service, where the GPL's obligations never trigger.
+
+Practical notes:
+
+- **Self-hosting for yourself or your household triggers nothing.** The obligation is to
+  *your users*, and a private instance has none but you.
+- **Running a public instance** means offering your source to its users. A "Source" link
+  in the footer satisfies it (the licence text says so in as many words).
+- **Dependencies stay under their own licences** — mostly MIT/BSD/ISC, with Apache-2.0
+  for asyncpg and the OpenTelemetry packages. All compatible with AGPL-3.0; GPL **v2**
+  would not have been, which is one of the two reasons it was not chosen.
