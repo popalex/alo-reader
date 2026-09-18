@@ -45,7 +45,9 @@ const folderRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([allRoute, starredRoute, feedRoute, folderRoute]);
 
-export const router = createRouter({ routeTree, defaultPreload: "intent" });
+// basepath must agree with vite.config.ts `base` and Caddy's handle_path: the
+// server strips /app, the router re-adds it when building links.
+export const router = createRouter({ routeTree, basepath: "/app", defaultPreload: "intent" });
 
 declare module "@tanstack/react-router" {
   interface Register {

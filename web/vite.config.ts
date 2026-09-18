@@ -3,6 +3,11 @@ import { VitePWA } from "vite-plugin-pwa";
 import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
+  // The app lives under /app/ so that / can be the landing page on the public
+  // instance (WP-17). Vite's base is fixed at build time, so this is one value for
+  // both auth modes: a self-host instance redirects / to /app/ rather than getting
+  // a second build. Caddy's handle_path strips the prefix again server-side.
+  base: "/app/",
   plugins: [
     react(),
     // PWA (WP-14): precache the app shell, serve already-loaded entries offline,
@@ -14,7 +19,7 @@ export default defineConfig({
       // Serve the SW in `vite dev` too, so offline/PWA is testable with `make dev`
       // (not just the prod build). vite-plugin-pwa's dev SW doesn't precache built
       // assets, so HMR still serves fresh code.
-      devOptions: { enabled: true, type: "module", navigateFallback: "index.html" },
+      devOptions: { enabled: true, type: "module", navigateFallback: "/app/index.html" },
       includeAssets: ["favicon.ico", "apple-touch-icon-180x180.png"],
       manifest: {
         name: "alo reader",
@@ -23,8 +28,8 @@ export default defineConfig({
         theme_color: "#0e7c6d",
         background_color: "#f6f7f9",
         display: "standalone",
-        start_url: "/",
-        scope: "/",
+        start_url: "/app/",
+        scope: "/app/",
         icons: [
           { src: "pwa-64x64.png", sizes: "64x64", type: "image/png" },
           { src: "pwa-192x192.png", sizes: "192x192", type: "image/png" },
@@ -40,7 +45,7 @@ export default defineConfig({
       workbox: {
         // Precache the built shell (js/css/html/icons) for offline boot.
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-        navigateFallback: "/index.html",
+        navigateFallback: "/app/index.html",
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {

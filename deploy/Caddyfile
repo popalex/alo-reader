@@ -17,6 +17,52 @@
 # here without a placeholder that expands to a whole directive. If you want the
 # expiry warnings, add a global options block at the top of this file:
 #     { email you@example.com }
+# ── Shared response headers ──────────────────────────────────────────────────
+# Imported by both the landing page and the app, so there is one definition of the
+# set. /api, /otlp and /grafana stay outside it: the API sends its own headers
+# (SecurityHeadersMiddleware) and a second set here would fight it.
+(alo_headers) {
+	header {
+		Content-Security-Policy "default-src 'self'; script-src 'self' {$ALO_CLERK_ORIGIN:https://*.clerk.accounts.dev} https://challenges.cloudflare.com; connect-src 'self' {$ALO_CLERK_ORIGIN:https://*.clerk.accounts.dev}; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src {$ALO_CLERK_ORIGIN:https://*.clerk.accounts.dev} https://challenges.cloudflare.com; worker-src 'self' blob:; manifest-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Cross-Origin-Opener-Policy "same-origin"
+		Permissions-Policy "geolocation=(), camera=(), microphone=(), browsing-topics=()"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+}
+
+# ── What lives at / ──────────────────────────────────────────────────────────
+# The landing page exists to turn a stranger into an account, so it belongs to
+# AUTH_MODE=clerk and nothing else: a single-user self-host instance has no
+# sign-up, and a marketing page in front of your own reader is a wall.
+#
+# The import below builds a snippet name out of AUTH_MODE itself, so the mode is
+# stated once — in .env, where the API already requires it — instead of twice. An
+# invalid value fails loudly at boot ("File to import not found: root_<value>"),
+# and an unset one never gets that far: caddy waits for a healthy api, and the api
+# refuses to start without an explicit AUTH_MODE.
+(root_clerk) {
+	handle / {
+		import alo_headers
+		root * /srv
+		rewrite * /landing.html
+		file_server
+	}
+}
+
+(root_none) {
+	handle / {
+		# `redir * /app/ 302`, not `redir /app/ 302`: a destination beginning with a
+		# slash parses as a path *matcher*, so the short form means "for requests to
+		# /app/, redirect to 302" — it matches nothing here, falls through, and
+		# answers an empty 200. Silent, and it cost an afternoon.
+		redir * /app/ 302
+	}
+}
+
 {$ALO_SITE_ADDRESS::80} {
 	encode gzip
 
@@ -94,31 +140,32 @@
 		reverse_proxy otel-lgtm:3000
 	}
 
-	handle {
-		# Security headers for the SPA (WP-15, DESIGN.md §1.6). The CSP is the second
-		# XSS wall after ingest sanitization; it allows 'self' plus what Clerk and
-		# rendered feed images legitimately need (scripts stay 'self' — the build uses
-		# external/bundled scripts, not inline). HSTS matters once WP-16 wires TLS.
-		#
-		# ALO_CLERK_ORIGIN is not decoration. clerk-js is loaded from the frontend API
-		# host encoded in the publishable key: a pk_test_ key resolves to
-		# *.clerk.accounts.dev, but a production pk_live_ key resolves to the
-		# customer's own clerk.<their-domain>. Pinning the development domain means
-		# login works in dev and is dead in production, with the CSP blocking both the
-		# script and the Frontend API calls. Set it to your Clerk frontend API origin
-		# whenever AUTH_MODE=clerk with a live key.
-		header {
-			Content-Security-Policy "default-src 'self'; script-src 'self' {$ALO_CLERK_ORIGIN:https://*.clerk.accounts.dev} https://challenges.cloudflare.com; connect-src 'self' {$ALO_CLERK_ORIGIN:https://*.clerk.accounts.dev}; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src {$ALO_CLERK_ORIGIN:https://*.clerk.accounts.dev} https://challenges.cloudflare.com; worker-src 'self' blob:; manifest-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
-			X-Content-Type-Options "nosniff"
-			X-Frame-Options "DENY"
-			Referrer-Policy "no-referrer"
-			Cross-Origin-Opener-Policy "same-origin"
-			Permissions-Policy "geolocation=(), camera=(), microphone=(), browsing-topics=()"
-			Strict-Transport-Security "max-age=31536000; includeSubDomains"
-			-Server
-		}
+	# Root behaviour, chosen by AUTH_MODE (see the snippets at the top).
+	import root_{$AUTH_MODE:clerk}
+
+	# The app. handle_path strips the prefix, so /app/starred asks the file server
+	# for /starred, which try_files resolves to the SPA shell. Vite builds with
+	# base=/app/, so every asset request already arrives prefixed.
+	redir /app /app/ 308
+	handle_path /app/* {
+		import alo_headers
 		root * /srv
 		try_files {path} /index.html
+		file_server
+	}
+
+	# Bookmarks from before the app moved. Cheap to honour, and the alternative is a
+	# 404 on somebody's home-screen shortcut.
+	redir /starred /app/starred 301
+	redir /feed/* /app{uri} 301
+	redir /folder/* /app{uri} 301
+
+	# Root-level files the landing page needs: its script, the favicon, the social
+	# card, robots.txt. No try_files fallback here on purpose — an unknown path is a
+	# 404, not another copy of the landing page.
+	handle {
+		import alo_headers
+		root * /srv
 		file_server
 	}
 }

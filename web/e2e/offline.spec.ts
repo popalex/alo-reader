@@ -6,7 +6,7 @@ import { expect, test } from "@playwright/test";
 
 test.describe("offline / PWA", () => {
   test("prefetched top articles open offline, with no error toast", async ({ page, context }) => {
-    await page.goto("/");
+    await page.goto("/app/");
     await page.waitForSelector("[data-index]");
     // Let the deferred (1.5s) top-of-stream prefetch fire and its requests settle.
     await page.waitForTimeout(2200);
@@ -31,7 +31,7 @@ test.describe("offline / PWA", () => {
         statePosts.push(req.url());
       }
     });
-    await page.goto("/");
+    await page.goto("/app/");
     await page.waitForSelector("[data-index]");
 
     // Go offline; the status bar confirms it.
@@ -58,7 +58,7 @@ test.describe("offline / PWA", () => {
 
   test("hard-reload while offline still boots the app shell", async ({ page, context }) => {
     // First visit registers + activates the service worker.
-    await page.goto("/");
+    await page.goto("/app/");
     await page.waitForFunction(() => navigator.serviceWorker?.controller != null, null, {
       timeout: 20_000,
     });
@@ -75,7 +75,7 @@ test.describe("offline / PWA", () => {
   });
 
   test("is installable: manifest + active service worker", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/app/");
     await page.waitForFunction(() => navigator.serviceWorker?.controller != null, null, {
       timeout: 20_000,
     });
