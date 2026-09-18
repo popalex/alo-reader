@@ -13,4 +13,9 @@ RUN pnpm build
 
 FROM caddy:2-alpine
 COPY --from=build /web/dist /srv
+# The landing page is deliberately not part of the SPA build: it needs no
+# framework, and anything under web/public/ would be swept into the service
+# worker's precache by workbox's glob — a marketing page inside the app's
+# offline shell. Copied after dist so /srv holds both.
+COPY deploy/landing/ /srv/
 COPY deploy/Caddyfile /etc/caddy/Caddyfile
