@@ -6,7 +6,7 @@ import { expect, test } from "@playwright/test";
 
 test.describe("search", () => {
   test("/ focuses search, results are highlighted, Esc clears", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/app/");
     await page.waitForSelector("[data-index]");
 
     // `/` focuses the search box (WP-12 wired the shortcut; WP-13 makes it live).
@@ -27,7 +27,7 @@ test.describe("search", () => {
   });
 
   test("scope toggle widens a feed search to all streams", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/app/");
     await page.waitForSelector("[data-index]");
 
     // Into a single feed, then search — scoped to that feed by default.

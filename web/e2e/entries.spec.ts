@@ -5,7 +5,7 @@ import { expect, test } from "@playwright/test";
 
 test.describe("entry list + reading pane", () => {
   test("lists entries and opens an article into the reader", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/app/");
     await page.waitForSelector("[data-index]");
 
     // Open a normal article (row 0 is the XSS probe; open row 1).
@@ -16,7 +16,7 @@ test.describe("entry list + reading pane", () => {
   });
 
   test("virtualizes 5k entries and pages in on scroll", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/app/");
     await page.waitForSelector("[data-index]");
     const rows = page.locator("[data-index]");
     const scroller = page.getByTestId("entry-scroll");
@@ -43,7 +43,7 @@ test.describe("entry list + reading pane", () => {
       void d.dismiss();
     });
 
-    await page.goto("/");
+    await page.goto("/app/");
     await page.waitForSelector("[data-index]");
     await page.locator("[data-index='0']").click(); // row 0 is the XSS probe
 
@@ -62,7 +62,7 @@ test.describe("mobile", () => {
   test.use({ viewport: { width: 390, height: 780 } });
 
   test("list -> entry -> back", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/app/");
     await page.waitForSelector("[data-index]");
 
     await page.locator("[data-index='1']").click();

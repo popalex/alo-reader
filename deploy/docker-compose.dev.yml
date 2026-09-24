@@ -12,6 +12,10 @@ services:
       - "3000:3000"
     volumes:
       - ./Caddyfile.dev:/etc/caddy/Caddyfile:ro
+      # The landing page, for design work at http://localhost:3000/landing.html.
+      # It is not part of the SPA build (see Dockerfile.caddy), so dev serves it
+      # straight off the working tree — edit and reload, no rebuild.
+      - ./landing:/landing:ro
     depends_on:
       - api
       - web

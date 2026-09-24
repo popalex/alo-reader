@@ -29,6 +29,20 @@
 		reverse_proxy otel-lgtm:3000
 	}
 
+	# Dev runs AUTH_MODE=none, so mirror the self-host root: / redirects to /app/,
+	# which is where the Vite dev server serves the app (base=/app/). The landing
+	# page is not part of the SPA build, so it is mounted and served from here for
+	# design work — `make dev` then has it at http://localhost:3000/landing.html.
+	handle / {
+		redir * /app/ 302
+	}
+
+	@landing path /landing.html /landing.js
+	handle @landing {
+		root * /landing
+		file_server
+	}
+
 	handle {
 		reverse_proxy web:5173
 	}

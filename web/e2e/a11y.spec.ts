@@ -15,7 +15,7 @@ const axe = (page: import("@playwright/test").Page) =>
 
 test.describe("accessibility", () => {
   test("no violations on list, reader and help overlay", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/app/");
     await page.waitForSelector("[data-index]");
     expect((await axe(page).analyze()).violations).toEqual([]);
 

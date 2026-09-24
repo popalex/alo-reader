@@ -28,13 +28,20 @@
 
   --text: #1b1f24;
   --text-2: #2b3138;
-  --text-dim: #6b7280;
-  --text-faint: #9aa1ab;
+  /* Both of these are content, not decoration — timestamps, feed names, unread
+     counts — so they carry WCAG AA (4.5:1) on every surface they sit on rather
+     than the 2.4:1 the old #9aa1ab managed on white. The four-step hierarchy is
+     intact: 16.6 / 13.1 / 6.2 / 4.9 against white. */
+  --text-dim: #5a616d;
+  --text-faint: #6b727c;
 
   --border: #eceef1;
   --border-2: #e7e9ec;
 
-  --accent: #0e7c6d;
+  /* One shade deeper than it was (#0e7c6d): the old value read 4.45:1 against
+     --accent-weak, its own selection tint, where unread feed names sit. The
+     difference is invisible; the audit failure was not. */
+  --accent: #0d7364;
   --accent-contrast: #ffffff;
   --accent-weak: #e7f2ef;
   --accent-border: #bcdcd5;
@@ -60,8 +67,8 @@
 
   --text: #eef1f5;
   --text-2: #c4ccd6;
-  --text-dim: #8b93a1;
-  --text-faint: #6b7280;
+  --text-dim: #949cab;
+  --text-faint: #7f8792;
 
   --border: #262a32;
   --border-2: #262a32;
@@ -94,8 +101,8 @@
 
     --text: #eef1f5;
     --text-2: #c4ccd6;
-    --text-dim: #8b93a1;
-    --text-faint: #6b7280;
+    --text-dim: #949cab;
+    --text-faint: #7f8792;
 
     --border: #262a32;
     --border-2: #262a32;
