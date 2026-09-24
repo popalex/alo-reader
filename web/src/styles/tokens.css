@@ -38,7 +38,10 @@
   --border: #eceef1;
   --border-2: #e7e9ec;
 
-  --accent: #0e7c6d;
+  /* One shade deeper than it was (#0e7c6d): the old value read 4.45:1 against
+     --accent-weak, its own selection tint, where unread feed names sit. The
+     difference is invisible; the audit failure was not. */
+  --accent: #0d7364;
   --accent-contrast: #ffffff;
   --accent-weak: #e7f2ef;
   --accent-border: #bcdcd5;

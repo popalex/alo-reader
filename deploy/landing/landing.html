@@ -8,7 +8,6 @@
       name="description"
       content="A calm RSS reader: every Atom and RSS feed you follow, newest first. Keyboard-driven, works offline, imports your OPML in one step."
     />
-    <link rel="canonical" href="/" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Nothing decides what you read." />
     <meta
@@ -37,7 +36,7 @@
         --text-faint: #6b727c;
         --line: #eceef1;
         --line-2: #e7e9ec;
-        --accent: #0e7c6d;
+        --accent: #0d7364;
         --accent-contrast: #ffffff;
         --accent-weak: #e7f2ef;
         --accent-border: #bcdcd5;
@@ -244,6 +243,8 @@
         grid-template-areas: "fav feed time" "fav title title" "sum sum sum";
       }
       .s-ent.sel { background: var(--accent-weak); box-shadow: inset 3px 0 0 var(--accent); }
+      /* Same step-up the app makes: --text-faint is under AA on the selection tint. */
+      .s-ent.sel .s-time, .s-ent.sel .s-sum { color: var(--text-dim); }
       .s-fav { grid-area: fav; width: 16px; height: 16px; border-radius: 4px; background: var(--line-2); margin-top: 2px; }
       .s-ent.unread .s-fav { background: var(--accent-border); }
       .s-feed-n { grid-area: feed; font-size: 12px; font-weight: 600; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

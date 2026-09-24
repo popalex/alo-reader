@@ -289,6 +289,15 @@
   background: var(--accent-weak);
 }
 
+/* --text-faint is 4.24:1 on the selection tint, under AA, so the metadata on the
+   open row steps up to --text-dim (5.45:1 light, 5.00:1 dark). The selected row
+   reads slightly stronger than its neighbours, which is the right emphasis. */
+.row[data-selected] .summary,
+.row[data-selected] .time,
+.row[data-selected][data-read] .feed {
+  color: var(--text-dim);
+}
+
 .row[data-selected]::before {
   content: "";
   position: absolute;
