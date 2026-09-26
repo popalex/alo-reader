@@ -99,7 +99,11 @@ class PatProvider:
             row = result.first()
             if row is None:
                 return None
-            api_token, user = row._tuple()
+            # Unpack the Row directly: Row._tuple() is deprecated from SQLAlchemy 2.1
+            # and a Row already behaves like a tuple. Harmless on the pinned 2.0.52,
+            # which is why CI is quiet — the toolchain container resolves the newer
+            # release and emits one warning per authenticated request, 209 in a run.
+            api_token, user = row
             if not hmac.compare_digest(api_token.token_hash, digest):
                 return None
             now = datetime.now(UTC)
