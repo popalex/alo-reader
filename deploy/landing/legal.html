@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>alo reader · terms and privacy</title>
+    <meta
+      name="description"
+      content="What alo reader stores, what it does not, who else touches it, and the terms of using the hosted service."
+    />
+    <meta name="robots" content="index, follow" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="stylesheet" href="/tokens.css" />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font-sans);
+        font-size: 16px;
+        line-height: 1.7;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap {
+        max-width: 68ch;
+        margin: 0 auto;
+        padding-inline: 20px;
+      }
+      .nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding-block: 16px;
+        border-bottom: 1px solid var(--line);
+        max-width: 980px;
+        margin: 0 auto;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-weight: 600;
+        font-size: 15px;
+        letter-spacing: -0.01em;
+        text-decoration: none;
+        color: var(--text);
+      }
+      .mark {
+        width: 22px;
+        height: 22px;
+        border-radius: 6px;
+        background: var(--accent);
+        display: grid;
+        place-items: center;
+        flex: 0 0 auto;
+      }
+      .mark svg {
+        width: 13px;
+        height: 13px;
+        stroke: var(--accent-contrast);
+        fill: none;
+        stroke-width: 2.1;
+      }
+      .nav a.back {
+        font-size: 13.5px;
+        color: var(--text-dim);
+        text-decoration: none;
+      }
+      .nav a.back:hover {
+        color: var(--text);
+      }
+      h1 {
+        font-size: clamp(26px, 4vw, 34px);
+        line-height: 1.15;
+        letter-spacing: -0.02em;
+        margin: 44px 0 8px;
+      }
+      .updated {
+        margin: 0 0 8px;
+        font-size: 13px;
+        color: var(--text-dim);
+      }
+      .summary {
+        margin: 24px 0 36px;
+        padding: 18px 20px;
+        background: var(--surface);
+        border: 1px solid var(--line-2);
+        border-radius: 10px;
+        font-size: 15px;
+      }
+      .summary p {
+        margin: 0;
+      }
+      .summary strong {
+        font-weight: 600;
+      }
+      h2 {
+        font-size: 17px;
+        margin: 36px 0 10px;
+        letter-spacing: -0.01em;
+      }
+      p,
+      li {
+        color: var(--text-2);
+      }
+      p {
+        margin: 0 0 14px;
+      }
+      ul {
+        margin: 0 0 14px;
+        padding-left: 22px;
+      }
+      li {
+        margin-bottom: 6px;
+      }
+      a {
+        color: var(--accent);
+        text-underline-offset: 2px;
+      }
+      .unset {
+        color: var(--text-dim);
+        font-style: italic;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0 0 14px;
+        font-size: 15px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 8px 12px 8px 0;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+        color: var(--text-2);
+      }
+      th {
+        font-weight: 600;
+        color: var(--text);
+        width: 40%;
+      }
+      footer {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 18px;
+        align-items: center;
+        margin-top: 44px;
+        padding-block: 20px;
+        border-top: 1px solid var(--line);
+        font-size: 12.5px;
+        color: var(--text-dim);
+      }
+      footer a {
+        text-decoration: none;
+      }
+      footer a:hover {
+        text-decoration: underline;
+      }
+      footer .sep {
+        flex: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="nav">
+      <a class="brand" href="/">
+        <span class="mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16" />
+            <circle cx="5" cy="19" r="1.6" fill="currentColor" stroke="none" />
+          </svg>
+        </span>
+        alo reader
+      </a>
+      <a class="back" href="/">Back to the front page</a>
+    </nav>
+
+    <main class="wrap">
+      <h1>Terms and privacy</h1>
+      <p class="updated">One page, because you should be able to read all of it.</p>
+
+      <div class="summary">
+        <p>
+          <strong>The short version.</strong> This service stores your email address, the feeds you
+          subscribe to, and which articles you have read or starred. It keeps no access logs, runs
+          no analytics, and shows no advertising. Delete your account and your data goes with it.
+          It is free while in beta and comes with no guarantees.
+        </p>
+      </div>
+
+      <h2>Who runs this</h2>
+      <p>
+        The hosted service at this address is operated by
+        {{if env "ALO_LEGAL_OPERATOR"}}<strong>{{env "ALO_LEGAL_OPERATOR"}}</strong>{{else}}<span
+          class="unset"
+          >the operator of this instance (set ALO_LEGAL_OPERATOR)</span
+        >{{end}}. The software is
+        <a href="https://github.com/popalex/alo-reader">open source under the AGPL-3.0</a>, and
+        anyone may run their own copy. This page covers <em>this</em> instance only; another
+        instance is somebody else's service with its own terms.
+      </p>
+
+      <h2>What is stored about you</h2>
+      <table>
+        <tbody>
+          <tr>
+            <th scope="row">Your email address</th>
+            <td>So you can sign in and be contacted about the service.</td>
+          </tr>
+          <tr>
+            <th scope="row">Your subscriptions and folders</th>
+            <td>The feeds you added and how you organised them.</td>
+          </tr>
+          <tr>
+            <th scope="row">Read and starred state</th>
+            <td>Which articles you have read, and which you kept.</td>
+          </tr>
+          <tr>
+            <th scope="row">API tokens you create</th>
+            <td>Stored hashed, and only if you create one.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Article text itself is fetched once and shared between everyone subscribed to a feed. It is
+        not personal data and is not tied to you beyond your read and starred state.
+      </p>
+
+      <h2>What is not stored</h2>
+      <ul>
+        <li><strong>No access logs.</strong> The web server records errors, not requests.</li>
+        <li>
+          <strong>No analytics and no tracking pixels.</strong> There is no third-party analytics
+          script on any page, and nothing to opt out of.
+        </li>
+        <li>
+          <strong>No advertising, and no profiling.</strong> Nothing here builds a profile of your
+          interests or sells anything derived from your reading.
+        </li>
+        <li>
+          <strong>Your IP address is not written down.</strong> It is used in memory to rate-limit
+          requests and then forgotten.
+        </li>
+      </ul>
+
+      <h2>Who else touches your data</h2>
+      <table>
+        <tbody>
+          <tr>
+            <th scope="row"><a href="https://clerk.com">Clerk</a></th>
+            <td>
+              Handles sign-in and holds your email address and session. Required to log in; there
+              is no way to use the hosted service without it.
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Error reporting</th>
+            <td>
+              Optional and off unless configured. When on, it receives exception details with
+              personal data disabled — no request bodies, no headers, no tracing of your activity.
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Hosting</th>
+            <td>
+              {{if env "ALO_LEGAL_HOSTING"}}{{env "ALO_LEGAL_HOSTING"}}{{else}}<span class="unset"
+                >The provider running this instance (set ALO_LEGAL_HOSTING)</span
+              >{{end}}. Backups are held on the same infrastructure.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Nobody buys this data, because it is not for sale and never will be. There is no ad network
+        and no data broker in this stack.
+      </p>
+
+      <h2>One thing worth knowing about images</h2>
+      <p>
+        Articles often contain images hosted by the publisher. Your browser loads those directly
+        from their servers, which means the publisher can see your IP address, exactly as if you had
+        visited their site. Proxying images through this service would prevent that and is on the
+        list, but it is not built yet, and it would be dishonest to imply otherwise.
+      </p>
+      <p>
+        Fetching the feeds themselves is different: the server polls them on your behalf, so a
+        publisher sees this service's address and its user agent, not yours.
+      </p>
+
+      <h2>How long things are kept</h2>
+      <ul>
+        <li><strong>Starred articles are kept indefinitely.</strong></li>
+        <li><strong>Unread articles are never purged.</strong></li>
+        <li>
+          Articles you have read and not starred are removed after 90 days, and only once every
+          subscriber to that feed has read them too.
+        </li>
+        <li>
+          Database backups are kept for 14 days. Deleting your account removes it from the live
+          database immediately, but a copy persists in those backups until they age out.
+        </li>
+      </ul>
+
+      <h2>Deleting your account</h2>
+      <p>
+        You can delete your account yourself, and it cascades: subscriptions, folders, read and
+        starred state, and API tokens go with it. There is a test in the repository that fills every
+        one of those tables and then asserts they are empty afterwards. Feeds themselves survive if
+        somebody else still subscribes to them; if nobody does, the feed is collected within a week.
+      </p>
+      <p>
+        You can take your data out at any time without deleting anything: export your subscriptions
+        as OPML, or read everything through the API with a token you create.
+      </p>
+
+      <h2>Using the service</h2>
+      <ul>
+        <li>One account per person, and a limit of 300 feeds per account.</li>
+        <li>
+          Do not point it at things it should not fetch, and do not use it as a backend for another
+          service or as a general-purpose crawler.
+        </li>
+        <li>
+          An account that abuses the poller, the API or other people can be suspended without
+          notice. That is the whole acceptable-use policy.
+        </li>
+      </ul>
+
+      <h2>What you are owed, and what you are not</h2>
+      <p>
+        This is a beta run by a small operation. It is free for now; if that changes you will be
+        told before it does, and never retroactively. There is no uptime guarantee, no support
+        commitment, and the service is provided as it is, without warranty of any kind. To the
+        extent the law allows, the operator is not liable for indirect or consequential loss,
+        including lost data or lost profits.
+      </p>
+      <p>
+        Two promises that cost nothing to make and are worth something: you will be given notice
+        before the service shuts down, with time to export, and the software is AGPL-licensed, so
+        the last good version can always be run by you.
+      </p>
+
+      <h2>Changes to this page</h2>
+      <p>
+        This page can change. Material changes will be announced to signed-in users rather than
+        quietly edited in. The page's history is public in the repository, so every past version is
+        visible in the commit log.
+      </p>
+
+      <h2>Contact</h2>
+      <p>
+        {{if env "ALO_CONTACT_EMAIL"}} Email
+        <a href="mailto:{{env "ALO_CONTACT_EMAIL"}}">{{env "ALO_CONTACT_EMAIL"}}</a> for anything on
+        this page: data requests, account problems, security reports, or if you publish a feed this
+        service polls and you would like it to stop. {{else}}
+        <span class="unset"
+          >No contact address is configured for this instance (set ALO_CONTACT_EMAIL).</span
+        >
+        {{end}}
+      </p>
+      <p>
+        Bugs are better as
+        <a href="https://github.com/popalex/alo-reader/issues">issues</a>, where everyone can see
+        them.
+      </p>
+    </main>
+
+    <div class="wrap">
+      <footer>
+        <span>© 2026 alo reader</span>
+        <span class="sep"></span>
+        <a href="https://github.com/popalex/alo-reader">Source (AGPL-3.0)</a>
+        <a href="/">Front page</a>
+      </footer>
+    </div>
+  </body>
+</html>

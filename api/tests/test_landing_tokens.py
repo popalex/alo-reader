@@ -17,7 +17,10 @@ from pathlib import Path
 import pytest
 
 TOKENS_PATH = "web/src/styles/tokens.css"
-LANDING_PATH = "deploy/landing/landing.html"
+# One copy for both static pages: landing.html and legal.html link it rather than
+# each inlining its own block, so there is a single thing to keep in step.
+SITE_TOKENS_PATH = "deploy/landing/tokens.css"
+STATIC_PAGES = ("deploy/landing/landing.html", "deploy/landing/legal.html")
 
 # The landing page renames two tokens for its own readability; every other name
 # matches. Mapped rather than tolerated, so a genuine mismatch still fails.
@@ -74,7 +77,7 @@ def _drift(landing_block: str, app_block: str) -> list[str]:
 def sources() -> tuple[str, str]:
     return (
         _repo_file(TOKENS_PATH).read_text(encoding="utf-8"),
-        _repo_file(LANDING_PATH).read_text(encoding="utf-8"),
+        _repo_file(SITE_TOKENS_PATH).read_text(encoding="utf-8"),
     )
 
 
@@ -94,9 +97,18 @@ def test_dark_tokens_match(sources: tuple[str, str]) -> None:
     )
 
 
-def test_the_landing_page_declares_the_tokens_it_uses(sources: tuple[str, str]) -> None:
+@pytest.mark.parametrize("page", STATIC_PAGES)
+def test_static_pages_declare_the_tokens_they_use(sources: tuple[str, str], page: str) -> None:
     """A var() with no declaration renders as nothing, which is invisible in review."""
-    _, landing = sources
-    declared = set(_vars(_block(landing, ":root {")))
-    used = set(re.findall(r"var\((--[a-z0-9-]+)\)", landing))
+    _, site_tokens = sources
+    declared = set(_vars(_block(site_tokens, ":root {")))
+    used = set(re.findall(r"var\((--[a-z0-9-]+)\)", _repo_file(page).read_text(encoding="utf-8")))
     assert used - declared == set()
+
+
+@pytest.mark.parametrize("page", STATIC_PAGES)
+def test_static_pages_link_the_shared_tokens(page: str) -> None:
+    """An inlined copy would drift the moment somebody edits only one page."""
+    html = _repo_file(page).read_text(encoding="utf-8")
+    assert 'href="/tokens.css"' in html
+    assert "--accent:" not in html, f"{page} redeclares tokens instead of linking them"
