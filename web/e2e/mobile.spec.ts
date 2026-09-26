@@ -7,7 +7,7 @@ test.describe("mobile shell", () => {
   test.use({ viewport: { width: 390, height: 780 } });
 
   test("feeds open in a drawer, navigate, and the drawer closes", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/app/");
     await page.waitForSelector("[data-index]");
 
     // No inline sidebar on mobile — open it from the hamburger.

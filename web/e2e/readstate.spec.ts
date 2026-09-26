@@ -13,7 +13,7 @@ async function totalUnread(page: Page): Promise<number> {
 
 test.describe("read-state", () => {
   test("opening an entry marks it read and drops the unread count", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/app/");
     await page.waitForSelector("[data-index]");
     const before = await totalUnread(page);
     expect(before).toBeGreaterThan(0);
@@ -30,7 +30,7 @@ test.describe("read-state", () => {
       await route.continue();
     });
 
-    await page.goto("/");
+    await page.goto("/app/");
     await page.waitForSelector("[data-index]");
     // A feed with plenty of unread entries, untouched by the other tests.
     await page.getByRole("link", { name: /Nature/ }).click();
@@ -48,7 +48,7 @@ test.describe("read-state", () => {
   });
 
   test("rolls back and toasts when the API fails mid-mark", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/app/");
     await page.waitForSelector("[data-index]");
     const before = await totalUnread(page);
 
@@ -67,7 +67,7 @@ test.describe("read-state", () => {
   });
 
   test("star toggles and persists across reload", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/app/");
     await page.waitForSelector("[data-index]");
     await page.locator("[data-index]").first().click();
     await page.waitForSelector("article h1");
@@ -88,7 +88,7 @@ test.describe("read-state", () => {
   });
 
   test("mark-all-read clears a feed's unread count", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/app/");
     await page.waitForSelector("[data-index]");
 
     const feed = page.getByRole("link", { name: /The Verge/ });

@@ -8,7 +8,7 @@ import { expect, test } from "@playwright/test";
 
 test.describe("keyboard-only session", () => {
   test("navigate, open, act, switch streams and mark-all with no mouse", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/app/");
     await page.waitForSelector("[data-index]");
 
     // j puts the keyboard cursor on the first row: a visible ring + real focus.

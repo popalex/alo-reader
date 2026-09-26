@@ -6,7 +6,7 @@ import { expect, test } from "@playwright/test";
 
 test.describe("app boot (AUTH_MODE=none)", () => {
   test("boots to the three-pane app with live sidebar data", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/app/");
 
     // Fixed views + a seeded folder and feed.
     const views = page.getByRole("navigation", { name: "Views" });
@@ -24,7 +24,7 @@ test.describe("app boot (AUTH_MODE=none)", () => {
   });
 
   test("navigating to a feed updates the list header", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/app/");
     await page.getByRole("link", { name: /Hacker News/ }).click();
     await expect(page).toHaveURL(/\/feed\/\d+$/);
     await expect(page.getByRole("heading", { name: "Hacker News", level: 1 })).toBeVisible();

@@ -12,7 +12,10 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-URL="http://localhost/"
+# The app, not the site root: since WP-17 the root is either the landing page
+# (AUTH_MODE=clerk) or a redirect to /app/ (none), and this script measures the
+# app. The landing page gets its own run once it ships.
+URL="http://localhost/app/"
 COMPOSE=(docker compose -f deploy/docker-compose.yml)
 MIN_PERF=${LH_MIN_PERF:-90}
 OUT="$(mktemp -d)/lighthouse.json"

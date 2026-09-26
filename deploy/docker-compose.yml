@@ -33,6 +33,16 @@ services:
       # and CI want. Set it to a hostname you control and Caddy issues and renews a
       # Let's Encrypt certificate on first request (see deploy/Caddyfile).
       ALO_SITE_ADDRESS: ${ALO_SITE_ADDRESS:-:80}
+      # Caddy decides what lives at / from the same variable the API reads: clerk
+      # serves the landing page, none redirects to /app/ (deploy/Caddyfile). It is
+      # plumbing, not a second knob — Caddy reads its own process environment, so
+      # the value has to be handed to this container too.
+      #
+      # The default only protects a hand-run `docker run` of this image. The API
+      # keeps no default and stays the one place that refuses to boot without an
+      # explicit AUTH_MODE, and caddy waits for a healthy api, so an operator who
+      # sets nothing reads the API's message rather than a Caddy parse error.
+      AUTH_MODE: ${AUTH_MODE:-clerk}
       # The Clerk frontend API origin the CSP must allow. clerk-js is loaded from
       # the host encoded in your publishable key, so a pk_live_ key needs your own
       # clerk.<domain> here or the CSP blocks login outright (see deploy/Caddyfile).
