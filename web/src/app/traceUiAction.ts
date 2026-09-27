@@ -3,7 +3,7 @@
 // so Tempo shows one continuous ui.subscribe → POST /api/... → backend trace. When
 // telemetry is off the global tracer is a no-op, so both helpers are free.
 
-import { SpanStatusCode, trace } from "@opentelemetry/api";
+import { type Context, context, SpanStatusCode, trace } from "@opentelemetry/api";
 
 type Attrs = Record<string, string | number | boolean>;
 
@@ -11,10 +11,24 @@ function tracer() {
   return trace.getTracer("alo-web");
 }
 
+// The context of the UI action in progress, for api/client.ts. startActiveSpan alone
+// is not enough: ZoneContextManager cannot follow native async/await (the build
+// targets ES2022), and TanStack Query awaits internally before it calls the
+// mutationFn, so by the time fetch runs the active context is empty and the POST
+// became its own trace instead of a child of ui.subscribe.
+let pendingUiAction: Context | undefined;
+
+/** The context of the `ui.*` action currently awaiting its fetch, if any. */
+export function pendingUiActionContext(): Context | undefined {
+  return pendingUiAction;
+}
+
 /** Wrap an async action (one that awaits a fetch) in a `ui.<name>` span. */
 export async function traceUiAction<T>(name: string, attributes: Attrs, fn: () => Promise<T>): Promise<T> {
   return tracer().startActiveSpan(name, async (span) => {
     for (const [key, value] of Object.entries(attributes)) span.setAttribute(key, value);
+    const previous = pendingUiAction;
+    pendingUiAction = trace.setSpan(context.active(), span);
     try {
       return await fn();
     } catch (error) {
@@ -22,6 +36,7 @@ export async function traceUiAction<T>(name: string, attributes: Attrs, fn: () =
       span.setStatus({ code: SpanStatusCode.ERROR });
       throw error;
     } finally {
+      pendingUiAction = previous;
       span.end();
     }
   });

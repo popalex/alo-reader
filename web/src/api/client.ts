@@ -2,6 +2,10 @@
 // origin — no CORS). The typed OpenAPI-generated client replaces the hand-typed
 // interfaces in WP-09; this stays the transport layer.
 
+import { context, trace } from "@opentelemetry/api";
+
+import { pendingUiActionContext } from "../app/traceUiAction";
+
 export interface ApiConfig {
   auth_mode: string;
   clerk_publishable_key?: string;
@@ -40,16 +44,26 @@ async function request(path: string, options: RequestOptions): Promise<Response>
   if (options.body !== undefined && !isForm) {
     headers["Content-Type"] = "application/json";
   }
-  const response = await fetch(`/api/v1${path}`, {
-    method: options.method ?? "GET",
-    headers,
-    body:
-      options.body === undefined
-        ? undefined
-        : isForm
-          ? (options.body as FormData)
-          : JSON.stringify(options.body),
-  });
+  const method = options.method ?? "GET";
+  const send = () =>
+    fetch(`/api/v1${path}`, {
+      method,
+      headers,
+      body:
+        options.body === undefined
+          ? undefined
+          : isForm
+            ? (options.body as FormData)
+            : JSON.stringify(options.body),
+    });
+  // Parent a write to the UI action that caused it when async context was lost on
+  // the way here (see traceUiAction.ts). Writes only: a background GET that happens
+  // to run while a dialog is submitting is not part of that action.
+  const uiAction = pendingUiActionContext();
+  const response =
+    uiAction && method !== "GET" && !trace.getSpan(context.active())
+      ? await context.with(uiAction, send)
+      : await send();
   if (!response.ok) {
     let code = "internal";
     let message = response.statusText || `HTTP ${response.status}`;
