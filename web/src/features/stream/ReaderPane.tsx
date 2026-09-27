@@ -29,7 +29,7 @@ export function ReaderPane() {
   const contentRef = useRef<HTMLDivElement>(null);
   // Defense-in-depth: re-sanitize the already-nh3-cleaned HTML in the browser.
   // No sanitizer yet (first article, chunk still loading) means no content yet.
-  const { sanitize, failed: sanitizerFailed } = useSanitizer();
+  const { sanitize, failed: sanitizerFailed } = useSanitizer(Boolean(query.data?.content_html));
   const html = useMemo(
     () =>
       sanitize && query.data?.content_html ? sanitize(query.data.content_html) : undefined,

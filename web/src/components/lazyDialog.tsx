@@ -4,12 +4,10 @@
 // cost ~30 kB of startup JS. The wrapper renders nothing until the dialog is first
 // opened, then loads it and keeps it mounted for good: unmounting on close would cut
 // off the exit animations (MobileSidebar styles [data-state="closed"]) and Radix's
-// focus return. The chunk is also prefetched at idle, so the first open does not
-// wait on the network in practice.
+// focus return. There is no idle prefetch: measured under Lighthouse, fetching the
+// chunks at idle landed inside the load window and cost more than it saved.
 
 import { type ComponentType, lazy, Suspense, useState } from "react";
-
-import { whenIdle } from "../lib/whenIdle";
 
 interface DialogProps {
   open: boolean;
@@ -23,7 +21,6 @@ export function lazyDialog<P extends DialogProps>(
   const Lazy = lazy(() =>
     load().then((component) => ({ default: component })),
   ) as unknown as ComponentType<P>;
-  whenIdle(() => void load().catch(() => undefined));
 
   function LazyDialog(props: P) {
     const [opened, setOpened] = useState(props.open);

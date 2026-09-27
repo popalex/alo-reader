@@ -6,8 +6,6 @@
 
 import { useEffect, useState } from "react";
 
-import { whenIdle } from "./whenIdle";
-
 export type Sanitize = (html: string) => string;
 
 let sanitizer: Sanitize | undefined;
@@ -24,14 +22,17 @@ export function loadSanitizer(): Promise<Sanitize> {
   return loading;
 }
 
-whenIdle(() => void loadSanitizer().catch(() => undefined));
-
-/** The sanitizer once loaded; `failed` if the chunk could not be fetched. */
-export function useSanitizer(): { sanitize: Sanitize | undefined; failed: boolean } {
+/** The sanitizer once loaded; `failed` if the chunk could not be fetched. Loads
+ *  only once `needed` is true: the reader is mounted before any article is open,
+ *  and fetching DOMPurify then would put it back on the startup path. */
+export function useSanitizer(needed: boolean): {
+  sanitize: Sanitize | undefined;
+  failed: boolean;
+} {
   const [sanitize, setSanitize] = useState<Sanitize | undefined>(() => sanitizer);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
-    if (sanitize) return;
+    if (sanitize || !needed) return;
     let live = true;
     loadSanitizer().then(
       (fn) => live && setSanitize(() => fn),
@@ -40,6 +41,6 @@ export function useSanitizer(): { sanitize: Sanitize | undefined; failed: boolea
     return () => {
       live = false;
     };
-  }, [sanitize]);
+  }, [sanitize, needed]);
   return { sanitize, failed };
 }
