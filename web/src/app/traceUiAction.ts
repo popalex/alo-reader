@@ -16,19 +16,22 @@ function tracer() {
 // targets ES2022), and TanStack Query awaits internally before it calls the
 // mutationFn, so by the time fetch runs the active context is empty and the POST
 // became its own trace instead of a child of ui.subscribe.
-let pendingUiAction: Context | undefined;
+// A list, not a single slot restored on exit: actions can finish out of order, and
+// restoring "the previous one" would then bring back a span that had already ended
+// and attach every later write to it.
+const pendingUiActions: Context[] = [];
 
-/** The context of the `ui.*` action currently awaiting its fetch, if any. */
+/** The context of the latest `ui.*` action still awaiting its fetch, if any. */
 export function pendingUiActionContext(): Context | undefined {
-  return pendingUiAction;
+  return pendingUiActions.at(-1);
 }
 
 /** Wrap an async action (one that awaits a fetch) in a `ui.<name>` span. */
 export async function traceUiAction<T>(name: string, attributes: Attrs, fn: () => Promise<T>): Promise<T> {
   return tracer().startActiveSpan(name, async (span) => {
     for (const [key, value] of Object.entries(attributes)) span.setAttribute(key, value);
-    const previous = pendingUiAction;
-    pendingUiAction = trace.setSpan(context.active(), span);
+    const ctx = trace.setSpan(context.active(), span);
+    pendingUiActions.push(ctx);
     try {
       return await fn();
     } catch (error) {
@@ -36,7 +39,7 @@ export async function traceUiAction<T>(name: string, attributes: Attrs, fn: () =
       span.setStatus({ code: SpanStatusCode.ERROR });
       throw error;
     } finally {
-      pendingUiAction = previous;
+      pendingUiActions.splice(pendingUiActions.indexOf(ctx), 1);
       span.end();
     }
   });

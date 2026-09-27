@@ -82,6 +82,23 @@ describe("traceUiAction", () => {
     expect(get.spanContext().traceId).not.toBe(ui.spanContext().traceId);
   });
 
+  it("forgets an action once it ends, even when actions finish out of order", async () => {
+    // a starts, b starts, a ends, b ends. Restoring "whatever was pending when I
+    // started" on exit would have b bring back a, which by then has already ended.
+    let finishA!: () => void;
+    let finishB!: () => void;
+    const a = traceUiAction("ui.a", {}, () => new Promise<void>((r) => (finishA = r)));
+    const b = traceUiAction("ui.b", {}, () => new Promise<void>((r) => (finishB = r)));
+    finishA();
+    await a;
+    finishB();
+    await b;
+
+    await createSubscription(null, { feed_url: "https://example.com/feed" });
+    const spans = await finished(["ui.a", "ui.b", "POST"]);
+    expect(spans.find((s) => s.name === "POST")!.parentSpanContext).toBeUndefined();
+  });
+
   it("leaves writes outside any action alone", async () => {
     await createSubscription(null, { feed_url: "https://example.com/feed" });
     const [post] = await finished(["POST"]);
