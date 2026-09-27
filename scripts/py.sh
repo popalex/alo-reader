@@ -10,7 +10,12 @@
 #
 # ./api is mounted read-only and copied to a writable /app inside, so nothing the
 # container does (egg-info, __pycache__, tool caches) can land root-owned in the
-# working tree. Anything a gate genuinely needs to produce goes to /out, which is
+# working tree.
+#
+# The corollary, which has bitten: a formatter's --fix or --write edits that copy
+# and nothing else. `ruff check --fix` in here reports "1 fixed" and leaves the
+# working tree untouched, so the next CI run fails on the error you watched get
+# fixed. Use the container to *find* problems; apply autofixes on the host. Anything a gate genuinely needs to produce goes to /out, which is
 # ./api read-write — see `make lock`, which chowns what it writes back to the
 # invoking user.
 #

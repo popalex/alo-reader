@@ -4,7 +4,7 @@ leaves the process; this is the same guarantee for the log."""
 
 import logging
 
-from app.main import _ScrubQueryString, _install_access_log_scrubber
+from app.main import _install_access_log_scrubber, _ScrubQueryString
 
 
 def _record(path: str) -> logging.LogRecord:
