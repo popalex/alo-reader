@@ -241,7 +241,8 @@
           proxy, not you, and the query string is replaced with <code>[scrubbed]</code> before the
           line is written, because search terms are the most personal thing a URL here carries.
           Those lines rotate out of the container's log within a few megabytes, and where the
-          optional telemetry stack is running they are kept for three days.
+          optional telemetry stack is running they are kept for
+          {{if env "LOKI_RETENTION"}}{{env "LOKI_RETENTION"}}{{else}}72h{{end}}.
         </li>
         <li>
           <strong>No analytics and no tracking pixels.</strong> There is no third-party analytics
@@ -282,9 +283,10 @@
             <td>
               {{if env "ALO_LEGAL_HOSTING"}}{{env "ALO_LEGAL_HOSTING"}}{{else}}<span class="unset"
                 >The provider running this instance (set ALO_LEGAL_HOSTING)</span
-              >{{end}}. Backups are written there, and an operator may also configure a copy to
-              off-site storage{{if env "ALO_LEGAL_BACKUP_REMOTE"}}, which on this instance is
-              {{env "ALO_LEGAL_BACKUP_REMOTE"}}{{end}}.
+              >{{end}}. Backups are written there{{if env "BACKUP_RCLONE_REMOTE"}}, and this
+              instance also copies every database dump to off-site storage{{if env
+              "ALO_LEGAL_BACKUP_REMOTE"}} at {{env "ALO_LEGAL_BACKUP_REMOTE"}}{{end}}{{else}}, and
+              are not copied anywhere else{{end}}.
             </td>
           </tr>
         </tbody>
