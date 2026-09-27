@@ -74,7 +74,7 @@ mako==1.4.3
     # via alembic
 markupsafe==3.0.3
     # via mako
-mypy==2.2.0
+mypy==2.3.1
     # via alo-reader-api (pyproject.toml)
 mypy-extensions==1.1.0
     # via mypy
@@ -122,7 +122,7 @@ pyyaml==6.0.3
     # via uvicorn
 requests==2.34.2
     # via docker
-ruff==0.15.20
+ruff==0.16.9
     # via alo-reader-api (pyproject.toml)
 sentry-sdk==2.70.0
     # via alo-reader-api (pyproject.toml)
@@ -138,7 +138,7 @@ starlette==1.7.0
     # via fastapi
 svix==2.5.0
     # via alo-reader-api (pyproject.toml)
-testcontainers==4.14.2
+testcontainers==4.15.0
     # via alo-reader-api (pyproject.toml)
 types-pyyaml==6.0.12.20260906
     # via alo-reader-api (pyproject.toml)
