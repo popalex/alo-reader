@@ -142,8 +142,10 @@
 	}
 
 	# Same-origin OTLP/HTTP endpoint for browser tracing (only used when the OTel
-	# overlay runs and /config reports otel_enabled). handle_path strips /otlp so
-	# /otlp/v1/traces reaches the collector as /v1/traces. Harmless without the
+	# overlay runs and /config reports otel_enabled). The rewrite sends
+	# /otlp/v1/traces to the collector as /v1/traces. Not handle_path: that strips
+	# the whole matched path, which here is all of it, so the collector got "/" and
+	# answered 404 to every browser span. Harmless without the
 	# overlay — nothing posts here and the upstream is resolved per-request.
 	#
 	# Traces only, capped, and closed by default. This is an unauthenticated write
@@ -158,12 +160,13 @@
 	# disk (see deploy/observability/README.md) — and the route itself is an allow-list
 	# like /grafana: loopback by default, so browser spans from real users need
 	# ALO_OTLP_ALLOW_IPS widened deliberately.
-	handle_path /otlp/v1/traces {
+	handle /otlp/v1/traces {
 		@otlp_denied not remote_ip {$ALO_OTLP_ALLOW_IPS:127.0.0.1/32 ::1}
 		respond @otlp_denied 403
 		request_body {
 			max_size 1MB
 		}
+		rewrite * /v1/traces
 		reverse_proxy otel-collector:4318
 	}
 
