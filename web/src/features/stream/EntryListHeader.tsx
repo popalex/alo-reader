@@ -33,9 +33,11 @@ function loadMenu(): Promise<Menu> {
   return menuLoad;
 }
 
-function LazyMobileActionsMenu(props: Omit<ComponentProps<Menu>, "defaultOpen">) {
+function LazyMobileActionsMenu(
+  props: Omit<ComponentProps<Menu>, "defaultOpen" | "focusFirstItem">,
+) {
   const [MenuImpl, setMenuImpl] = useState<Menu | undefined>(() => loadedMenu);
-  const [tapped, setTapped] = useState(false);
+  const [tapped, setTapped] = useState<false | "pointer" | "keyboard">(false);
   useEffect(() => {
     if (!tapped || MenuImpl) return;
     let live = true;
@@ -52,14 +54,19 @@ function LazyMobileActionsMenu(props: Omit<ComponentProps<Menu>, "defaultOpen">)
     };
   }, [tapped, MenuImpl]);
 
-  if (MenuImpl) return <MenuImpl {...props} defaultOpen={tapped} />;
+  if (MenuImpl) {
+    return (
+      <MenuImpl {...props} defaultOpen={tapped !== false} focusFirstItem={tapped === "keyboard"} />
+    );
+  }
   return (
     <button
       type="button"
       className={menuStyles.trigger}
       aria-label="More actions"
       aria-haspopup="menu"
-      onClick={() => setTapped(true)}
+      // A click fired by Enter or Space has detail 0.
+      onClick={(event) => setTapped(event.detail === 0 ? "keyboard" : "pointer")}
     >
       <MoreVertical size={18} />
     </button>

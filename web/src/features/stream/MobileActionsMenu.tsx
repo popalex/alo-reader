@@ -2,6 +2,8 @@
 // (refresh, mark-all-read, theme) so the top app bar stays `☰ · title · ⋯`.
 // Desktop keeps the inline controls; this trigger is CSS-hidden there.
 
+import { useRef } from "react";
+
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Check, CheckCheck, MoreVertical, RefreshCw } from "lucide-react";
 
@@ -14,14 +16,20 @@ export function MobileActionsMenu({
   onMarkAllRead,
   canMarkAllRead,
   defaultOpen = false,
+  focusFirstItem = false,
 }: {
   onRefresh: () => void;
   onMarkAllRead: () => void;
   canMarkAllRead: boolean;
-  /** True when this mounts because the user just tapped the placeholder trigger. */
+  /** True when this mounts because the user just activated the placeholder trigger. */
   defaultOpen?: boolean;
+  /** Opened from the keyboard: focus the first item, as Radix does for a keyboard
+   *  open of its own trigger. Mounting already open otherwise leaves focus on the
+   *  menu container. */
+  focusFirstItem?: boolean;
 }) {
   const [theme, setTheme] = useTheme();
+  const focusedFirst = useRef(false);
   return (
     <DropdownMenu.Root defaultOpen={defaultOpen}>
       <DropdownMenu.Trigger asChild>
@@ -30,7 +38,22 @@ export function MobileActionsMenu({
         </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content className={styles.content} align="end" sideOffset={6}>
+        <DropdownMenu.Content
+          className={styles.content}
+          align="end"
+          sideOffset={6}
+          ref={(content) => {
+            // Runs on the first mount only (focusedFirst guards it). Radix focuses the
+            // container in its own mount effect; the next frame comes after that.
+            if (!content || !focusFirstItem || focusedFirst.current) return;
+            focusedFirst.current = true;
+            requestAnimationFrame(() =>
+              content
+                .querySelector<HTMLElement>('[role="menuitem"]:not([data-disabled])')
+                ?.focus(),
+            );
+          }}
+        >
           <DropdownMenu.Item className={styles.item} onSelect={onRefresh}>
             <RefreshCw size={15} /> Refresh
           </DropdownMenu.Item>
