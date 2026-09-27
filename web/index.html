@@ -11,6 +11,11 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="alo" />
     <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
+    <!-- The first thing the app fetches, and everything else waits on it (auth mode
+         decides whether Clerk loads). Fetched in parallel with the JS instead of
+         after it, which takes one round trip off the path to the first list paint.
+         Must stay a plain same-origin GET to match App.tsx's getConfig() request. -->
+    <link rel="preload" href="/api/v1/config" as="fetch" crossorigin />
   </head>
   <body>
     <div id="root"></div>
