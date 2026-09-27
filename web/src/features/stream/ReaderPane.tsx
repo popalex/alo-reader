@@ -147,7 +147,7 @@ export function ReaderPane() {
       >
         {sanitizerFailed ? (
           <div className={styles.state} role="alert">
-            Couldn’t load the article viewer. Check your connection and reopen the article.
+            Couldn’t load the article viewer. Reload the page to try again.
           </div>
         ) : (
           <div

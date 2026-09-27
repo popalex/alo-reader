@@ -6,33 +6,57 @@
 // off the exit animations (MobileSidebar styles [data-state="closed"]) and Radix's
 // focus return. There is no idle prefetch: measured under Lighthouse, fetching the
 // chunks at idle landed inside the load window and cost more than it saved.
+//
+// Loading is explicit rather than React.lazy, because a chunk can fail to load. The
+// usual case is a deploy while the app is open: the page still names the old hashed
+// chunk, and the new image no longer has it. React.lazy would throw that to the
+// nearest error boundary, which for the sidebar's dialogs is the whole app. Here the
+// user gets a toast and the dialog stays closed. Only a reload recovers: Chrome
+// caches a failed module import for the life of the page and never refetches it.
 
-import { type ComponentType, lazy, Suspense, useState } from "react";
+import { type ComponentType, useEffect, useState } from "react";
+
+import { pushToast } from "../app/toast";
 
 interface DialogProps {
   open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
 export function lazyDialog<P extends DialogProps>(
   load: () => Promise<ComponentType<P>>,
 ): ComponentType<P> {
-  // lazy() types its result with ref attributes, which a generic P cannot satisfy.
-  // None of these dialogs takes a ref, so narrowing back to ComponentType<P> is safe.
-  const Lazy = lazy(() =>
-    load().then((component) => ({ default: component })),
-  ) as unknown as ComponentType<P>;
+  let loaded: ComponentType<P> | undefined;
+  let pending: Promise<ComponentType<P>> | undefined;
 
   function LazyDialog(props: P) {
-    const [opened, setOpened] = useState(props.open);
-    // Adjusting state during render, not in an effect: the dialog must start
-    // loading in the same render that asks for it to be open.
-    if (props.open && !opened) setOpened(true);
-    if (!opened) return null;
-    return (
-      <Suspense fallback={null}>
-        <Lazy {...props} />
-      </Suspense>
-    );
+    const [Component, setComponent] = useState<ComponentType<P> | undefined>(() => loaded);
+    const { open, onOpenChange } = props;
+
+    useEffect(() => {
+      if (Component || !open) return;
+      let live = true;
+      pending ??= load().then(
+        (component) => (loaded = component),
+        (error: unknown) => {
+          pending = undefined; // harmless where the browser does refetch
+          throw error;
+        },
+      );
+      pending.then(
+        (component) => live && setComponent(() => component),
+        () => {
+          if (!live) return;
+          pushToast("Couldn't open that. Reload the page to get the latest version of the app.");
+          onOpenChange(false);
+        },
+      );
+      return () => {
+        live = false;
+      };
+    }, [Component, open, onOpenChange]);
+
+    return Component ? <Component {...props} /> : null;
   }
   return LazyDialog;
 }

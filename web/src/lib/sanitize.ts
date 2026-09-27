@@ -22,9 +22,10 @@ export function loadSanitizer(): Promise<Sanitize> {
   return loading;
 }
 
-/** The sanitizer once loaded; `failed` if the chunk could not be fetched. Loads
- *  only once `needed` is true: the reader is mounted before any article is open,
- *  and fetching DOMPurify then would put it back on the startup path. */
+/** The sanitizer once loaded; `failed` if its chunk could not be fetched, which only
+ *  a reload recovers (a failed module import is cached for the life of the page).
+ *  Loads only once `needed` is true: the reader is mounted before any article is
+ *  open, and fetching DOMPurify then would put it back on the startup path. */
 export function useSanitizer(needed: boolean): {
   sanitize: Sanitize | undefined;
   failed: boolean;
@@ -32,7 +33,7 @@ export function useSanitizer(needed: boolean): {
   const [sanitize, setSanitize] = useState<Sanitize | undefined>(() => sanitizer);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
-    if (sanitize || !needed) return;
+    if (sanitize || !needed || failed) return;
     let live = true;
     loadSanitizer().then(
       (fn) => live && setSanitize(() => fn),
@@ -41,6 +42,6 @@ export function useSanitizer(needed: boolean): {
     return () => {
       live = false;
     };
-  }, [sanitize, needed]);
+  }, [sanitize, needed, failed]);
   return { sanitize, failed };
 }
