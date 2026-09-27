@@ -34,7 +34,7 @@ export interface StreamSearch {
    *  search is active and scoped to everything. */
   activeStream: StreamDescriptor;
   /** Focused by the `/` shortcut. */
-  searchRef: RefObject<HTMLInputElement>;
+  searchRef: RefObject<HTMLInputElement | null>;
 }
 
 export function useStreamSearch(stream: StreamDescriptor): StreamSearch {
