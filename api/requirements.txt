@@ -30,7 +30,7 @@ click==8.5.0
     # via uvicorn
 cryptography==50.0.1
     # via pyjwt
-deprecated==1.3.1
+deprecated==3.0.0
     # via svix
 fastapi==0.141.1
     # via alo-reader-api (pyproject.toml)
@@ -38,7 +38,7 @@ feedparser==6.0.14
     # via alo-reader-api (pyproject.toml)
 feedparser-sgmllib==2.1.0
     # via feedparser
-greenlet==3.5.5
+greenlet==3.5.6
     # via
     #   alo-reader-api (pyproject.toml)
     #   sqlalchemy
@@ -54,11 +54,11 @@ httpx==0.28.1
     # via
     #   alo-reader-api (pyproject.toml)
     #   svix
-idna==3.19
+idna==3.20
     # via
     #   anyio
     #   httpx
-mako==1.4.1
+mako==1.4.3
     # via alembic
 markupsafe==3.0.3
     # via mako
@@ -76,7 +76,7 @@ pydantic-core==2.46.5
     # via pydantic
 pydantic-settings==2.15.0
     # via alo-reader-api (pyproject.toml)
-pyjwt==2.14.0
+pyjwt==2.15.0
     # via alo-reader-api (pyproject.toml)
 python-dateutil==2.9.0.post0
     # via svix
@@ -89,17 +89,17 @@ python-multipart==0.0.32
     # via alo-reader-api (pyproject.toml)
 pyyaml==6.0.3
     # via uvicorn
-sentry-sdk==2.69.1
+sentry-sdk==2.70.0
     # via alo-reader-api (pyproject.toml)
 six==1.17.0
     # via python-dateutil
-sqlalchemy==2.0.52
+sqlalchemy==2.0.54
     # via
     #   alembic
     #   alo-reader-api (pyproject.toml)
 standardwebhooks==1.1.0
     # via svix
-starlette==1.6.0
+starlette==1.7.0
     # via fastapi
 svix==2.5.0
     # via alo-reader-api (pyproject.toml)
@@ -117,17 +117,17 @@ typing-inspection==0.4.4
     #   fastapi
     #   pydantic
     #   pydantic-settings
-urllib3==2.7.0
+urllib3==2.8.0
     # via sentry-sdk
-uvicorn==0.52.4
+uvicorn==0.54.0
     # via alo-reader-api (pyproject.toml)
 uvloop==0.22.1
     # via uvicorn
-watchfiles==1.2.0
+watchfiles==1.3.0
     # via uvicorn
 websockets==17.1
     # via uvicorn
-wrapt==2.4.1
+wrapt==2.5.0
     # via deprecated
 zstandard==0.25.0
     # via alo-reader-api (pyproject.toml)

@@ -14,7 +14,12 @@ dependencies = [
     "pydantic>=2.7",
     "pydantic-settings>=2.3",
     "python-dotenv>=1.0",
-    "sqlalchemy[asyncio]>=2.0",
+    # Ceiling set by OpenTelemetry, not by SQLAlchemy. opentelemetry-instrumentation-
+    # sqlalchemy (0.66b0) declares sqlalchemy<2.1, and an instrumentor outside its range
+    # does not fail: it logs nothing and instruments nothing, so every DB span vanishes
+    # from Tempo while tests, lint and mypy all stay green. Lift it only once the
+    # instrumentation's range admits 2.1, and check for SELECT spans in Tempo.
+    "sqlalchemy[asyncio]>=2.0,<2.1",
     "asyncpg>=0.29",
     "greenlet>=3.0",
     "alembic>=1.13",

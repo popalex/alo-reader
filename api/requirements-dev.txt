@@ -15,7 +15,7 @@ anyio==4.15.1
     #   httpx
     #   starlette
     #   watchfiles
-ast-serialize==0.11.1
+ast-serialize==0.11.2
     # via mypy
 asyncpg==0.31.0
     # via alo-reader-api (pyproject.toml)
@@ -35,7 +35,7 @@ click==8.5.0
     # via uvicorn
 cryptography==50.0.1
     # via pyjwt
-deprecated==1.3.1
+deprecated==3.0.0
     # via svix
 docker==7.2.0
     # via testcontainers
@@ -45,7 +45,7 @@ feedparser==6.0.14
     # via alo-reader-api (pyproject.toml)
 feedparser-sgmllib==2.1.0
     # via feedparser
-greenlet==3.5.5
+greenlet==3.5.6
     # via
     #   alo-reader-api (pyproject.toml)
     #   sqlalchemy
@@ -61,7 +61,7 @@ httpx==0.28.1
     # via
     #   alo-reader-api (pyproject.toml)
     #   svix
-idna==3.19
+idna==3.20
     # via
     #   anyio
     #   httpx
@@ -70,7 +70,7 @@ iniconfig==2.3.0
     # via pytest
 librt==0.15.0
     # via mypy
-mako==1.4.1
+mako==1.4.3
     # via alembic
 markupsafe==3.0.3
     # via mako
@@ -100,7 +100,7 @@ pydantic-settings==2.15.0
     # via alo-reader-api (pyproject.toml)
 pygments==2.21.0
     # via pytest
-pyjwt==2.14.0
+pyjwt==2.15.0
     # via alo-reader-api (pyproject.toml)
 pytest==9.1.1
     # via
@@ -124,17 +124,17 @@ requests==2.34.2
     # via docker
 ruff==0.15.20
     # via alo-reader-api (pyproject.toml)
-sentry-sdk==2.69.1
+sentry-sdk==2.70.0
     # via alo-reader-api (pyproject.toml)
 six==1.17.0
     # via python-dateutil
-sqlalchemy==2.0.52
+sqlalchemy==2.0.54
     # via
     #   alembic
     #   alo-reader-api (pyproject.toml)
 standardwebhooks==1.1.0
     # via svix
-starlette==1.6.0
+starlette==1.7.0
     # via fastapi
 svix==2.5.0
     # via alo-reader-api (pyproject.toml)
@@ -158,21 +158,21 @@ typing-inspection==0.4.4
     #   fastapi
     #   pydantic
     #   pydantic-settings
-urllib3==2.7.0
+urllib3==2.8.0
     # via
     #   docker
     #   requests
     #   sentry-sdk
     #   testcontainers
-uvicorn==0.52.4
+uvicorn==0.54.0
     # via alo-reader-api (pyproject.toml)
 uvloop==0.22.1
     # via uvicorn
-watchfiles==1.2.0
+watchfiles==1.3.0
     # via uvicorn
 websockets==17.1
     # via uvicorn
-wrapt==2.4.1
+wrapt==2.5.0
     # via
     #   deprecated
     #   testcontainers
