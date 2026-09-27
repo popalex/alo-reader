@@ -13,8 +13,8 @@ import type { Folder, Subscription } from "../../api/endpoints";
 import { useDeleteFolder, useDeleteSubscription, useUpdateFolder } from "../../api/feedMutations";
 import { useCounts, useFolders, useSubscriptions } from "../../api/queries";
 import { Favicon } from "../../components/Favicon";
-import styles from "./Sidebar.module.css";
 import { lazyDialog } from "../../components/lazyDialog";
+import styles from "./Sidebar.module.css";
 
 const ConfirmDialog = lazyDialog(() =>
   import("../../components/ConfirmDialog").then((m) => m.ConfirmDialog),

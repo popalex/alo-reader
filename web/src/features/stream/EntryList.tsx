@@ -19,6 +19,7 @@ import type { EntryListItem } from "../../api/endpoints";
 import { useMarkStreamRead, useSetEntryState } from "../../api/mutations";
 import { usePrefetchEntry, useStreamEntries, useSubscriptions } from "../../api/queries";
 import { useOnline } from "../../app/offline/useOffline";
+import { lazyDialog } from "../../components/lazyDialog";
 import { useMobileNav } from "../layout/mobileNav";
 import { useAnyModalOpen } from "../../keyboard/modalLock";
 import { useKeyboard, type KeyboardActions } from "../../keyboard/useKeyboard";
@@ -34,7 +35,6 @@ import { useStreamSearch } from "./useStreamSearch";
 import { useScrollReadMarker } from "./useScrollReadMarker";
 import { useSelection } from "./selection";
 import styles from "./EntryList.module.css";
-import { lazyDialog } from "../../components/lazyDialog";
 
 const ConfirmDialog = lazyDialog(() =>
   import("../../components/ConfirmDialog").then((m) => m.ConfirmDialog),

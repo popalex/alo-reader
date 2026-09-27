@@ -10,11 +10,11 @@ import { Outlet, useRouterState } from "@tanstack/react-router";
 import { usePendingFeedPolling } from "../../api/queries";
 import { UnreadAnnouncer } from "../../app/UnreadAnnouncer";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
+import { lazyDialog } from "../../components/lazyDialog";
 import { useIsMobile } from "../../lib/useMediaQuery";
 import { Sidebar } from "../sidebar/Sidebar";
 import { MobileNavContext } from "./mobileNav";
 import styles from "./AppLayout.module.css";
-import { lazyDialog } from "../../components/lazyDialog";
 
 const MobileSidebar = lazyDialog(() => import("./MobileSidebar").then((m) => m.MobileSidebar));
 
