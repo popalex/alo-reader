@@ -11,6 +11,30 @@ export interface BrowserTelemetryOptions {
   exportUrl: string;
 }
 
+/** Span attribute names that can carry a URL, across semconv versions. */
+const URL_ATTRS = ["http.url", "url.full", "http.target"] as const;
+
+/**
+ * Replace the query string on a span's URL attributes with `[scrubbed]`.
+ *
+ * The backend does this in two other places — app/telemetry.py for its server span,
+ * app/sentry.py for error events — because a search query is the most personal thing
+ * these URLs carry. The browser exports straight to /otlp, so it is the third door.
+ */
+export function scrubQueryString(span: unknown): void {
+  const s = span as {
+    attributes?: Record<string, unknown>;
+    setAttribute?: (k: string, v: string) => void;
+  };
+  if (!s || typeof s.setAttribute !== "function") return;
+  for (const name of URL_ATTRS) {
+    const value = s.attributes?.[name];
+    if (typeof value === "string" && value.includes("?")) {
+      s.setAttribute(name, `${value.split("?")[0]}?[scrubbed]`);
+    }
+  }
+}
+
 export function initBrowserTelemetry({ serviceName, exportUrl }: BrowserTelemetryOptions): void {
   if (initialized) return;
   initialized = true;
@@ -75,6 +99,12 @@ export function initBrowserTelemetry({ serviceName, exportUrl }: BrowserTelemetr
                 } catch {
                   /* naming is best-effort */
                 }
+                // Keep search terms out of Tempo. FetchInstrumentation puts the whole
+                // request URL on the span, so /streams/all/entries?q=… would export a
+                // reader's query even though the API scrubs its own span and its access
+                // log. This hook runs on the failure path too, before the span ends and
+                // while its attributes are still writable.
+                scrubQueryString(span);
               },
             }),
           ],

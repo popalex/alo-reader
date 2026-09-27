@@ -78,6 +78,31 @@ async def _gauge_refresh_loop() -> None:
         await asyncio.sleep(_GAUGE_REFRESH_S)
 
 
+class _ScrubQueryString(logging.Filter):
+    """Drop the query string from uvicorn.access records.
+
+    uvicorn formats access lines from a 5-tuple of args, the third of which is the
+    request path with its query string attached. Rewriting that one element keeps
+    the line intact and loses only the values.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if isinstance(args, tuple) and len(args) >= 3 and isinstance(args[2], str):
+            path = args[2]
+            if "?" in path:
+                scrubbed = path.split("?", 1)[0] + "?[scrubbed]"
+                record.args = args[:2] + (scrubbed,) + args[3:]
+        return True
+
+
+def _install_access_log_scrubber() -> None:
+    """Idempotent: a second call must not stack a second filter on the logger."""
+    access = logging.getLogger("uvicorn.access")
+    if not any(isinstance(f, _ScrubQueryString) for f in access.filters):
+        access.addFilter(_ScrubQueryString())
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     validate_boot_config()
@@ -88,6 +113,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Attach the OTLP log handler now, not at import: uvicorn has finished installing its
     # own logging config by the time the lifespan runs, so the handler survives on the
     # uvicorn.* loggers and the api's logs actually reach Loki.
+    # Strip query strings from uvicorn's access log, for the same reason sentry.py
+    # scrubs them before an event leaves the process: /streams/all/entries?q=... puts
+    # a reader's search terms in a log line, and search terms are the most personal
+    # thing this API takes in a URL. The status line is still logged; only the part
+    # after "?" goes. Installed here rather than at import because uvicorn applies
+    # its own dictConfig afterwards and would discard a filter attached earlier.
+    _install_access_log_scrubber()
     if telemetry.is_enabled():
         telemetry.enable_log_export()
     # Sentry is initialised at import (below), but anything it logged there went

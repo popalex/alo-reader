@@ -49,6 +49,37 @@ def _db_span_name(statement: str) -> str | None:
 _LOG_EXPORT_LOGGERS = ("alo.api", "worker", "uvicorn.error", "uvicorn.access")
 
 
+# Attributes the FastAPI instrumentation fills from the request URL. Which names
+# are used depends on the semconv version the instrumentation emits, so all of the
+# spellings are covered rather than the one this version happens to pick.
+_URL_SPAN_ATTRS = ("http.target", "http.url", "url.query", "url.full")
+
+
+def _scrub_span_query_string(span: Any, scope: dict[str, Any]) -> None:
+    """Keep search terms out of Tempo, the way sentry.py keeps them out of events.
+
+    The access log is scrubbed in app/main.py, but a span carries the same URL by
+    another route: ``/streams/all/entries?q=…`` would otherwise reach the trace
+    store intact. Runs at span start, where attributes are still writable — a
+    ReadableSpan handed to an exporter is not.
+    """
+    if span is None or not span.is_recording():
+        return
+    query = scope.get("query_string") or b""
+    if not query:
+        return
+    path = scope.get("path", "")
+    for name in _URL_SPAN_ATTRS:
+        value = (span.attributes or {}).get(name)
+        if isinstance(value, str) and "?" in value:
+            span.set_attribute(name, value.split("?", 1)[0] + "?[scrubbed]")
+    # url.query holds the bare query with no "?" to split on.
+    if isinstance((span.attributes or {}).get("url.query"), str):
+        span.set_attribute("url.query", "[scrubbed]")
+    if path and not (span.attributes or {}).get("http.target"):
+        span.set_attribute("http.target", f"{path}?[scrubbed]")
+
+
 class _HealthLogFilter(logging.Filter):
     """Drop /healthz access logs so probes don't flood Loki (uvicorn.access format:
     request path is ``record.args[2]``)."""
@@ -202,6 +233,7 @@ def configure_telemetry(
             tracer_provider=tracer_provider,
             meter_provider=meter_provider,
             excluded_urls="healthz",
+            server_request_hook=_scrub_span_query_string,
         )
     HTTPXClientInstrumentor().instrument(
         tracer_provider=tracer_provider,

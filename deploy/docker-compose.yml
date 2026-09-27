@@ -49,6 +49,21 @@ services:
       ALO_CONTACT_EMAIL: ${ALO_CONTACT_EMAIL:-}
       ALO_LEGAL_OPERATOR: ${ALO_LEGAL_OPERATOR:-}
       ALO_LEGAL_HOSTING: ${ALO_LEGAL_HOSTING:-}
+      # The disclosure defaults from the setting that decides the behaviour, so an
+      # operator who turns on off-box backups discloses them without having to find
+      # a second variable. ALO_LEGAL_BACKUP_REMOTE only replaces the wording with a
+      # friendly name — "Backblaze B2, EU" rather than an rclone target that may
+      # carry a bucket name nobody needs to publish.
+      ALO_LEGAL_BACKUP_REMOTE: ${ALO_LEGAL_BACKUP_REMOTE:-}
+      BACKUP_RCLONE_REMOTE: ${BACKUP_RCLONE_REMOTE:-}
+      # Loki's window, for the same reason as the other two retention figures: the
+      # page states it as fact and the overlay lets an operator change it.
+      LOKI_RETENTION: ${LOKI_RETENTION:-72h}
+      # Both are operator-configurable, and /legal states them as fact, so the page
+      # has to read the same values the API and the backup sidecar do rather than
+      # hardcoding the defaults and lying on any instance that changed them.
+      RETENTION_HORIZON_DAYS: ${RETENTION_HORIZON_DAYS:-90}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
       # The Clerk frontend API origin the CSP must allow. clerk-js is loaded from
       # the host encoded in your publishable key, so a pk_live_ key needs your own
       # clerk.<domain> here or the CSP blocks login outright (see deploy/Caddyfile).

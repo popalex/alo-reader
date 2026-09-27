@@ -187,9 +187,11 @@
       <div class="summary">
         <p>
           <strong>The short version.</strong> This service stores your email address, the feeds you
-          subscribe to, and which articles you have read or starred. It keeps no access logs, runs
-          no analytics, and shows no advertising. Delete your account and your data goes with it.
-          It is free while in beta and comes with no guarantees.
+          subscribe to, and which articles you have read or starred. It runs no analytics and shows
+          no advertising. Server logs keep request lines, including your IP address, long enough to
+          block anyone abusing the service — never your searches, which are stripped out
+          everywhere. Delete your account and your data goes with it. It is free while in beta and
+          comes with no guarantees.
         </p>
       </div>
 
@@ -231,9 +233,33 @@
         not personal data and is not tied to you beyond your read and starred state.
       </p>
 
+      <h2>Server logs</h2>
+      <p>
+        Requests are logged: the time, the method, the path, the status, and the IP address they
+        came from. That last one is there for one reason — an account or an address that floods
+        the service has to be identifiable before it can be blocked — and it is the only place
+        your address is kept at all. Entries rotate out within roughly thirty megabytes per
+        service, which on a quiet instance is days and on a busy one is hours; nothing sweeps them
+        into long-term storage.
+      </p>
+      <p>
+        What those lines do <em>not</em> contain is the query string. That is where a search puts
+        its terms, so it is emptied before anything is written, and the same is done in the three
+        other places a URL travels: the application's own request log, the traces the optional
+        telemetry stack collects, and any error report. All four write
+        <code>[scrubbed]</code> in place of what you typed.
+      </p>
+
       <h2>What is not stored</h2>
       <ul>
-        <li><strong>No access logs.</strong> The web server records errors, not requests.</li>
+        <li>
+          <strong>Your searches stay out of every log.</strong> A search puts its terms in a URL,
+          and a URL ends up in more places than you would expect: the request log, the error log,
+          the traces the optional telemetry stack collects, and any error report. All four replace
+          the query with <code>[scrubbed]</code> before anything is written or sent. Request lines
+          rotate out of the container's log within a few megabytes; where the telemetry stack runs,
+          they are kept for {{if env "LOKI_RETENTION"}}{{env "LOKI_RETENTION"}}{{else}}72h{{end}}.
+        </li>
         <li>
           <strong>No analytics and no tracking pixels.</strong> There is no third-party analytics
           script on any page, and nothing to opt out of.
@@ -242,10 +268,7 @@
           <strong>No advertising, and no profiling.</strong> Nothing here builds a profile of your
           interests or sells anything derived from your reading.
         </li>
-        <li>
-          <strong>Your IP address is not written down.</strong> It is used in memory to rate-limit
-          requests and then forgotten.
-        </li>
+
       </ul>
 
       <h2>Who else touches your data</h2>
@@ -261,8 +284,11 @@
           <tr>
             <th scope="row">Error reporting</th>
             <td>
-              Optional and off unless configured. When on, it receives exception details with
-              personal data disabled — no request bodies, no headers, no tracing of your activity.
+              Optional, and off unless an operator configures it. When on, it receives exception
+              details with the SDK's personal-data mode disabled, and this service additionally
+              strips the query string from the URL before the event leaves the process. It does
+              still receive a filtered set of request headers, and an operator can turn on
+              performance tracing, which is off by default.
             </td>
           </tr>
           <tr>
@@ -270,7 +296,10 @@
             <td>
               {{if env "ALO_LEGAL_HOSTING"}}{{env "ALO_LEGAL_HOSTING"}}{{else}}<span class="unset"
                 >The provider running this instance (set ALO_LEGAL_HOSTING)</span
-              >{{end}}. Backups are held on the same infrastructure.
+              >{{end}}. Backups are written there{{if env "BACKUP_RCLONE_REMOTE"}}, and this
+              instance also copies every database dump to off-site storage{{if env
+              "ALO_LEGAL_BACKUP_REMOTE"}} at {{env "ALO_LEGAL_BACKUP_REMOTE"}}{{end}}{{else}}, and
+              are not copied anywhere else{{end}}.
             </td>
           </tr>
         </tbody>
@@ -297,21 +326,29 @@
         <li><strong>Starred articles are kept indefinitely.</strong></li>
         <li><strong>Unread articles are never purged.</strong></li>
         <li>
-          Articles you have read and not starred are removed after 90 days, and only once every
-          subscriber to that feed has read them too.
+          Articles you have read and not starred are removed after
+          {{if env "RETENTION_HORIZON_DAYS"}}{{env "RETENTION_HORIZON_DAYS"}}{{else}}90{{end}} days,
+          and only once every subscriber to that feed has read them too. The period is set per
+          instance; the figure here is the one this instance runs.
         </li>
         <li>
-          Database backups are kept for 14 days. Deleting your account removes it from the live
-          database immediately, but a copy persists in those backups until they age out.
+          Database backups are kept for
+          {{if env "BACKUP_RETENTION_DAYS"}}{{env "BACKUP_RETENTION_DAYS"}}{{else}}14{{end}} days.
+          Deleting your account removes it from the live database, but a copy persists in those
+          backups until they age out.
         </li>
       </ul>
 
       <h2>Deleting your account</h2>
       <p>
-        You can delete your account yourself, and it cascades: subscriptions, folders, read and
-        starred state, and API tokens go with it. There is a test in the repository that fills every
-        one of those tables and then asserts they are empty afterwards. Feeds themselves survive if
-        somebody else still subscribes to them; if nobody does, the feed is collected within a week.
+        You can delete your account yourself. Deletion happens at the sign-in provider first,
+        which then notifies this service, and the local cascade runs when that notification
+        arrives — normally within seconds, and the notification is retried for about a day if this
+        service is unreachable. The cascade takes subscriptions, folders, read and starred state,
+        and API tokens with it; there is a test in the repository that fills every one of those
+        tables and then asserts they are empty afterwards. Feeds themselves survive if somebody
+        else still subscribes to them; if nobody does, the feed is removed after a grace period on
+        the next maintenance sweep.
       </p>
       <p>
         You can take your data out at any time without deleting anything: export your subscriptions
