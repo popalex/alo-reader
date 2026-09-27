@@ -15,8 +15,9 @@
 # deliberately no ACME_EMAIL variable: both `tls` and the global `email` option
 # reject an empty argument, so an optional env-driven address cannot be expressed
 # here without a placeholder that expands to a whole directive. If you want the
-# expiry warnings, add a global options block at the top of this file:
-#     { email you@example.com }
+# expiry warnings, add an `email you@example.com` line to the global options block
+# below — Caddy allows exactly one such block and it must come first, so a second
+# one is a parse error rather than an addition.
 # ── What the error log is allowed to keep ────────────────────────────────────
 # There is no access log here, but Caddy's *error* logger attaches the whole
 # request to every 5xx — and that means the client address, the full URI with its
@@ -24,9 +25,11 @@
 # therefore write a reader's search terms to disk, which is exactly what the API's
 # own log filter and span hook exist to prevent.
 #
-# So the default logger is filtered rather than silenced: the query string is
-# emptied and the headers dropped, both of which carry personal detail and neither
-# of which helps you act on an error. The client address stays, in full and
+# So the default logger is filtered rather than silenced: everything after the "?"
+# is replaced wholesale, and the headers are dropped. Wholesale rather than a list of
+# parameter names to delete, because such a list is only correct until somebody adds
+# a parameter — today it is q and cursor, tomorrow it is ?token= and nobody updates
+# the filter. The client address stays, in full and
 # unmasked, because the thing an operator actually does with these logs is block a
 # source that is hammering the box, and a /24 blocks everyone behind the same
 # carrier NAT along with them.
@@ -42,10 +45,7 @@
 			fields {
 				request>remote_port delete
 				request>headers delete
-				request>uri query {
-					delete q
-					delete cursor
-				}
+				request>uri regexp "\?.*" "?[scrubbed]"
 			}
 		}
 	}
@@ -126,7 +126,7 @@
 	encode gzip
 
 	# Access log, on purpose and with the same filter as the error logger: the client
-	# address in full, the query string emptied, the headers dropped. Without it the
+	# address in full, everything after the "?" replaced, the headers dropped. Without it the
 	# question "which address is making thousands of requests?" has no answer, since
 	# a successful flood and a rate-limited one both look like ordinary traffic to the
 	# error logger. Docker's json-file driver rotates these (10 MB x 3 per service,
@@ -136,10 +136,7 @@
 			wrap console
 			fields {
 				request>headers delete
-				request>uri query {
-					delete q
-					delete cursor
-				}
+				request>uri regexp "\?.*" "?[scrubbed]"
 			}
 		}
 	}
