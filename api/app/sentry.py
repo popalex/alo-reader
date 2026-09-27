@@ -87,7 +87,11 @@ def configure_sentry(*, service_name: str, version: str) -> bool:
         integrations=[LoggingIntegration(level=logging.INFO, event_level=logging.ERROR)],
         # Which process an event came from. api and worker fail in different ways.
         server_name=service_name,
+        # Two hooks for one job. before_send only sees error events; a transaction
+        # (sent whenever traces_sample_rate is above 0) goes through
+        # before_send_transaction instead, and carries the same request block.
         before_send=_scrub_query_string,
+        before_send_transaction=_scrub_query_string,
     )
     sentry_sdk.set_tag("service", service_name)
 
