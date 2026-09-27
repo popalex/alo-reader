@@ -19,6 +19,24 @@ if (!root) {
 // Apply the saved colour-theme choice before first paint.
 initTheme();
 
+// The service worker precaches every asset for offline use. Registering it at `load`
+// (the plugin's default) put that install and its ~40 downloads inside the first-load
+// window, as a long task of its own. A few seconds later costs nothing: offline use
+// needs the first visit to finish anyway.
+// In `make dev` the plugin serves its dev service worker at dev-sw.js?dev-sw, as a
+// module (devOptions in vite.config.ts), so offline stays testable there too.
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    window.setTimeout(() => {
+      const base = import.meta.env.BASE_URL;
+      void navigator.serviceWorker.register(
+        import.meta.env.DEV ? `${base}dev-sw.js?dev-sw` : `${base}sw.js`,
+        { scope: base, type: import.meta.env.DEV ? "module" : "classic" },
+      );
+    }, 3000);
+  });
+}
+
 createRoot(root).render(
   <StrictMode>
     <App />
