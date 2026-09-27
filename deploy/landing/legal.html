@@ -235,14 +235,20 @@
       <h2>What is not stored</h2>
       <ul>
         <li>
-          <strong>Your IP address is never recorded.</strong> The web server at the edge logs
-          errors, not requests, so nothing writes down where you connected from. The application
-          behind it logs a line per request — method, path and status — but it only ever sees the
-          proxy, not you, and the query string is replaced with <code>[scrubbed]</code> before the
-          line is written, because search terms are the most personal thing a URL here carries.
-          Those lines rotate out of the container's log within a few megabytes, and where the
-          optional telemetry stack is running they are kept for
-          {{if env "LOKI_RETENTION"}}{{env "LOKI_RETENTION"}}{{else}}72h{{end}}.
+          <strong>Your full IP address is never written down.</strong> The web server at the edge
+          keeps no access log at all. When a request fails it writes an error entry, and that entry
+          keeps only a masked address — the first three groups of an IPv4 address, so
+          <code>203.0.113.47</code> is stored as <code>203.0.113.0</code>. That is enough to see one
+          source overwhelming the server and block it, and not enough to identify you. Your address
+          is also held in memory for a few seconds to rate-limit requests, and never stored.
+        </li>
+        <li>
+          <strong>Your searches stay out of every log.</strong> A search puts its terms in a URL,
+          and a URL ends up in more places than you would expect: the request log, the error log,
+          the traces the optional telemetry stack collects, and any error report. All four replace
+          the query with <code>[scrubbed]</code> before anything is written or sent. Request lines
+          rotate out of the container's log within a few megabytes; where the telemetry stack runs,
+          they are kept for {{if env "LOKI_RETENTION"}}{{env "LOKI_RETENTION"}}{{else}}72h{{end}}.
         </li>
         <li>
           <strong>No analytics and no tracking pixels.</strong> There is no third-party analytics
@@ -252,10 +258,7 @@
           <strong>No advertising, and no profiling.</strong> Nothing here builds a profile of your
           interests or sells anything derived from your reading.
         </li>
-        <li>
-          <strong>No rate-limit records.</strong> Your address is held in memory only long enough
-          to count requests, and is never written to disk or a database.
-        </li>
+
       </ul>
 
       <h2>Who else touches your data</h2>

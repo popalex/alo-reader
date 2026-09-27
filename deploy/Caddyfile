@@ -17,6 +17,43 @@
 # here without a placeholder that expands to a whole directive. If you want the
 # expiry warnings, add a global options block at the top of this file:
 #     { email you@example.com }
+# ── What the error log is allowed to keep ────────────────────────────────────
+# There is no access log here, but Caddy's *error* logger attaches the whole
+# request to every 5xx — and that means the client address, the full URI with its
+# query string, and the headers. A proxy hiccup on /streams/all/entries?q=… would
+# therefore write a reader's search terms to disk, which is exactly what the API's
+# own log filter and span hook exist to prevent.
+#
+# So the default logger is filtered rather than silenced. The query is emptied and
+# the headers go, but the addresses are *masked* instead of deleted: a /24 (or /48
+# for IPv6) still shows one source hammering the box, which is what you need to
+# reach for a firewall rule, while never storing an address that identifies a
+# person. Rate limiting is unaffected either way — the token bucket reads
+# X-Real-IP at request time (auth/middleware.py) and never consults a log.
+{
+	log {
+		format filter {
+			wrap console
+			fields {
+				request>remote_ip ip_mask {
+					ipv4 24
+					ipv6 48
+				}
+				request>client_ip ip_mask {
+					ipv4 24
+					ipv6 48
+				}
+				request>remote_port delete
+				request>headers delete
+				request>uri query {
+					delete q
+					delete cursor
+				}
+			}
+		}
+	}
+}
+
 # ── Shared response headers ──────────────────────────────────────────────────
 # Imported by both the landing page and the app, so there is one definition of the
 # set. /api, /otlp and /grafana stay outside it: the API sends its own headers
