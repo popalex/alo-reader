@@ -228,15 +228,38 @@
 	handle_path /app/* {
 		import alo_headers
 		root * /srv
+		# The build writes .br and .gz next to every text file, at maximum compression
+		# (web/scripts/precompress.mjs). Brotli-11 makes app.js about 15% smaller than
+		# the gzip `encode` produces on the fly, and costs nothing per request. Files
+		# without a sibling fall back to `encode`.
+		#
 		# Vite content-hashes every built asset, so a given URL's bytes never change:
-		# cache them for a year and immutably. The shell is the opposite — it names
-		# the hashed files, so a stale copy pins a user to an old build.
-		@hashed path /assets/*
-		header @hashed Cache-Control "public, max-age=31536000, immutable"
-		@shell path / /index.html /manifest.webmanifest /sw.js
-		header @shell Cache-Control "no-cache"
-		try_files {path} /index.html
-		file_server
+		# cache them for a year and immutably. Two rules keep that safe:
+		#   - No SPA fallback under /assets/. A missing chunk used to get index.html
+		#     with 200 and text/html, which a browser rejects as a module. After a
+		#     deploy, an open tab asking for an old chunk would get exactly that.
+		#   - Only a 2xx is marked immutable. That fallback page was cached under the
+		#     chunk's URL for a year, so even a reload couldn't recover it.
+		@assets path /assets/*
+		handle @assets {
+			header {
+				Cache-Control "public, max-age=31536000, immutable"
+				match status 2xx
+			}
+			file_server {
+				precompressed br gzip
+			}
+		}
+		# The shell is the opposite: it names the hashed files, so a stale copy pins a
+		# user to an old build.
+		handle {
+			@shell path / /index.html /manifest.webmanifest /sw.js
+			header @shell Cache-Control "no-cache"
+			try_files {path} /index.html
+			file_server {
+				precompressed br gzip
+			}
+		}
 	}
 
 	# Bookmarks from before the app moved. Cheap to honour, and the alternative is a

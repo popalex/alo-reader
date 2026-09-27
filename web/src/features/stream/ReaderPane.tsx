@@ -7,7 +7,6 @@
 
 import { useEffect, useMemo, useRef } from "react";
 
-import DOMPurify from "dompurify";
 import { Check, ChevronLeft, Circle, ExternalLink, Star } from "lucide-react";
 
 import { useSetEntryState } from "../../api/mutations";
@@ -15,6 +14,7 @@ import { useEntry, useSubscriptions } from "../../api/queries";
 import { useOnline } from "../../app/offline/useOffline";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { Favicon } from "../../components/Favicon";
+import { useSanitizer } from "../../lib/sanitize";
 import { formatDateTime } from "../../lib/time";
 import { safeExternalUrl } from "../../lib/url";
 import { useSelection } from "./selection";
@@ -28,9 +28,12 @@ export function ReaderPane() {
   const setState = useSetEntryState();
   const contentRef = useRef<HTMLDivElement>(null);
   // Defense-in-depth: re-sanitize the already-nh3-cleaned HTML in the browser.
+  // No sanitizer yet (first article, chunk still loading) means no content yet.
+  const { sanitize, failed: sanitizerFailed } = useSanitizer(Boolean(query.data?.content_html));
   const html = useMemo(
-    () => (query.data?.content_html ? DOMPurify.sanitize(query.data.content_html) : undefined),
-    [query.data?.content_html],
+    () =>
+      sanitize && query.data?.content_html ? sanitize(query.data.content_html) : undefined,
+    [sanitize, query.data?.content_html],
   );
 
   // Make feed images lazy/async after each content change (the container is
@@ -142,12 +145,18 @@ export function ReaderPane() {
           </div>
         }
       >
-        <div
-          ref={contentRef}
-          className={styles.content}
-          // nh3 at ingest + DOMPurify here (see the file header) — double-sanitized.
-          dangerouslySetInnerHTML={{ __html: html ?? "" }}
-        />
+        {sanitizerFailed ? (
+          <div className={styles.state} role="alert">
+            Couldn’t load the article viewer. Reload the page to try again.
+          </div>
+        ) : (
+          <div
+            ref={contentRef}
+            className={styles.content}
+            // nh3 at ingest + DOMPurify here (see the file header) — double-sanitized.
+            dangerouslySetInnerHTML={{ __html: html ?? "" }}
+          />
+        )}
       </ErrorBoundary>
     </article>
   );

@@ -6,24 +6,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && node scripts/precompress.mjs",
     "preview": "vite preview",
     "tsc": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
     "size": "size-limit"
   },
-  "size-limit": [
-    {
-      "name": "main app (initial JS + CSS, gzip)",
-      "path": [
-        "dist/assets/app-*.js",
-        "dist/assets/index-*.css"
-      ],
-      "gzip": true,
-      "limit": "180 kB"
-    }
-  ],
   "dependencies": {
     "@clerk/clerk-react": "^5.61.10",
     "@fontsource-variable/inter": "^5.3.0",

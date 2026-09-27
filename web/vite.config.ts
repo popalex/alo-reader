@@ -86,9 +86,9 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        // Name the entry chunk `app-*.js` so the size-limit budget measures only the
-        // initial bundle. Lazy chunks keep `[name]-*.js` (some vendored package index
-        // modules chunk as `index-*.js`), which must not be summed into the budget.
+        // A recognisable name for the entry chunk. The size-limit budget no longer
+        // depends on it: .size-limit.cjs reads the startup files from index.html,
+        // because shared chunks (React, once dialogs are lazy) get other names.
         entryFileNames: "assets/app-[hash].js",
       },
     },

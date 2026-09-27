@@ -12,11 +12,19 @@ import { ChevronDown, Inbox, Loader2, Pencil, Plus, Settings2, Star, Trash2 } fr
 import type { Folder, Subscription } from "../../api/endpoints";
 import { useDeleteFolder, useDeleteSubscription, useUpdateFolder } from "../../api/feedMutations";
 import { useCounts, useFolders, useSubscriptions } from "../../api/queries";
-import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { Favicon } from "../../components/Favicon";
-import { AddSubscriptionDialog } from "../subscribe/AddSubscriptionDialog";
-import { FeedSettingsDialog } from "../subscribe/FeedSettingsDialog";
+import { lazyDialog } from "../../components/lazyDialog";
 import styles from "./Sidebar.module.css";
+
+const ConfirmDialog = lazyDialog(() =>
+  import("../../components/ConfirmDialog").then((m) => m.ConfirmDialog),
+);
+const AddSubscriptionDialog = lazyDialog(() =>
+  import("../subscribe/AddSubscriptionDialog").then((m) => m.AddSubscriptionDialog),
+);
+const FeedSettingsDialog = lazyDialog(() =>
+  import("../subscribe/FeedSettingsDialog").then((m) => m.FeedSettingsDialog),
+);
 
 function FeedLink({
   sub,
