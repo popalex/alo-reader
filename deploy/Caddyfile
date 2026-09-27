@@ -24,25 +24,22 @@
 # therefore write a reader's search terms to disk, which is exactly what the API's
 # own log filter and span hook exist to prevent.
 #
-# So the default logger is filtered rather than silenced. The query is emptied and
-# the headers go, but the addresses are *masked* instead of deleted: a /24 (or /48
-# for IPv6) still shows one source hammering the box, which is what you need to
-# reach for a firewall rule, while never storing an address that identifies a
-# person. Rate limiting is unaffected either way — the token bucket reads
-# X-Real-IP at request time (auth/middleware.py) and never consults a log.
+# So the default logger is filtered rather than silenced: the query string is
+# emptied and the headers dropped, both of which carry personal detail and neither
+# of which helps you act on an error. The client address stays, in full and
+# unmasked, because the thing an operator actually does with these logs is block a
+# source that is hammering the box, and a /24 blocks everyone behind the same
+# carrier NAT along with them.
+#
+# Note what this logger does *not* see: a flood of successful requests, or the 429s
+# the app's own rate limiter returns, are not errors. The access log below is what
+# makes those visible. Rate limiting itself never consults a log — the token bucket
+# reads X-Real-IP at request time (auth/middleware.py).
 {
 	log {
 		format filter {
 			wrap console
 			fields {
-				request>remote_ip ip_mask {
-					ipv4 24
-					ipv6 48
-				}
-				request>client_ip ip_mask {
-					ipv4 24
-					ipv6 48
-				}
 				request>remote_port delete
 				request>headers delete
 				request>uri query {
@@ -127,6 +124,25 @@
 
 {$ALO_SITE_ADDRESS::80} {
 	encode gzip
+
+	# Access log, on purpose and with the same filter as the error logger: the client
+	# address in full, the query string emptied, the headers dropped. Without it the
+	# question "which address is making thousands of requests?" has no answer, since
+	# a successful flood and a rate-limited one both look like ordinary traffic to the
+	# error logger. Docker's json-file driver rotates these (10 MB x 3 per service,
+	# see docker-compose.yml), which is the retention the /legal page states.
+	log {
+		format filter {
+			wrap console
+			fields {
+				request>headers delete
+				request>uri query {
+					delete q
+					delete cursor
+				}
+			}
+		}
+	}
 
 	# Same-origin OTLP/HTTP endpoint for browser tracing (only used when the OTel
 	# overlay runs and /config reports otel_enabled). handle_path strips /otlp so

@@ -187,10 +187,11 @@
       <div class="summary">
         <p>
           <strong>The short version.</strong> This service stores your email address, the feeds you
-          subscribe to, and which articles you have read or starred. It runs no analytics, shows no
-          advertising, and never records your IP address. Request lines are logged briefly for
-          operations, with search terms stripped out. Delete your account and your data goes with
-          it. It is free while in beta and comes with no guarantees.
+          subscribe to, and which articles you have read or starred. It runs no analytics and shows
+          no advertising. Server logs keep request lines, including your IP address, long enough to
+          block anyone abusing the service — never your searches, which are stripped out
+          everywhere. Delete your account and your data goes with it. It is free while in beta and
+          comes with no guarantees.
         </p>
       </div>
 
@@ -232,16 +233,25 @@
         not personal data and is not tied to you beyond your read and starred state.
       </p>
 
+      <h2>Server logs</h2>
+      <p>
+        Requests are logged: the time, the method, the path, the status, and the IP address they
+        came from. That last one is there for one reason — an account or an address that floods
+        the service has to be identifiable before it can be blocked — and it is the only place
+        your address is kept at all. Entries rotate out within roughly thirty megabytes per
+        service, which on a quiet instance is days and on a busy one is hours; nothing sweeps them
+        into long-term storage.
+      </p>
+      <p>
+        What those lines do <em>not</em> contain is the query string. That is where a search puts
+        its terms, so it is emptied before anything is written, and the same is done in the three
+        other places a URL travels: the application's own request log, the traces the optional
+        telemetry stack collects, and any error report. All four write
+        <code>[scrubbed]</code> in place of what you typed.
+      </p>
+
       <h2>What is not stored</h2>
       <ul>
-        <li>
-          <strong>Your full IP address is never written down.</strong> The web server at the edge
-          keeps no access log at all. When a request fails it writes an error entry, and that entry
-          keeps only a masked address — the first three groups of an IPv4 address, so
-          <code>203.0.113.47</code> is stored as <code>203.0.113.0</code>. That is enough to see one
-          source overwhelming the server and block it, and not enough to identify you. Your address
-          is also held in memory for a few seconds to rate-limit requests, and never stored.
-        </li>
         <li>
           <strong>Your searches stay out of every log.</strong> A search puts its terms in a URL,
           and a URL ends up in more places than you would expect: the request log, the error log,
