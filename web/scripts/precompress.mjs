@@ -5,9 +5,10 @@
 // service worker and manifest get siblings too.
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { brotliCompressSync, constants, gzipSync } from "node:zlib";
 
-const dist = new URL("../dist/", import.meta.url).pathname;
+const dist = fileURLToPath(new URL("../dist/", import.meta.url));
 const files = (await readdir(dist, { recursive: true })).filter((f) =>
   /\.(js|css|html|svg|json|webmanifest)$/.test(f),
 );
