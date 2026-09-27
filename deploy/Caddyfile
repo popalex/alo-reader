@@ -54,9 +54,31 @@
 		rewrite * /landing.html
 		file_server
 	}
+
+	# /legal is clerk-only, and not by accident. It describes accounts, an email
+	# address, a sign-in provider and a deletion flow, none of which exist in
+	# AUTH_MODE=none — a single-user self-host instance would be publishing a
+	# privacy policy about a relationship it does not have.
+	@legal path /legal /legal.html
+	handle @legal {
+		import alo_headers
+		root * /srv
+		header Cache-Control "no-cache"
+		rewrite * /legal.html
+		templates
+		file_server
+	}
 }
 
 (root_none) {
+	# The generic static handler below would happily serve /legal.html in this mode,
+	# so it is refused here instead: the page describes accounts and a sign-in
+	# provider that do not exist without Clerk.
+	@legal path /legal /legal.html
+	handle @legal {
+		respond 404
+	}
+
 	handle / {
 		# `redir * /app/ 302`, not `redir /app/ 302`: a destination beginning with a
 		# slash parses as a path *matcher*, so the short form means "for requests to
@@ -181,14 +203,9 @@
 		# how long a change takes to reach someone.
 		header Cache-Control "public, max-age=3600"
 
-		# /legal rather than /legal.html. try_files leaves an unknown path alone, so a
-		# typo is still a 404 rather than a copy of some other page.
+		# Extensionless URLs for any static page. try_files leaves an unknown path
+		# alone, so a typo is still a 404 rather than a copy of some other page.
 		try_files {path} {path}.html
-
-		# Renders {{env "…"}} in served HTML. The legal page needs it: who operates an
-		# instance and how to reach them is per-operator, and a self-hoster should set
-		# a variable rather than edit a file the next pull will conflict with.
-		templates
 		file_server
 	}
 }
