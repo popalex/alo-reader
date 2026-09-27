@@ -236,7 +236,13 @@
 		@shell path / /index.html /manifest.webmanifest /sw.js
 		header @shell Cache-Control "no-cache"
 		try_files {path} /index.html
-		file_server
+		# The build writes .br and .gz next to every text asset, at maximum
+		# compression (vite.config.ts, precompress). Brotli-11 makes app.js about
+		# 15% smaller than the gzip `encode` produces on the fly, and it costs
+		# nothing per request. Files without a sibling fall back to `encode`.
+		file_server {
+			precompressed br gzip
+		}
 	}
 
 	# Bookmarks from before the app moved. Cheap to honour, and the alternative is a
