@@ -12,9 +12,11 @@ import { UnreadAnnouncer } from "../../app/UnreadAnnouncer";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { useIsMobile } from "../../lib/useMediaQuery";
 import { Sidebar } from "../sidebar/Sidebar";
-import { MobileSidebar } from "./MobileSidebar";
 import { MobileNavContext } from "./mobileNav";
 import styles from "./AppLayout.module.css";
+import { lazyDialog } from "../../components/lazyDialog";
+
+const MobileSidebar = lazyDialog(() => import("./MobileSidebar").then((m) => m.MobileSidebar));
 
 export function AppLayout() {
   const isMobile = useIsMobile();
