@@ -15,7 +15,9 @@ export default defineConfig({
     // (idb, replayed on `online`), not here — the SW only owns caching.
     VitePWA({
       registerType: "autoUpdate",
-      injectRegister: "auto",
+      // Registered from src/main.tsx instead, a few seconds after load, so the
+      // install and its precache downloads stay out of the first-load window.
+      injectRegister: null,
       // Serve the SW in `vite dev` too, so offline/PWA is testable with `make dev`
       // (not just the prod build). vite-plugin-pwa's dev SW doesn't precache built
       // assets, so HMR still serves fresh code.
