@@ -160,3 +160,47 @@ def test_query_string_never_leaves_the_process() -> None:
 
     assert scrubbed["request"]["query_string"] == "[scrubbed]"
     assert scrubbed["request"]["url"] == "https://reader.example/api/v1/streams/all/entries"
+
+
+def test_transactions_are_scrubbed_too(
+    settings: Callable[..., Settings], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With SENTRY_TRACES_SAMPLE_RATE above 0, every request becomes a transaction.
+
+    Those skip before_send and go through before_send_transaction, carrying the same
+    ASGI query_string. Drives a real request through the SDK and reads what the
+    transport would have sent, so a hook left unregistered fails here.
+    """
+    import sentry_sdk
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from sentry_sdk.transport import Transport
+
+    sent: list[Any] = []
+
+    class Capture(Transport):
+        def capture_envelope(self, envelope: Any) -> None:
+            sent.append(envelope.serialize().decode())
+
+    real_init = sentry_sdk.init
+    monkeypatch.setattr(sentry_sdk, "init", lambda **kw: real_init(transport=Capture(), **kw))
+
+    settings(sentry_dsn="https://key@example.invalid/1", sentry_traces_sample_rate=1.0)
+    try:
+        sentry.configure_sentry(service_name="alo-api", version="1.0.0")
+
+        app = FastAPI()
+
+        @app.get("/streams/all/entries")
+        def entries() -> dict[str, str]:
+            return {}
+
+        TestClient(app).get("/streams/all/entries?q=private+terms")
+        sentry_sdk.flush()
+
+        transactions = [e for e in sent if '"type":"transaction"' in e]
+        assert transactions, "no transaction was sent; the test is not exercising the hook"
+        assert all("private" not in e for e in transactions)
+        assert any("[scrubbed]" in e for e in transactions)
+    finally:
+        real_init(dsn="")

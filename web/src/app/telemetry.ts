@@ -35,6 +35,24 @@ export function scrubQueryString(span: unknown): void {
   }
 }
 
+/**
+ * Span processor that runs scrubQueryString on every span as it starts.
+ *
+ * At start rather than in FetchInstrumentation's applyCustomAttributesOnSpan hook,
+ * because the hook is skipped on some exit paths: when cloning or reading the
+ * response throws, the instrumentation ends the span directly. url.full is written
+ * once, when the span is created, so scrubbing at start covers every way it can end.
+ * Structurally typed so this module keeps the SDK out of the initial bundle.
+ */
+export const queryScrubProcessor = {
+  onStart(span: unknown): void {
+    scrubQueryString(span);
+  },
+  onEnd(): void {},
+  forceFlush: (): Promise<void> => Promise.resolve(),
+  shutdown: (): Promise<void> => Promise.resolve(),
+};
+
 export function initBrowserTelemetry({ serviceName, exportUrl }: BrowserTelemetryOptions): void {
   if (initialized) return;
   initialized = true;
@@ -60,7 +78,12 @@ export function initBrowserTelemetry({ serviceName, exportUrl }: BrowserTelemetr
       ]) => {
         const provider = new WebTracerProvider({
           resource: resourceFromAttributes({ "service.name": serviceName }),
-          spanProcessors: [new BatchSpanProcessor(new OTLPTraceExporter({ url: exportUrl }))],
+          // The scrubber first: processors run in order, so the batch never holds a
+          // span that still has the query on it.
+          spanProcessors: [
+            queryScrubProcessor,
+            new BatchSpanProcessor(new OTLPTraceExporter({ url: exportUrl })),
+          ],
         });
         // ZoneContextManager keeps the active span across async boundaries, so a ui.*
         // span stays the parent of the fetch it triggers. The propagator MUST be set
@@ -99,12 +122,6 @@ export function initBrowserTelemetry({ serviceName, exportUrl }: BrowserTelemetr
                 } catch {
                   /* naming is best-effort */
                 }
-                // Keep search terms out of Tempo. FetchInstrumentation puts the whole
-                // request URL on the span, so /streams/all/entries?q=… would export a
-                // reader's query even though the API scrubs its own span and its access
-                // log. This hook runs on the failure path too, before the span ends and
-                // while its attributes are still writable.
-                scrubQueryString(span);
               },
             }),
           ],
