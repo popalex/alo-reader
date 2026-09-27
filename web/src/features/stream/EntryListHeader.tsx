@@ -2,20 +2,69 @@
 // (refresh, mark-all-read, density, theme). On desktop the actions are inline;
 // on mobile they collapse into a lazy-loaded overflow menu.
 
-import { Suspense, lazy } from "react";
+import { type ComponentProps, useEffect, useState } from "react";
 
-import { CheckCheck, Loader2, Menu, RefreshCw } from "lucide-react";
+import { CheckCheck, Loader2, Menu, MoreVertical, RefreshCw } from "lucide-react";
 
 import { ThemeToggle } from "../../app/ThemeToggle";
+import { pushToast } from "../../app/toast";
 import { DensityToggle } from "./DensityToggle";
 import type { Density } from "./density";
+import type { MobileActionsMenu as MenuComponent } from "./MobileActionsMenu";
 import styles from "./EntryList.module.css";
+import menuStyles from "./MobileActionsMenu.module.css";
 
-// Mobile-only overflow menu — lazy so its Radix dropdown code (~18kB gz) never
-// ships to desktop, where the inline controls are used instead.
-const MobileActionsMenu = lazy(() =>
-  import("./MobileActionsMenu").then((m) => ({ default: m.MobileActionsMenu })),
-);
+// Mobile-only overflow menu. Its Radix dropdown code (~18 kB gz) never ships to
+// desktop, and on mobile it loads on the first tap rather than at startup: rendering
+// it eagerly put the chunk request and the dropdown's mount inside the first-load
+// window, which is exactly what Lighthouse's mobile run measures. Until then the
+// header shows a plain button that looks the same.
+type Menu = typeof MenuComponent;
+let loadedMenu: Menu | undefined;
+let menuLoad: Promise<Menu> | undefined;
+function loadMenu(): Promise<Menu> {
+  menuLoad ??= import("./MobileActionsMenu").then(
+    (m) => (loadedMenu = m.MobileActionsMenu),
+    (error: unknown) => {
+      menuLoad = undefined;
+      throw error;
+    },
+  );
+  return menuLoad;
+}
+
+function LazyMobileActionsMenu(props: Omit<ComponentProps<Menu>, "defaultOpen">) {
+  const [MenuImpl, setMenuImpl] = useState<Menu | undefined>(() => loadedMenu);
+  const [tapped, setTapped] = useState(false);
+  useEffect(() => {
+    if (!tapped || MenuImpl) return;
+    let live = true;
+    loadMenu().then(
+      (m) => live && setMenuImpl(() => m),
+      () => {
+        if (!live) return;
+        pushToast("Couldn't open that. Reload the page to get the latest version of the app.");
+        setTapped(false);
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [tapped, MenuImpl]);
+
+  if (MenuImpl) return <MenuImpl {...props} defaultOpen={tapped} />;
+  return (
+    <button
+      type="button"
+      className={menuStyles.trigger}
+      aria-label="More actions"
+      aria-haspopup="menu"
+      onClick={() => setTapped(true)}
+    >
+      <MoreVertical size={18} />
+    </button>
+  );
+}
 
 export function EntryListHeader({
   title,
@@ -91,13 +140,11 @@ export function EntryListHeader({
           <ThemeToggle />
         </div>
         {isMobile && (
-          <Suspense fallback={null}>
-            <MobileActionsMenu
-              onRefresh={onRefresh}
-              onMarkAllRead={onMarkAllRead}
-              canMarkAllRead={canMarkAll && !markPending}
-            />
-          </Suspense>
+          <LazyMobileActionsMenu
+            onRefresh={onRefresh}
+            onMarkAllRead={onMarkAllRead}
+            canMarkAllRead={canMarkAll && !markPending}
+          />
         )}
       </div>
     </header>

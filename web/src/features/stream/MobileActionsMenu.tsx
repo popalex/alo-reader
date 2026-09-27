@@ -13,14 +13,17 @@ export function MobileActionsMenu({
   onRefresh,
   onMarkAllRead,
   canMarkAllRead,
+  defaultOpen = false,
 }: {
   onRefresh: () => void;
   onMarkAllRead: () => void;
   canMarkAllRead: boolean;
+  /** True when this mounts because the user just tapped the placeholder trigger. */
+  defaultOpen?: boolean;
 }) {
   const [theme, setTheme] = useTheme();
   return (
-    <DropdownMenu.Root>
+    <DropdownMenu.Root defaultOpen={defaultOpen}>
       <DropdownMenu.Trigger asChild>
         <button type="button" className={styles.trigger} aria-label="More actions">
           <MoreVertical size={18} />
