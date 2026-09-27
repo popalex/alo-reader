@@ -29,7 +29,7 @@ from app.version import APP_VERSION
 from app.worker.fetch import fetch_feed
 from app.worker.log import emit as _log
 from app.worker.maintenance import maintenance_loop
-from app.worker.pipeline import FeedOutcome, FetchFn, process_feed
+from app.worker.pipeline import OUTCOME_CLASSES, FeedOutcome, FetchFn, process_feed
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
@@ -182,6 +182,7 @@ async def run(
     session_factory = session_factory or get_sessionmaker()
     if production:
         telemetry.configure_telemetry(service_name="alo-worker", engine=get_engine())
+        telemetry.prime_worker_counters(OUTCOME_CLASSES)
         # Log-handler attachment is split out of configure_telemetry (see its docstring);
         # attach it so the worker's logs reach Loki.
         telemetry.enable_log_export()

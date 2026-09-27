@@ -28,7 +28,7 @@ from httpx import ASGITransport
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
-from testcontainers.postgres import PostgresContainer  # type: ignore[import-untyped]
+from testcontainers.community.postgres import PostgresContainer
 
 # Ambient auth mode for the suite; `AUTH_MODE=clerk pytest api` overrides it.
 # Tests that depend on a specific mode pin it via the `set_auth_mode` fixture.
@@ -77,9 +77,7 @@ def database_url() -> Iterator[str]:
     # created (data lives in RAM, which also speeds the DB tests up), so nothing leaks even
     # on an ungraceful exit. delete_volume=True (testcontainers' clean-stop default) covers
     # the graceful case. Mirrors ~/src/phonies.
-    container = PostgresContainer(image, driver="asyncpg").with_kwargs(
-        tmpfs={"/var/lib/postgresql": ""}
-    )
+    container = PostgresContainer(image, driver="asyncpg").with_tmpfs_mount("/var/lib/postgresql")
     with container as pg:
         url = pg.get_connection_url()
         os.environ["DATABASE_URL"] = url

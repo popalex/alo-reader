@@ -49,6 +49,20 @@ class FeedRow(FetchTarget, Protocol):
 
 # Outcome status: new_body | not_modified | http_error | network_error | blocked
 # | redirect_conflict (permanent-redirect target already exists).
+# | empty_body | not_a_feed. Listed once here so telemetry can start a counter series
+# for each at 0 (see telemetry.prime_worker_counters); add new statuses to it.
+OUTCOME_CLASSES = (
+    "new_body",
+    "not_modified",
+    "http_error",
+    "network_error",
+    "blocked",
+    "redirect_conflict",
+    "empty_body",
+    "not_a_feed",
+)
+
+
 @dataclass(frozen=True)
 class FeedOutcome:
     feed_id: int

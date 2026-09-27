@@ -14,7 +14,12 @@ dependencies = [
     "pydantic>=2.7",
     "pydantic-settings>=2.3",
     "python-dotenv>=1.0",
-    "sqlalchemy[asyncio]>=2.0",
+    # Ceiling set by OpenTelemetry, not by SQLAlchemy. opentelemetry-instrumentation-
+    # sqlalchemy (0.66b0) declares sqlalchemy<2.1, and an instrumentor outside its range
+    # does not fail: it logs nothing and instruments nothing, so every DB span vanishes
+    # from Tempo while tests, lint and mypy all stay green. Lift it only once the
+    # instrumentation's range admits 2.1, and check for SELECT spans in Tempo.
+    "sqlalchemy[asyncio]>=2.0,<2.1",
     "asyncpg>=0.29",
     "greenlet>=3.0",
     "alembic>=1.13",
@@ -40,13 +45,13 @@ dependencies = [
 # (Dockerfile PIP_INSTALL_SPEC=".[otel]"); the default image and tests omit it, so
 # app.telemetry must import OTel lazily. Pinned (SDK 1.x paired with 0.xxb0 instrumentation).
 otel = [
-    "opentelemetry-exporter-otlp==1.43.0",
-    "opentelemetry-instrumentation-fastapi==0.64b0",
-    "opentelemetry-instrumentation-httpx==0.64b0",
-    "opentelemetry-instrumentation-logging==0.64b0",
-    "opentelemetry-instrumentation-sqlalchemy==0.64b0",
-    "opentelemetry-sdk==1.43.0",
-    "opentelemetry-semantic-conventions==0.64b0",
+    "opentelemetry-exporter-otlp==1.45.0",
+    "opentelemetry-instrumentation-fastapi==0.66b0",
+    "opentelemetry-instrumentation-httpx==0.66b0",
+    "opentelemetry-instrumentation-logging==0.66b0",
+    "opentelemetry-instrumentation-sqlalchemy==0.66b0",
+    "opentelemetry-sdk==1.45.0",
+    "opentelemetry-semantic-conventions==0.66b0",
 ]
 # Dev tooling is pinned exactly: with no Python lockfile, `>=` let CI float to
 # the latest release, and a mypy/ruff bump could add rules that fail CI on
@@ -54,9 +59,9 @@ otel = [
 dev = [
     "pytest==9.1.1",
     "pytest-asyncio==1.4.0",
-    "testcontainers[postgres]==4.14.2",
-    "ruff==0.15.20",
-    "mypy==2.2.0",
+    "testcontainers[postgres]==4.15.0",
+    "ruff==0.16.9",
+    "mypy==2.3.1",
     # Stubs only. pyyaml itself is a runtime dep (feedparser pulls it); the alert-rule
     # test is what reads YAML directly, and mypy refuses an untyped import under strict.
     "types-pyyaml==6.0.12.20260906",

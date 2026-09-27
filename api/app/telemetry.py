@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 import os
 import re
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any
@@ -379,6 +379,24 @@ def record_fetch(*, outcome: str, http_status: int | None, host: str, duration_m
     r.fetch_duration.record(duration_ms, {"class": outcome})
     if http_status in (403, 429):
         r.fetch_host_responses.add(1, {"host": host or "?", "code": str(http_status)})
+
+
+def prime_worker_counters(outcome_classes: Iterable[str]) -> None:
+    """Start the worker's counters at 0, so their first real increment is visible.
+
+    Prometheus rate() and increase() measure against the previous sample. A series
+    whose first sample already holds 20 has none, so the 20 entries a new feed brings
+    on its first fetch never showed on a rate panel, and neither did the first fetch
+    of each outcome class after a restart. Adding 0 at startup makes every series
+    exist from the first export. The duration histogram has no equivalent: recording
+    a 0 there would count as a fetch.
+    """
+    r = _runtime
+    if not r.enabled:
+        return
+    for outcome in outcome_classes:
+        r.fetch_outcomes.add(0, {"class": outcome})
+    r.entries_inserted.add(0)
 
 
 def record_entries_inserted(count: int) -> None:

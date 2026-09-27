@@ -99,3 +99,39 @@ def test_shutdown_leaves_is_enabled_honest() -> None:
     runtime = telemetry.TelemetryRuntime(enabled=True)
     runtime.shutdown()
     assert runtime.enabled is False
+
+
+def test_prime_worker_counters_starts_every_series_at_zero() -> None:
+    rt = TelemetryRuntime(
+        enabled=True, fetch_outcomes=MagicMock(), entries_inserted=MagicMock(), gauges=_Gauges()
+    )
+    telemetry._runtime = rt
+
+    telemetry.prime_worker_counters(("new_body", "not_modified"))
+
+    assert rt.fetch_outcomes.add.call_args_list == [
+        ((0, {"class": "new_body"}),),
+        ((0, {"class": "not_modified"}),),
+    ]
+    rt.entries_inserted.add.assert_called_once_with(0)
+
+
+def test_prime_worker_counters_is_a_noop_when_disabled() -> None:
+    telemetry.prime_worker_counters(("new_body",))  # must not touch the None instruments
+
+
+def test_outcome_classes_cover_every_status_the_worker_records() -> None:
+    """A status missing from OUTCOME_CLASSES gets no zero sample, and its first
+    fetch after a restart disappears from the rate panel again. Reads the literals
+    out of the source so a new status cannot be added without this noticing."""
+    import re
+    from pathlib import Path
+    from typing import get_args
+
+    from app.worker import fetch, pipeline
+
+    source = Path(pipeline.__file__).read_text()
+    in_pipeline = set(re.findall(r'status="([a-z_]+)"', source))
+    assert in_pipeline, "the pattern no longer matches; update this test"
+    recorded = in_pipeline | set(get_args(fetch.FetchStatus))
+    assert recorded <= set(pipeline.OUTCOME_CLASSES)
