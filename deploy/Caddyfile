@@ -180,6 +180,15 @@
 		# immutable, but an hour of caching saves a round trip per visit and bounds
 		# how long a change takes to reach someone.
 		header Cache-Control "public, max-age=3600"
+
+		# /legal rather than /legal.html. try_files leaves an unknown path alone, so a
+		# typo is still a 404 rather than a copy of some other page.
+		try_files {path} {path}.html
+
+		# Renders {{env "…"}} in served HTML. The legal page needs it: who operates an
+		# instance and how to reach them is per-operator, and a self-hoster should set
+		# a variable rather than edit a file the next pull will conflict with.
+		templates
 		file_server
 	}
 }

@@ -43,6 +43,12 @@ services:
       # explicit AUTH_MODE, and caddy waits for a healthy api, so an operator who
       # sets nothing reads the API's message rather than a Caddy parse error.
       AUTH_MODE: ${AUTH_MODE:-clerk}
+      # Rendered into /legal (deploy/landing/legal.html). Per-operator by nature:
+      # whoever runs an instance is the one users must be able to reach. Unset, the
+      # page says so plainly rather than showing a blank or a stranger's address.
+      ALO_CONTACT_EMAIL: ${ALO_CONTACT_EMAIL:-}
+      ALO_LEGAL_OPERATOR: ${ALO_LEGAL_OPERATOR:-}
+      ALO_LEGAL_HOSTING: ${ALO_LEGAL_HOSTING:-}
       # The Clerk frontend API origin the CSP must allow. clerk-js is loaded from
       # the host encoded in your publishable key, so a pk_live_ key needs your own
       # clerk.<domain> here or the CSP blocks login outright (see deploy/Caddyfile).

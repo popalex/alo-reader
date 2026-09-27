@@ -19,49 +19,8 @@
     <!-- Inter is self-hosted by the app build; this page deliberately stays on the
          system stack rather than pulling a 48 kB font file in front of the first
          paint. font-src is 'self' anyway, so a font CDN would be blocked. -->
+    <link rel="stylesheet" href="/tokens.css" />
     <style>
-      /* Tokens copied from web/src/styles/tokens.css. Copied, not imported: the
-         built stylesheet is content-hashed, so linking it would couple this page to
-         a build artefact's filename. Keep the two in step by value. */
-      :root {
-        color-scheme: light;
-        --font-sans: "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-        --radius: 8px;
-        --bg: #f6f7f9;
-        --surface: #ffffff;
-        --surface-2: #fafbfc;
-        --text: #1b1f24;
-        --text-2: #2b3138;
-        --text-dim: #5a616d;
-        --text-faint: #6b727c;
-        --line: #eceef1;
-        --line-2: #e7e9ec;
-        --accent: #0d7364;
-        --accent-contrast: #ffffff;
-        --accent-weak: #e7f2ef;
-        --accent-border: #bcdcd5;
-        --star: #d99a12;
-      }
-      @media (prefers-color-scheme: dark) {
-        :root {
-          color-scheme: dark;
-          --bg: #14161b;
-          --surface: #181b21;
-          --surface-2: #1c2027;
-          --text: #eef1f5;
-          --text-2: #c4ccd6;
-          --text-dim: #949cab;
-          --text-faint: #7f8792;
-          --line: #262a32;
-          --line-2: #262a32;
-          --accent: #7fb2a6;
-          --accent-contrast: #0f1512;
-          --accent-weak: #20302c;
-          --accent-border: #37564e;
-          --star: #e0b877;
-        }
-      }
-
       * {
         box-sizing: border-box;
       }
@@ -586,9 +545,7 @@
         <span>© 2026 alo reader</span>
         <span class="sep"></span>
         <a class="src" href="https://github.com/popalex/alo-reader">Source (AGPL-3.0)</a>
-        <a href="/contact">Contact</a>
-        <a href="/privacy">Privacy</a>
-        <a href="/terms">Terms</a>
+        <a href="/legal">Terms &amp; privacy</a>
       </footer>
     </div>
 
