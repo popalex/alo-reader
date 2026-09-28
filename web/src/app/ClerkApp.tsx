@@ -1,14 +1,7 @@
 // Clerk-mode shell, loaded lazily (separate chunk) only when the server's
 // /config says auth_mode=clerk — none-mode users never download Clerk code.
 
-import {
-  ClerkProvider,
-  SignedIn,
-  SignedOut,
-  SignIn,
-  UserButton,
-  useAuth,
-} from "@clerk/clerk-react";
+import { ClerkProvider, Show, SignIn, UserButton, useAuth } from "@clerk/react";
 import { useCallback, useRef, type ReactNode } from "react";
 
 import { AppProviders } from "./AppProviders";
@@ -27,19 +20,19 @@ function ClerkTokenBridge({ children }: { children: ReactNode }) {
 export default function ClerkApp({ publishableKey }: { publishableKey: string }) {
   return (
     <ClerkProvider publishableKey={publishableKey}>
-      <SignedOut>
+      <Show when="signed-out">
         <main style={{ display: "grid", placeItems: "center", minHeight: "100vh" }}>
           <SignIn />
         </main>
-      </SignedOut>
-      <SignedIn>
+      </Show>
+      <Show when="signed-in">
         <header style={{ display: "flex", justifyContent: "flex-end", padding: "0.5rem 1rem" }}>
           <UserButton />
         </header>
         <ClerkTokenBridge>
           <AppProviders />
         </ClerkTokenBridge>
-      </SignedIn>
+      </Show>
     </ClerkProvider>
   );
 }
