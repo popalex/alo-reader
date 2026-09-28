@@ -35,6 +35,28 @@ async def create(
     return user
 
 
+async def get_or_create_by_clerk_id(session: AsyncSession, clerk_user_id: str) -> User:
+    """The user for this Clerk id, creating the row if there is none.
+
+    A first sign-in sends several API calls at once, and each finds no row. A plain
+    INSERT made all but one of them fail on the unique clerk_user_id, which the caller
+    caught and retried, and Postgres logged a duplicate-key ERROR for every loser.
+    ON CONFLICT DO NOTHING makes a loser wait for the winner's commit and then insert
+    nothing. Under READ COMMITTED the SELECT that follows, a new statement, sees the
+    winner's row. The sequence still advances for each loser (nextval runs before the
+    conflict check), so user ids can have gaps; nothing relies on them being dense.
+    """
+    await session.execute(
+        pg_insert(User)
+        .values(clerk_user_id=clerk_user_id)
+        .on_conflict_do_nothing(index_elements=[User.clerk_user_id])
+    )
+    user = await get_by_clerk_id(session, clerk_user_id)
+    if user is None:  # unreachable unless the row was deleted between the two statements
+        raise LookupError(f"no user row for {clerk_user_id!r} after insert")
+    return user
+
+
 async def get(session: AsyncSession, user_id: int) -> User | None:
     return await session.get(User, user_id)
 

@@ -119,6 +119,42 @@ async def test_valid_jwt_unknown_user_auto_provisions(
     assert response.json()["id"] == user.id
 
 
+async def test_concurrent_first_requests_provision_one_row(
+    api_client: httpx.AsyncClient, clerk_env: ClerkEnv
+) -> None:
+    """A first sign-in fires several API calls at once, and each finds no row. They
+    must all succeed and converge on a single user, which ON CONFLICT DO NOTHING does
+    without any of them hitting the unique constraint as an error."""
+    headers = clerk_env.headers(clerk_env.make_jwt("user_burst"))
+    responses = await asyncio.gather(
+        *(api_client.get("/api/v1/me", headers=headers) for _ in range(8))
+    )
+    assert [r.status_code for r in responses] == [200] * 8
+    assert len({r.json()["id"] for r in responses}) == 1
+    async with app_db.get_sessionmaker()() as s:
+        count = await s.scalar(
+            select(func.count()).select_from(User).where(User.clerk_user_id == "user_burst")
+        )
+    assert count == 1
+
+
+async def test_get_or_create_by_clerk_id_under_concurrent_transactions(api_db: str) -> None:
+    """The store function on its own: separate transactions racing on one id, the
+    losers waiting on the winner's commit, and every caller getting the same row."""
+    factory = app_db.get_sessionmaker()
+
+    async def provision() -> int:
+        async with factory() as session, session.begin():
+            return (await users_store.get_or_create_by_clerk_id(session, "user_race")).id
+
+    ids = await asyncio.gather(*(provision() for _ in range(6)))
+    assert len(set(ids)) == 1
+    async with factory() as s:
+        existing = await users_store.get_by_clerk_id(s, "user_race")
+    assert existing is not None and existing.id == ids[0]
+    assert existing.quota_subs == 300  # the column default, as create() gave
+
+
 @pytest.mark.parametrize(
     "overrides",
     [
