@@ -14,6 +14,7 @@ import pytest_asyncio
 from cryptography.hazmat.primitives.asymmetric import rsa
 from jwt.algorithms import RSAAlgorithm
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 
 from app import db as app_db
 from app.auth.clerk import (
@@ -117,6 +118,77 @@ async def test_valid_jwt_unknown_user_auto_provisions(
     assert user is not None
     assert user.email == ""  # filled later by the user.created/updated webhook
     assert response.json()["id"] == user.id
+
+
+async def test_concurrent_first_requests_provision_one_row(
+    api_client: httpx.AsyncClient, clerk_env: ClerkEnv
+) -> None:
+    """A first sign-in fires several API calls at once, and each finds no row. They
+    must all succeed and converge on a single user, which ON CONFLICT DO NOTHING does
+    without any of them hitting the unique constraint as an error."""
+    headers = clerk_env.headers(clerk_env.make_jwt("user_burst"))
+    responses = await asyncio.gather(
+        *(api_client.get("/api/v1/me", headers=headers) for _ in range(8))
+    )
+    assert [r.status_code for r in responses] == [200] * 8
+    assert len({r.json()["id"] for r in responses}) == 1
+    async with app_db.get_sessionmaker()() as s:
+        count = await s.scalar(
+            select(func.count()).select_from(User).where(User.clerk_user_id == "user_burst")
+        )
+    assert count == 1
+
+
+async def test_get_or_create_by_clerk_id_under_concurrent_transactions(api_db: str) -> None:
+    """The store function on its own: separate transactions racing on one id, the
+    losers waiting on the winner's commit, and every caller getting the same row."""
+    factory = app_db.get_sessionmaker()
+
+    async def provision() -> int:
+        async with factory() as session, session.begin():
+            user = await users_store.get_or_create_by_clerk_id(session, "user_race")
+            assert user is not None  # no tombstone for this id
+            return user.id
+
+    ids = await asyncio.gather(*(provision() for _ in range(6)))
+    assert len(set(ids)) == 1
+    async with factory() as s:
+        existing = await users_store.get_by_clerk_id(s, "user_race")
+    assert existing is not None and existing.id == ids[0]
+    assert existing.quota_subs == 300  # the column default, as create() gave
+
+
+async def test_deleted_clerk_account_is_not_recreated_by_its_token(
+    api_client: httpx.AsyncClient, clerk_env: ClerkEnv
+) -> None:
+    """user.deleted removes the row and leaves a tombstone. The account's session token
+    stays valid for about a minute; a request with it must be refused, not quietly
+    rebuild an empty identity that nothing will ever delete."""
+    async with app_db.get_sessionmaker()() as s, s.begin():
+        await users_store.mark_clerk_deleted(s, "user_gone")
+
+    response = await api_client.get(
+        "/api/v1/me", headers=clerk_env.headers(clerk_env.make_jwt("user_gone"))
+    )
+    assert response.status_code == 401
+    async with app_db.get_sessionmaker()() as s:
+        assert await users_store.get_by_clerk_id(s, "user_gone") is None
+
+
+async def test_provisioning_failure_other_than_the_race_is_503_not_a_sign_out(
+    api_client: httpx.AsyncClient, clerk_env: ClerkEnv, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A constraint other than clerk_user_id says nothing about the token. A 401 would
+    make the SPA sign the user out over a server-side fault."""
+
+    async def boom(*_args: object, **_kwargs: object) -> None:
+        raise IntegrityError("INSERT", {}, Exception("some other constraint"))
+
+    monkeypatch.setattr(users_store, "get_or_create_by_clerk_id", boom)
+    response = await api_client.get(
+        "/api/v1/me", headers=clerk_env.headers(clerk_env.make_jwt("user_unlucky"))
+    )
+    assert response.status_code == 503
 
 
 @pytest.mark.parametrize(

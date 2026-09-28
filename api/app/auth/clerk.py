@@ -208,24 +208,24 @@ class ClerkProvider:
             return None
         return dict(claims)
 
-    async def _local_user(self, clerk_user_id: str) -> AuthedUser:
+    async def _local_user(self, clerk_user_id: str) -> AuthedUser | None:
         async with self._session_factory()() as session, session.begin():
+            # Read first: the insert below advances the id sequence even when the row
+            # exists, so it runs only on a first sign-in.
             user = await users_store.get_by_clerk_id(session, clerk_user_id)
-            if user is not None:
-                return authed(user)
-        # Webhook hasn't created the row yet: auto-provision (empty email; the
-        # user.created/updated webhook fills it). Racing requests can collide on
-        # the unique clerk_user_id — loser re-reads.
-        try:
-            async with self._session_factory()() as session, session.begin():
-                user = await users_store.create(session, clerk_user_id=clerk_user_id)
-                return authed(user)
-        except IntegrityError as exc:
-            # Lost the auto-provision race: the winner's row is there to re-read.
-            # If it is not, the constraint that fired was a different one, and an
-            # assert would both lie about that and vanish under python -O.
-            async with self._session_factory()() as session, session.begin():
-                user = await users_store.get_by_clerk_id(session, clerk_user_id)
-                if user is None:
+            if user is None:
+                # Webhook hasn't created the row yet: auto-provision (empty email; the
+                # user.created/updated webhook fills it). Concurrent first requests all
+                # land here; the insert is ON CONFLICT DO NOTHING, so they converge on
+                # one row without an error.
+                try:
+                    user = await users_store.get_or_create_by_clerk_id(session, clerk_user_id)
+                except IntegrityError as exc:
+                    # Not the clerk_user_id conflict, which the insert absorbs: some
+                    # other constraint, which is not a verdict on the token. 503, not
+                    # 401, so the SPA does not sign the user out over it.
                     raise AuthUnavailable("could not provision the local user") from exc
-                return authed(user)
+                if user is None:
+                    # A deleted Clerk account whose session token has not expired yet.
+                    return None
+            return authed(user)

@@ -7,7 +7,7 @@ rather than scoped by ``user_id`` (there is nothing above a user to scope to).
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import delete as sql_delete
-from sqlalchemy import select, text
+from sqlalchemy import literal, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,6 +33,37 @@ async def create(
     session.add(user)
     await session.flush()
     return user
+
+
+async def get_or_create_by_clerk_id(session: AsyncSession, clerk_user_id: str) -> User | None:
+    """The user for this Clerk id, creating the row if there is none. None if the id
+    belongs to a deleted Clerk account.
+
+    A first sign-in sends several API calls at once, and each finds no row. A plain
+    INSERT made all but one of them fail on the unique clerk_user_id, which the caller
+    caught and retried, and Postgres logged a duplicate-key ERROR for every loser.
+    ON CONFLICT DO NOTHING makes a loser wait for the winner's commit and then insert
+    nothing. Under READ COMMITTED the SELECT that follows, a new statement, sees the
+    winner's row. The sequence still advances for each loser (nextval runs before the
+    conflict check), so user ids can have gaps; nothing relies on them being dense.
+
+    The tombstone check is part of the INSERT, not a query before it. The user.deleted
+    webhook removes the row and records the tombstone; a request still carrying that
+    account's session token (valid for about a minute) used to recreate an empty row
+    here that nothing would ever delete. The webhook path already refused this.
+    """
+    tombstoned = select(DeletedClerkUser.clerk_user_id).where(
+        DeletedClerkUser.clerk_user_id == clerk_user_id
+    )
+    await session.execute(
+        pg_insert(User)
+        .from_select(
+            ["clerk_user_id"],
+            select(literal(clerk_user_id)).where(~tombstoned.exists()),
+        )
+        .on_conflict_do_nothing(index_elements=[User.clerk_user_id])
+    )
+    return await get_by_clerk_id(session, clerk_user_id)
 
 
 async def get(session: AsyncSession, user_id: int) -> User | None:
