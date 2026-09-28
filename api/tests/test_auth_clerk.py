@@ -14,6 +14,7 @@ import pytest_asyncio
 from cryptography.hazmat.primitives.asymmetric import rsa
 from jwt.algorithms import RSAAlgorithm
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 
 from app import db as app_db
 from app.auth.clerk import (
@@ -153,6 +154,22 @@ async def test_get_or_create_by_clerk_id_under_concurrent_transactions(api_db: s
         existing = await users_store.get_by_clerk_id(s, "user_race")
     assert existing is not None and existing.id == ids[0]
     assert existing.quota_subs == 300  # the column default, as create() gave
+
+
+async def test_provisioning_failure_other_than_the_race_is_503_not_a_sign_out(
+    api_client: httpx.AsyncClient, clerk_env: ClerkEnv, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A constraint other than clerk_user_id says nothing about the token. A 401 would
+    make the SPA sign the user out over a server-side fault."""
+
+    async def boom(*_args: object, **_kwargs: object) -> None:
+        raise IntegrityError("INSERT", {}, Exception("some other constraint"))
+
+    monkeypatch.setattr(users_store, "get_or_create_by_clerk_id", boom)
+    response = await api_client.get(
+        "/api/v1/me", headers=clerk_env.headers(clerk_env.make_jwt("user_unlucky"))
+    )
+    assert response.status_code == 503
 
 
 @pytest.mark.parametrize(

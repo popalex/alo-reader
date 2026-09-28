@@ -18,6 +18,7 @@ import httpx
 import jwt
 from jwt.types import Options as JwtOptions
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.exc import IntegrityError
 from starlette.requests import Request
 
 from app.store import users as users_store
@@ -219,6 +220,9 @@ class ClerkProvider:
                 # one row without an error.
                 try:
                     user = await users_store.get_or_create_by_clerk_id(session, clerk_user_id)
-                except LookupError as exc:
+                except (IntegrityError, LookupError) as exc:
+                    # Not the clerk_user_id conflict, which the insert absorbs: some
+                    # other constraint, which is not a verdict on the token. 503, not
+                    # 401, so the SPA does not sign the user out over it.
                     raise AuthUnavailable("could not provision the local user") from exc
             return authed(user)
