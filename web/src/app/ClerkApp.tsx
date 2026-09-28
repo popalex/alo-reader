@@ -19,7 +19,15 @@ function ClerkTokenBridge({ children }: { children: ReactNode }) {
 
 export default function ClerkApp({ publishableKey }: { publishableKey: string }) {
   return (
-    <ClerkProvider publishableKey={publishableKey}>
+    <ClerkProvider
+      publishableKey={publishableKey}
+      // Clerk's default is "/", which since the app moved to /app/ is the landing
+      // page: a successful sign-in dropped the user on marketing copy. Signing out
+      // does go to the landing page, on purpose.
+      signInFallbackRedirectUrl={import.meta.env.BASE_URL}
+      signUpFallbackRedirectUrl={import.meta.env.BASE_URL}
+      afterSignOutUrl="/"
+    >
       <Show when="signed-out">
         <main style={{ display: "grid", placeItems: "center", minHeight: "100vh" }}>
           <SignIn />
