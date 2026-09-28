@@ -27,3 +27,7 @@ web/openapi.json
 web/test-results/
 web/playwright-report/
 web/playwright/.cache/
+
+# Secrets for the Clerk-mode e2e suite (make e2e-clerk). Holds CLERK_SECRET_KEY,
+# which must never be committed and never goes in .env (the API reads that file).
+.env.e2e-clerk
