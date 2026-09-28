@@ -16,7 +16,9 @@ cd "$(dirname "$0")/.."
 # (AUTH_MODE=clerk) or a redirect to /app/ (none), and this script measures the
 # app. The landing page gets its own run once it ships.
 URL="http://localhost/app/"
-COMPOSE=(docker compose -f deploy/docker-compose.yml)
+# Its own compose project: the teardown below runs `down -v`, and under the default
+# project name that deleted the database of whatever stack `make up` was running.
+COMPOSE=(docker compose -p alo-lighthouse -f deploy/docker-compose.yml)
 MIN_PERF=${LH_MIN_PERF:-90}
 OUT="$(mktemp -d)/lighthouse.json"
 

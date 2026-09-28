@@ -205,6 +205,59 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
+  e2e-clerk:
+    # The same stack in AUTH_MODE=clerk against a dedicated Clerk development
+    # instance (scripts/e2e-clerk.sh): sign-in and sign-up through the real forms,
+    # token refresh, sign-out, and the webhook handler with signed payloads. The
+    # default e2e job runs AUTH_MODE=none and never loads Clerk at all.
+    #
+    # Needs the E2E_CLERK_* repository secrets. Fork PRs and Dependabot runs do not
+    # get secrets, so there the job reports a notice and passes instead of failing.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
+      CLERK_ISSUER: ${{ secrets.E2E_CLERK_ISSUER }}
+      CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
+      CLERK_WEBHOOK_SECRET: ${{ secrets.E2E_CLERK_WEBHOOK_SECRET }}
+    steps:
+      - name: Check for the Clerk e2e secrets
+        id: secrets
+        run: |
+          if [ -n "$CLERK_SECRET_KEY" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::E2E_CLERK_* secrets are not available to this run (fork or Dependabot); skipping the Clerk-mode suite."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.secrets.outputs.present == 'true'
+        uses: actions/checkout@v7
+      - if: steps.secrets.outputs.present == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - if: steps.secrets.outputs.present == 'true'
+        run: corepack enable && corepack prepare pnpm@latest --activate
+      - if: steps.secrets.outputs.present == 'true'
+        run: pnpm -C web install
+      - name: Install Playwright Chromium
+        if: steps.secrets.outputs.present == 'true'
+        run: pnpm -C web exec playwright install --with-deps chromium
+      - name: make e2e-clerk
+        if: steps.secrets.outputs.present == 'true'
+        run: make e2e-clerk
+      - name: Upload failure screenshots
+        # Screenshots and error context only: playwright.clerk.config.ts records no
+        # trace in CI, because traces carry the Clerk testing token and this repo's
+        # artifacts are downloadable by anyone.
+        if: failure() && steps.secrets.outputs.present == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-failures-clerk
+          path: web/test-results/
+          retention-days: 14
+          if-no-files-found: ignore
+
   lighthouse:
     # Performance budget (>= 90) on the built SPA. Cheap, and a budget regression is
     # easiest to fix in the PR that caused it.

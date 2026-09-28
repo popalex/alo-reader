@@ -112,6 +112,6 @@ export default defineConfig({
     // jsdom lacks IndexedDB (offline queue) and matchMedia (responsive hook).
     setupFiles: ["./tests/setup.ts"],
     // Playwright specs live in e2e/ and must not be collected by Vitest.
-    exclude: [...configDefaults.exclude, "e2e/**"],
+    exclude: [...configDefaults.exclude, "e2e/**", "e2e-clerk/**"],
   },
 });

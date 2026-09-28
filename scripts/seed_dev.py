@@ -116,7 +116,22 @@ XSS_RAW = (
 XSS_TITLE = "XSS probe: this should render inert"
 
 
-async def get_or_create_none_user(session) -> User:
+async def get_or_create_seed_user(session) -> User:
+    """The user the dataset belongs to.
+
+    AUTH_MODE=none: the single user, the one without a Clerk id. The Clerk-mode e2e
+    suite (scripts/e2e-clerk.sh) instead sets SEED_CLERK_USER_ID to the test user it
+    just created in Clerk, so the data is there when that user first signs in.
+    """
+    clerk_user_id = os.environ.get("SEED_CLERK_USER_ID") or None
+    if clerk_user_id:
+        stmt = select(User).where(User.clerk_user_id == clerk_user_id)
+        user = (await session.scalars(stmt)).first()
+        if user is None:
+            user = User(clerk_user_id=clerk_user_id, email="")
+            session.add(user)
+            await session.flush()
+        return user
     stmt = select(User).where(User.clerk_user_id.is_(None)).order_by(User.id).limit(1)
     user = (await session.scalars(stmt)).first()
     if user is None:
@@ -136,7 +151,7 @@ async def main() -> None:
 
     async with Session() as session:
         async with session.begin():
-            user = await get_or_create_none_user(session)
+            user = await get_or_create_seed_user(session)
 
             seeded_urls = [f"{FEED_URL_PREFIX}{i}" for i in range(len(FEED_DEFS))]
             await session.execute(delete(EntryState).where(EntryState.user_id == user.id))

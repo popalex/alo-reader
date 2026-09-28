@@ -36,7 +36,7 @@ export default tseslint.config(
 
   // Tests, e2e specs and tooling config run under Node with test globals.
   {
-    files: ["tests/**", "e2e/**", "*.config.{ts,js}"],
+    files: ["tests/**", "e2e/**", "e2e-clerk/**", "*.config.{ts,js}"],
     languageOptions: {
       globals: { ...globals.node, ...globals.browser },
     },
