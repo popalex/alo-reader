@@ -28,6 +28,12 @@ updates:
       day: monday
     open-pull-requests-limit: 5
     groups:
+      # React and Clerk in one PR. @clerk/react pins React to the minors it has
+      # been tested with (~19.3.0-0), and pnpm only warns on an unmet peer, so a
+      # React bump on its own would pass CI while leaving Clerk outside its range.
+      # Listed first: a dependency joins the first group it matches.
+      react-and-clerk:
+        patterns: ["react", "react-dom", "@types/react", "@types/react-dom", "@clerk/*"]
       web-minor-and-patch:
         update-types: [minor, patch]
     commit-message:
