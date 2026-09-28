@@ -13,7 +13,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 BASE="http://localhost/api/v1"
-COMPOSE=(docker compose -f deploy/docker-compose.yml)
+# Its own compose project: the teardown below runs `down -v`, and under the default
+# project name that deleted the database of whatever stack `make up` was running.
+COMPOSE=(docker compose -p alo-e2e -f deploy/docker-compose.yml)
 
 # AUTH_MODE=none → one auto-provisioned user; both seed_dev and the SPA resolve
 # to it.
