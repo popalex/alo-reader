@@ -32,7 +32,7 @@ COMPOSE_DEV_OTEL := $(DC) -f deploy/docker-compose.yml -f deploy/docker-compose.
 # (see `make db`). Postgres itself is never installed on the host.
 TEST_DATABASE_URL ?= postgresql+asyncpg://alo:alo@localhost:5432/alo
 
-.PHONY: venv lock lock-upgrade lint typecheck test-api test-web e2e lighthouse size up seed dev down db db-down migrate generate-client bench-search loadtest pg-image
+.PHONY: venv lock lock-upgrade lint typecheck test-api test-web e2e e2e-clerk lighthouse size up seed dev down db db-down migrate generate-client bench-search loadtest pg-image
 
 ## Optional: a local virtualenv, for editor tooling (autocomplete, go-to-def).
 ## The gates below do not use it — they run in the toolchain container — so this
@@ -99,6 +99,11 @@ test-web:
 ## KEEP_UP=1 leaves the stack running afterwards.
 e2e:
 	./scripts/e2e.sh
+
+## The same stack in AUTH_MODE=clerk against a dedicated Clerk dev instance
+## (secrets in .env.e2e-clerk; see scripts/e2e-clerk.sh).
+e2e-clerk:
+	./scripts/e2e-clerk.sh
 
 ## Lighthouse performance budget (>=90) against the built SPA served by Caddy.
 lighthouse:
