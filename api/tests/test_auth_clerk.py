@@ -146,7 +146,9 @@ async def test_get_or_create_by_clerk_id_under_concurrent_transactions(api_db: s
 
     async def provision() -> int:
         async with factory() as session, session.begin():
-            return (await users_store.get_or_create_by_clerk_id(session, "user_race")).id
+            user = await users_store.get_or_create_by_clerk_id(session, "user_race")
+            assert user is not None  # no tombstone for this id
+            return user.id
 
     ids = await asyncio.gather(*(provision() for _ in range(6)))
     assert len(set(ids)) == 1
@@ -154,6 +156,23 @@ async def test_get_or_create_by_clerk_id_under_concurrent_transactions(api_db: s
         existing = await users_store.get_by_clerk_id(s, "user_race")
     assert existing is not None and existing.id == ids[0]
     assert existing.quota_subs == 300  # the column default, as create() gave
+
+
+async def test_deleted_clerk_account_is_not_recreated_by_its_token(
+    api_client: httpx.AsyncClient, clerk_env: ClerkEnv
+) -> None:
+    """user.deleted removes the row and leaves a tombstone. The account's session token
+    stays valid for about a minute; a request with it must be refused, not quietly
+    rebuild an empty identity that nothing will ever delete."""
+    async with app_db.get_sessionmaker()() as s, s.begin():
+        await users_store.mark_clerk_deleted(s, "user_gone")
+
+    response = await api_client.get(
+        "/api/v1/me", headers=clerk_env.headers(clerk_env.make_jwt("user_gone"))
+    )
+    assert response.status_code == 401
+    async with app_db.get_sessionmaker()() as s:
+        assert await users_store.get_by_clerk_id(s, "user_gone") is None
 
 
 async def test_provisioning_failure_other_than_the_race_is_503_not_a_sign_out(

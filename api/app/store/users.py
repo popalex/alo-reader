@@ -7,7 +7,7 @@ rather than scoped by ``user_id`` (there is nothing above a user to scope to).
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import delete as sql_delete
-from sqlalchemy import select, text
+from sqlalchemy import literal, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,8 +35,9 @@ async def create(
     return user
 
 
-async def get_or_create_by_clerk_id(session: AsyncSession, clerk_user_id: str) -> User:
-    """The user for this Clerk id, creating the row if there is none.
+async def get_or_create_by_clerk_id(session: AsyncSession, clerk_user_id: str) -> User | None:
+    """The user for this Clerk id, creating the row if there is none. None if the id
+    belongs to a deleted Clerk account.
 
     A first sign-in sends several API calls at once, and each finds no row. A plain
     INSERT made all but one of them fail on the unique clerk_user_id, which the caller
@@ -45,16 +46,24 @@ async def get_or_create_by_clerk_id(session: AsyncSession, clerk_user_id: str) -
     nothing. Under READ COMMITTED the SELECT that follows, a new statement, sees the
     winner's row. The sequence still advances for each loser (nextval runs before the
     conflict check), so user ids can have gaps; nothing relies on them being dense.
+
+    The tombstone check is part of the INSERT, not a query before it. The user.deleted
+    webhook removes the row and records the tombstone; a request still carrying that
+    account's session token (valid for about a minute) used to recreate an empty row
+    here that nothing would ever delete. The webhook path already refused this.
     """
+    tombstoned = select(DeletedClerkUser.clerk_user_id).where(
+        DeletedClerkUser.clerk_user_id == clerk_user_id
+    )
     await session.execute(
         pg_insert(User)
-        .values(clerk_user_id=clerk_user_id)
+        .from_select(
+            ["clerk_user_id"],
+            select(literal(clerk_user_id)).where(~tombstoned.exists()),
+        )
         .on_conflict_do_nothing(index_elements=[User.clerk_user_id])
     )
-    user = await get_by_clerk_id(session, clerk_user_id)
-    if user is None:  # unreachable unless the row was deleted between the two statements
-        raise LookupError(f"no user row for {clerk_user_id!r} after insert")
-    return user
+    return await get_by_clerk_id(session, clerk_user_id)
 
 
 async def get(session: AsyncSession, user_id: int) -> User | None:
