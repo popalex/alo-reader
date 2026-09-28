@@ -91,6 +91,28 @@ deliberate: `none` must never be what you get by accident.
 - `none` — no authentication at all; every request is the same single user.
   Only behind a private network, a VPN, or reverse-proxy auth.
 
+#### Setting up a Clerk instance
+
+Each Clerk instance (development, production, the e2e one) needs all of these.
+The last two live only in the Clerk dashboard, so nothing in this repo can
+catch them being missed except `make e2e-clerk`:
+
+1. **Keys.** `CLERK_PUBLISHABLE_KEY` and `CLERK_ISSUER` come from Configure →
+   API keys (the issuer is the *Frontend* API URL). Do not add the secret key:
+   the API verifies session tokens against the public JWKS and never calls
+   Clerk's Backend API, so it has no use for it.
+2. **Webhook.** Configure → Webhooks → Add endpoint:
+   `https://<your-domain>/api/v1/webhooks/clerk`, subscribed to `user.created`,
+   `user.updated` and `user.deleted`. Its signing secret is
+   `CLERK_WEBHOOK_SECRET`; every endpoint has its own, and a mismatch shows up
+   as 401s on deliveries. Without working deliveries, local rows never learn an
+   email address and deleted accounts keep their data.
+3. **Account Portal redirects.** Account Portal → Redirects: set *After sign-up
+   fallback* and *After sign-in fallback* to `/app` on your host. Sign-up runs on
+   Clerk's hosted page, which sends the user to this fallback; left at its
+   default it is `/`, the landing page, and a new user arrives there instead of
+   in the app.
+
 ### Upgrading
 
 `git pull && make up` rebuilds and restarts. Migrations run as a one-shot
