@@ -1,8 +1,12 @@
 import { expect, test } from "@playwright/test";
 
+import { resetSeedData } from "./reset";
+
 // WP-14 acceptance: the PWA keeps working with the network off. Each Playwright
 // test gets its own context (fresh service worker + caches), so these don't leak
 // SW state into the other specs.
+
+test.beforeAll(resetSeedData);
 
 test.describe("offline / PWA", () => {
   test("prefetched top articles open offline, with no error toast", async ({ page, context }) => {

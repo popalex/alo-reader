@@ -1,8 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 
-// Read-state interactions (WP-11) against the seeded stack. Tests run serially
-// (playwright.config workers:1) and share cumulative backend state, so they use
-// delta assertions and put the destructive feed mark-all-read near the end.
+import { resetSeedData } from "./reset";
+
+// Read-state interactions (WP-11) against the seeded stack. The file starts from
+// freshly seeded data (reset.ts), but its tests run in order and share state with
+// each other, so they use delta assertions and put the destructive feed
+// mark-all-read near the end.
 
 async function totalUnread(page: Page): Promise<number> {
   const link = page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: /All items/ });
@@ -10,6 +13,8 @@ async function totalUnread(page: Page): Promise<number> {
   const m = text.match(/(\d+)/);
   return m ? Number(m[1]) : 0;
 }
+
+test.beforeAll(resetSeedData);
 
 test.describe("read-state", () => {
   test("opening an entry marks it read and drops the unread count", async ({ page }) => {

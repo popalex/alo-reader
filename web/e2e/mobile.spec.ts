@@ -1,7 +1,11 @@
 import { expect, test } from "@playwright/test";
 
+import { resetSeedData } from "./reset";
+
 // The mobile shell (≤768px): the feeds sidebar is an off-canvas drawer opened
 // from the top-bar hamburger; picking a feed switches streams and closes it.
+
+test.beforeAll(resetSeedData);
 
 test.describe("mobile shell", () => {
   test.use({ viewport: { width: 390, height: 780 } });

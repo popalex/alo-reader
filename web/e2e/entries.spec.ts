@@ -1,7 +1,11 @@
 import { expect, test } from "@playwright/test";
 
+import { resetSeedData } from "./reset";
+
 // Drives the entry list + reading pane against the seed_dev dataset (~5k
 // entries, with an XSS-probe entry as the newest item of the first feed).
+
+test.beforeAll(resetSeedData);
 
 test.describe("entry list + reading pane", () => {
   test("lists entries and opens an article into the reader", async ({ page }) => {

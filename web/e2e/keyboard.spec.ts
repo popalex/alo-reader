@@ -1,10 +1,14 @@
 import { expect, test } from "@playwright/test";
 
+import { resetSeedData } from "./reset";
+
 // WP-12 acceptance: a full session driven ONLY by the keyboard. The initial
 // page load is the one allowed non-keyboard action (there is no subscribe flow
 // yet — the seed provides feeds); everything after is page.keyboard.*, no
-// mouse. Runs serially against the shared seeded stack, so its one destructive
-// step (mark-all) is scoped to the Starred stream, not All items.
+// mouse. Its one destructive step (mark-all) is scoped to the Starred stream, not
+// All items; the next spec file gets freshly seeded data either way (reset.ts).
+
+test.beforeAll(resetSeedData);
 
 test.describe("keyboard-only session", () => {
   test("navigate, open, act, switch streams and mark-all with no mouse", async ({ page }) => {

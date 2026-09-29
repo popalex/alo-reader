@@ -1,8 +1,12 @@
 import { expect, test } from "@playwright/test";
 
+import { resetSeedData } from "./reset";
+
 // WP-13: `/` focuses search, typing filters the stream with highlighted snippets,
 // Esc clears. Read-only against the seeded corpus (seed_dev bodies contain the
 // word "paragraph"), so order among the serial specs doesn't matter.
+
+test.beforeAll(resetSeedData);
 
 test.describe("search", () => {
   test("/ focuses search, results are highlighted, Esc clears", async ({ page }) => {

@@ -1,8 +1,12 @@
 import { expect, test } from "@playwright/test";
 
+import { resetSeedData } from "./reset";
+
 // Runs against the real stack seeded by scripts/seed_dev.py (folders + 20 feeds
 // + ~5k entries). AUTH_MODE=none, so the SPA's bare requests resolve to the
 // single seeded user.
+
+test.beforeAll(resetSeedData);
 
 test.describe("app boot (AUTH_MODE=none)", () => {
   test("boots to the three-pane app with live sidebar data", async ({ page }) => {
