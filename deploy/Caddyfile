@@ -107,6 +107,9 @@
 		# it is the page most likely to be edited between deploys.
 		header Cache-Control "no-cache"
 		rewrite * /landing.html
+		# For og:image and og:url, which must be absolute: {{.Host}} is this
+		# instance's own hostname, so one landing.html serves every deployment.
+		templates
 		file_server
 	}
 

@@ -41,7 +41,7 @@
 	# and routing only the HTML sent it to Vite instead, which left the preview with
 	# no colours at all. /legal is here for the same reason — it is previewable in
 	# dev even though production serves it only in clerk mode.
-	@static path /landing.html /landing.js /tokens.css /inter-latin-wght-normal.woff2 /legal /legal.html
+	@static path /landing.html /landing.js /tokens.css /inter-latin-wght-normal.woff2 /og-card.png /legal /legal.html
 	handle @static {
 		root * /landing
 		try_files {path} {path}.html

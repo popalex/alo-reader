@@ -14,6 +14,17 @@
       property="og:description"
       content="Every article from every feed you follow, in the order it was published. No ranking, no recommendations, no notifications."
     />
+    <!-- Absolute URLs, filled in by Caddy (templates) with this instance's host.
+         The card is this page rendered at 1200x630: web/scripts/social-card.mjs. -->
+    <meta property="og:url" content="https://{{.Host}}/" />
+    <meta property="og:image" content="https://{{.Host}}/og-card.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="alo reader: the headline 'Nothing decides what you read.' above the app, showing a feed list and an article."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
     <link
       rel="preload"
       href="/inter-latin-wght-normal.woff2"
