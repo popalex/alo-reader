@@ -21,6 +21,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.exc import IntegrityError
 from starlette.requests import Request
 
+from app.config import get_settings
 from app.store import users as users_store
 
 from .pat import TOKEN_PREFIX, SessionFactory
@@ -219,7 +220,9 @@ class ClerkProvider:
                 # land here; the insert is ON CONFLICT DO NOTHING, so they converge on
                 # one row without an error.
                 try:
-                    user = await users_store.get_or_create_by_clerk_id(session, clerk_user_id)
+                    user = await users_store.get_or_create_by_clerk_id(
+                        session, clerk_user_id, quota_subs=get_settings().quota_subs_default
+                    )
                 except IntegrityError as exc:
                     # Not the clerk_user_id conflict, which the insert absorbs: some
                     # other constraint, which is not a verdict on the token. 503, not

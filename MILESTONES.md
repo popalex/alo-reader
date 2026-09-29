@@ -208,7 +208,7 @@ Makefile   MILESTONES.md   DESIGN.md
 
 ---
 
-### WP-17 · Public launch surface — 🚧 PARTLY DONE (3 of 7 deliverables, #84–#86)
+### WP-17 · Public launch surface — 🚧 PARTLY DONE (4 of 7 deliverables)
 
 **Status, checked against the repo on 2026-09-29.**
 - ✅ **`/` — the landing page** (#84): static `deploy/landing/landing.html`, no app bundle referenced, `<title>`, meta description, `og:type` / `og:title`. Mode-aware, as revised on 2026-09-17: the landing page and `/legal` exist only in `AUTH_MODE=clerk`; in `none`, `/` redirects to `/app/`. One Caddyfile picks the behaviour with `import root_{$AUTH_MODE:clerk}` (`root_clerk` / `root_none` snippets). No second variable, no second Caddyfile.
@@ -217,7 +217,7 @@ Makefile   MILESTONES.md   DESIGN.md
 - ✅ Beyond the list: one `/legal` page for terms, privacy and contact (#85), made true to what the stack actually does (#86).
 - ⬜ **The signed-out shell at `/app`**: still the bare centred `<SignIn />` in `ClerkApp.tsx`: no product name, theme toggle or legal links.
 - ⬜ **Assets**: no `og:image` / Twitter card, and no per-theme screenshots generated from the e2e stack.
-- ⬜ **`QUOTA_SUBS_DEFAULT`**: `quota_subs` is still hardcoded in `api/app/store/users.py` (also in the parking lot).
+- ✅ **`QUOTA_SUBS_DEFAULT`** (branch `feat/quota-subs-default`): a setting, default 300, read by every path that creates an account; the value stays per-row.
 - ⬜ **`docs/LAUNCH.md`**: not written. The README's Clerk checklist and the Cloudflare Tunnel section cover part of it.
 - ✅ **Acceptance** (branch `test/wp17-acceptance`): e2e-clerk checks the landing CTA in all three states (stranger, signed in, signed out), which caught and fixed a signed-out visitor being told "You are already signed in"; Lighthouse on `/` scored 100 in all four categories in 3 of 3 local runs (2026-09-29). Not yet a CI gate: `scripts/lighthouse.sh` still measures only `/app/`.
 

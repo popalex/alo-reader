@@ -151,6 +151,18 @@ async def api_client(api_db: str) -> AsyncIterator[httpx.AsyncClient]:
 
 
 @pytest.fixture
+def quota_default(monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[[int], None]]:
+    """Set QUOTA_SUBS_DEFAULT for one test."""
+
+    def _set(value: int) -> None:
+        monkeypatch.setenv("QUOTA_SUBS_DEFAULT", str(value))
+        get_settings.cache_clear()
+
+    yield _set
+    get_settings.cache_clear()
+
+
+@pytest.fixture
 def set_auth_mode(monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[[str], None]]:
     """Pin AUTH_MODE for one test regardless of the ambient suite mode."""
 
@@ -180,7 +192,7 @@ async def make_pat_user(email: str = "pat@example.com") -> PatUser:
     from app.store import users as users_store
 
     async with app_db.get_sessionmaker()() as s, s.begin():
-        user = await users_store.create(s, email=email)
+        user = await users_store.create(s, email=email, quota_subs=300)
         _, token = await pat.create(s, user.id, label="test")
         return PatUser(user_id=user.id, token=token)
 

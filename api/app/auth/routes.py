@@ -150,7 +150,12 @@ async def clerk_webhook(request: Request, session: Session) -> None:
         elif event_type == "user.created" and not await users_store.is_clerk_deleted(
             session, clerk_user_id
         ):
-            await users_store.create(session, clerk_user_id=clerk_user_id, email=email)
+            await users_store.create(
+                session,
+                clerk_user_id=clerk_user_id,
+                email=email,
+                quota_subs=get_settings().quota_subs_default,
+            )
         # A user.updated for a row we do not have is dropped rather than created.
         # svix retries for a day and does not guarantee order, so an update landing
         # after the delete would otherwise rebuild the local identity of an account

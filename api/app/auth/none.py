@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
 
+from app.config import get_settings
 from app.models import User
 from app.store import users as users_store
 
@@ -47,4 +48,6 @@ class NoneProvider:
         user = (await session.scalars(stmt)).first()
         if user is not None:
             return user
-        return await users_store.create(session, clerk_user_id=None, email="")
+        return await users_store.create(
+            session, clerk_user_id=None, email="", quota_subs=get_settings().quota_subs_default
+        )
