@@ -133,6 +133,20 @@
 		file_server
 	}
 
+	# The "Moving from ..." guides (deploy/landing/from/). Clerk-only like the landing
+	# page: they end in "Create an account". Extensionless URLs, templated for the
+	# canonical and og tags, and the .html names redirect for the same reason as above.
+	redir /from/feedly.html /from/feedly 301
+	redir /from/inoreader.html /from/inoreader 301
+	handle /from/* {
+		import alo_headers
+		root * /srv
+		header Cache-Control "no-cache"
+		try_files {path}.html
+		templates
+		file_server
+	}
+
 	# For crawlers, generated per request so every instance names its own host. The
 	# app and the API are not for search results: they carry X-Robots-Tag: noindex
 	# (see those routes), which a crawler can only see if it may fetch them, so
@@ -153,6 +167,8 @@ Sitemap: https://{host}/sitemap.xml
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://{host}/</loc></url>
   <url><loc>https://{host}/legal</loc></url>
+  <url><loc>https://{host}/from/feedly</loc></url>
+  <url><loc>https://{host}/from/inoreader</loc></url>
 </urlset>
 ` 200
 	}
@@ -168,10 +184,13 @@ Sitemap: https://{host}/sitemap.xml
 	}
 
 	# A self-hosted reader is private: nothing on it belongs in search results, even
-	# when it is reachable from the internet. The landing page is clerk-only, so its
-	# file is refused here like /legal.
+	# when it is reachable from the internet. The landing page and the guides are
+	# clerk-only, so their files are refused here like /legal.
 	header X-Robots-Tag "noindex, nofollow"
 	handle /landing.html {
+		respond 404
+	}
+	handle /from/* {
 		respond 404
 	}
 	handle /robots.txt {

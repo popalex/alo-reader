@@ -1,0 +1,195 @@
+/* Text pages under the landing page: /legal and the "Moving from ..." guides.
+   Colours and fonts come from tokens.css; this is layout and type only. */
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap {
+  max-width: 68ch;
+  margin: 0 auto;
+  padding-inline: 20px;
+}
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-block: 16px;
+  border-bottom: 1px solid var(--line);
+  /* The landing page's header sits in a 980px wrap with 20px sides; this matches it
+     and keeps the same 20px off the screen edge on a phone. */
+  width: calc(100% - 40px);
+  max-width: 940px;
+  margin: 0 auto;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  color: var(--text);
+}
+.mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--accent);
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+.mark svg {
+  width: 13px;
+  height: 13px;
+  stroke: var(--accent-contrast);
+  fill: none;
+  stroke-width: 2.1;
+}
+.nav a.back {
+  font-size: 13.5px;
+  color: var(--text-dim);
+  text-decoration: none;
+}
+.nav a.back:hover {
+  color: var(--text);
+}
+h1 {
+  font-size: clamp(26px, 4vw, 34px);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  margin: 44px 0 8px;
+}
+.updated {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.summary {
+  margin: 24px 0 36px;
+  padding: 18px 20px;
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  font-size: 15px;
+}
+.summary p {
+  margin: 0;
+}
+.summary strong {
+  font-weight: 600;
+}
+h2 {
+  font-size: 17px;
+  margin: 36px 0 10px;
+  letter-spacing: -0.01em;
+}
+p,
+li {
+  color: var(--text-2);
+}
+p {
+  margin: 0 0 14px;
+}
+ul {
+  margin: 0 0 14px;
+  padding-left: 22px;
+}
+li {
+  margin-bottom: 6px;
+}
+a {
+  color: var(--accent);
+  text-underline-offset: 2px;
+}
+.unset {
+  color: var(--text-dim);
+  font-style: italic;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 14px;
+  font-size: 15px;
+}
+th,
+td {
+  text-align: left;
+  padding: 8px 12px 8px 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+  color: var(--text-2);
+}
+th {
+  font-weight: 600;
+  color: var(--text);
+  width: 40%;
+}
+footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  align-items: center;
+  margin-top: 44px;
+  padding-block: 20px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+footer a {
+  text-decoration: none;
+}
+footer a:hover {
+  text-decoration: underline;
+}
+footer .sep {
+  flex: 1;
+}
+
+/* The guides: numbered steps, a closing call to action. */
+ol {
+  margin: 0 0 14px;
+  padding-left: 22px;
+}
+ol li {
+  padding-left: 4px;
+}
+code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+.next {
+  margin-top: 40px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-radius: var(--radius);
+  padding: 11px 19px;
+  font-size: 14.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.next p {
+  margin-top: 14px;
+  font-size: 14.5px;
+}

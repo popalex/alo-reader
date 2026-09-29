@@ -217,7 +217,12 @@ test.describe.serial("clerk mode", () => {
     const get = (path: string) => request.get(path, { maxRedirects: 0 });
 
     // Duplicates redirect to the clean URL.
-    for (const [from, to] of [["/landing.html", "/"], ["/legal.html", "/legal"]]) {
+    for (const [from, to] of [
+      ["/landing.html", "/"],
+      ["/legal.html", "/legal"],
+      ["/from/feedly.html", "/from/feedly"],
+      ["/from/inoreader.html", "/from/inoreader"],
+    ]) {
       const r = await get(from);
       expect(r.status(), from).toBe(301);
       expect(r.headers()["location"], from).toBe(to);
@@ -229,9 +234,16 @@ test.describe.serial("clerk mode", () => {
     const sitemap = await (await get("/sitemap.xml")).text();
     expect(sitemap).toContain("<loc>https://localhost/</loc>");
     expect(sitemap).toContain("<loc>https://localhost/legal</loc>");
+    expect(sitemap).toContain("<loc>https://localhost/from/feedly</loc>");
+    expect(sitemap).toContain("<loc>https://localhost/from/inoreader</loc>");
 
     // Public pages: indexable, canonical, host filled in.
-    for (const [path, canonical] of [["/", "https://localhost/"], ["/legal", "https://localhost/legal"]]) {
+    for (const [path, canonical] of [
+      ["/", "https://localhost/"],
+      ["/legal", "https://localhost/legal"],
+      ["/from/feedly", "https://localhost/from/feedly"],
+      ["/from/inoreader", "https://localhost/from/inoreader"],
+    ]) {
       const r = await get(path);
       expect(r.headers()["x-robots-tag"], path).toBeUndefined();
       expect(await r.text(), path).toContain(`<link rel="canonical" href="${canonical}" />`);
@@ -249,6 +261,28 @@ test.describe.serial("clerk mode", () => {
     for (const path of ["/app/", "/app/starred", "/app/index.html", "/api/v1/config"]) {
       expect((await get(path)).headers()["x-robots-tag"], path).toBe("noindex");
     }
+  });
+
+  test("the moving guides are served, linked from the landing page, and link to each other", async ({
+    page,
+    request,
+  }) => {
+    for (const [path, heading, other] of [
+      ["/from/feedly", "Moving from Feedly", "/from/inoreader"],
+      ["/from/inoreader", "Moving from Inoreader", "/from/feedly"],
+    ]) {
+      const r = await page.goto(path);
+      expect(r?.status(), path).toBe(200);
+      await expect(page.getByRole("heading", { name: heading, level: 1 })).toBeVisible();
+      await expect(page.getByRole("link", { name: "Create an account" }).last()).toHaveAttribute("href", "/app/");
+      await expect(page.getByRole("link", { name: "That guide is here" })).toHaveAttribute("href", other);
+    }
+    // An unknown guide is a 404, not some other page.
+    expect((await request.get("/from/nowhere", { maxRedirects: 0 })).status()).toBe(404);
+
+    await page.goto("/");
+    await expect(page.getByRole("link", { name: "from Feedly" })).toHaveAttribute("href", "/from/feedly");
+    await expect(page.getByRole("link", { name: "from Inoreader" })).toHaveAttribute("href", "/from/inoreader");
   });
 
   test("the landing page and /legal are served in clerk mode", async ({ page }) => {
