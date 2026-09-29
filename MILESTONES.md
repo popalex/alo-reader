@@ -219,7 +219,7 @@ Makefile   MILESTONES.md   DESIGN.md
 - ⬜ **Assets**: no `og:image` / Twitter card, and no per-theme screenshots generated from the e2e stack.
 - ⬜ **`QUOTA_SUBS_DEFAULT`**: `quota_subs` is still hardcoded in `api/app/store/users.py` (also in the parking lot).
 - ⬜ **`docs/LAUNCH.md`**: not written. The README's Clerk checklist and the Cloudflare Tunnel section cover part of it.
-- ⬜ **Acceptance** not yet shown: Lighthouse ≥ 95 on `/` in all four categories, and an e2e test that a signed-in browser at `/` sees "Open alo reader" (e2e-clerk now makes that testable).
+- ✅ **Acceptance** (branch `test/wp17-acceptance`): e2e-clerk checks the landing CTA in all three states (stranger, signed in, signed out), which caught and fixed a signed-out visitor being told "You are already signed in"; Lighthouse on `/` scored 100 in all four categories in 3 of 3 local runs (2026-09-29). Not yet a CI gate: `scripts/lighthouse.sh` still measures only `/app/`.
 
 **Depends:** WP-16 (needs the terms/privacy pages and the tag). **Read:** DESIGN.md §0.1 (public-first), §1.4 (quotas), §1.5 (deploy).
 
