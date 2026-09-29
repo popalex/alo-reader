@@ -221,22 +221,49 @@ test.describe.serial("clerk mode", () => {
     await expect(page).toHaveTitle(/.+/);
   });
 
-  test("sign-up through Clerk's hosted page comes back into the app", async ({ page }) => {
-    // The bot check on sign-up is why this needs the testing token; a person would
-    // tick it. The hosted page lives on Clerk's domain, so the token is set for the
-    // whole context, not just our origin.
+  test("the signed-out screen: sign in or create an account, with the product around it", async ({
+    page,
+  }) => {
+    await page.goto("/app/");
+    await expect(page.getByRole("heading", { name: "Sign in or create an account" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "alo reader" })).toHaveAttribute("href", "/");
+    await expect(page.getByRole("group", { name: "Colour theme" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Terms & privacy" })).toHaveAttribute("href", "/legal");
+    await expect(page.locator('input[name="identifier"]')).toBeVisible();
+    // Sign-up happens in this form now: no link out to Clerk's hosted page.
+    await expect(page.locator('a[href*="accounts.dev"]')).toHaveCount(0);
+  });
+
+  test("sign-up happens in the same form and lands in the app", async ({ page }) => {
+    // withSignUp: an address with no account continues into sign-up right here.
+    // In-page, Clerk renders Cloudflare's interactive check before the sign-up request,
+    // and a testing token does not get an automated browser past it (it did on the
+    // hosted page). So the dedicated e2e instance has bot sign-up protection turned
+    // off; real instances keep it, and people tick the box in this same form.
+    const offSite: string[] = [];
+    page.on("framenavigated", (f) => {
+      if (f === page.mainFrame() && !f.url().startsWith("http://localhost")) offSite.push(f.url());
+    });
     await setupClerkTestingToken({ context: page.context() });
     await page.goto("/app/");
-    await page.getByRole("link", { name: "Sign up" }).click();
-    await page.locator('input[name="emailAddress"]').fill(signupEmail);
-    const password = page.locator('input[name="password"]');
-    if (await password.isVisible()) await password.fill(`E2e-${randomUUID()}`);
-    const prepared = page.waitForResponse((r) => isPrepare(r.url()) && r.ok());
+    await page.locator('input[name="identifier"]').fill(signupEmail);
+    let prepared = page.waitForResponse((r) => isPrepare(r.url()) && r.ok());
     await page.getByRole("button", { name: "Continue", exact: true }).click();
+
+    // Depending on the instance, sign-up asks for a password before the email code.
+    const password = page.locator('input[name="password"]');
+    const code = page.locator('input[autocomplete="one-time-code"]').first();
+    await expect(password.or(code)).toBeVisible();
+    if (await password.isVisible()) {
+      await password.fill(`E2e-${randomUUID()}`);
+      prepared = page.waitForResponse((r) => isPrepare(r.url()) && r.ok());
+      await page.getByRole("button", { name: "Continue", exact: true }).click();
+    }
     await enterTestCode(page, prepared);
 
     await expect(page).toHaveURL(/localhost\/app\/?/, { timeout: 30_000 });
     await expect(page.getByRole("button", { name: "Subscribe", exact: true })).toBeVisible();
+    expect(offSite).toEqual([]);
   });
 
   test("webhooks: user.updated fills the email, user.deleted removes the account for good", async ({

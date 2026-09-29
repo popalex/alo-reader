@@ -208,14 +208,14 @@ Makefile   MILESTONES.md   DESIGN.md
 
 ---
 
-### WP-17 · Public launch surface — 🚧 PARTLY DONE (4 of 7 deliverables)
+### WP-17 · Public launch surface — 🚧 PARTLY DONE (5 of 7 deliverables)
 
 **Status, checked against the repo on 2026-09-29.**
 - ✅ **`/` — the landing page** (#84): static `deploy/landing/landing.html`, no app bundle referenced, `<title>`, meta description, `og:type` / `og:title`. Mode-aware, as revised on 2026-09-17: the landing page and `/legal` exist only in `AUTH_MODE=clerk`; in `none`, `/` redirects to `/app/`. One Caddyfile picks the behaviour with `import root_{$AUTH_MODE:clerk}` (`root_clerk` / `root_none` snippets). No second variable, no second Caddyfile.
 - ✅ **The `/app` move** (#84): Vite `base: "/app/"`, router basepath, PWA scope, e2e and Lighthouse paths. Clerk's post-sign-in redirect was left at `/` until #93, and the hosted sign-up's redirect is an Account Portal setting (README, "Setting up a Clerk instance").
 - ✅ **Session-aware CTA** (#84): `deploy/landing/landing.js` swaps the CTA to "Open alo reader" for a signed-in visitor.
 - ✅ Beyond the list: one `/legal` page for terms, privacy and contact (#85), made true to what the stack actually does (#86).
-- ⬜ **The signed-out shell at `/app`**: still the bare centred `<SignIn />` in `ClerkApp.tsx`: no product name, theme toggle or legal links.
+- ✅ **The signed-out shell at `/app`** (branch `feat/signed-out-shell`): the landing's mark, wordmark and footer around Clerk's form, theme toggle, legal links, Clerk drawn in the app's tokens in both themes; sign-up happens in the same form (`withSignUp`), not on Clerk's hosted page.
 - ⬜ **Assets**: no `og:image` / Twitter card, and no per-theme screenshots generated from the e2e stack.
 - ✅ **`QUOTA_SUBS_DEFAULT`** (branch `feat/quota-subs-default`): a setting, default 300, read by every path that creates an account; the value stays per-row.
 - ⬜ **`docs/LAUNCH.md`**: not written. The README's Clerk checklist and the Cloudflare Tunnel section cover part of it.

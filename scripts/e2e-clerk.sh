@@ -7,8 +7,10 @@
 #
 # Needs four values, from .env.e2e-clerk locally (gitignored) or the environment in CI:
 #   CLERK_PUBLISHABLE_KEY, CLERK_ISSUER, CLERK_SECRET_KEY, CLERK_WEBHOOK_SECRET
-# CLERK_SECRET_KEY is what lets the browser through the instance's bot protection
-# (Clerk testing tokens) and creates/deletes the test users. It belongs to the e2e
+# CLERK_SECRET_KEY issues Clerk testing tokens and creates/deletes the test users.
+# The e2e instance must have bot sign-up protection OFF: sign-up happens in our own
+# page (<SignIn withSignUp>), where Cloudflare's interactive check is shown before the
+# sign-up request and a testing token cannot pass it. Real instances keep it on. It belongs to the e2e
 # instance only and is never passed to the app: the API does not use it.
 #
 # Isolation: its own compose project, so `down -v` here can never touch the volumes
