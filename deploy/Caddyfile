@@ -132,6 +132,30 @@
 		templates
 		file_server
 	}
+
+	# For crawlers, generated per request so every instance names its own host. The
+	# app and the API are not for search results: they carry X-Robots-Tag: noindex
+	# (see those routes), which a crawler can only see if it may fetch them, so
+	# robots.txt disallows only what has nothing to read.
+	handle /robots.txt {
+		header Content-Type "text/plain; charset=utf-8"
+		respond `User-agent: *
+Disallow: /api/
+Disallow: /otlp/
+Disallow: /grafana
+
+Sitemap: https://{host}/sitemap.xml
+` 200
+	}
+	handle /sitemap.xml {
+		header Content-Type "application/xml; charset=utf-8"
+		respond `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://{host}/</loc></url>
+  <url><loc>https://{host}/legal</loc></url>
+</urlset>
+` 200
+	}
 }
 
 (root_none) {

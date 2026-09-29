@@ -22,7 +22,7 @@ CADDYFILES = ("deploy/Caddyfile", "deploy/Caddyfile.dev")
 # Every placeholder the Caddyfiles use today, checked against Caddy's documentation.
 # A new one goes here only after confirming Caddy expands it (a quick reverse_proxy to
 # an echo server will show the literal string if it does not).
-KNOWN_PLACEHOLDERS = {"{client_ip}", "{path}", "{uri}"}
+KNOWN_PLACEHOLDERS = {"{client_ip}", "{host}", "{path}", "{uri}"}
 
 
 def _repo_file(relative: str) -> Path:
