@@ -180,7 +180,7 @@ Sitemap: https://{host}/sitemap.xml
 	# provider that do not exist without Clerk.
 	@legal path /legal /legal.html
 	handle @legal {
-		respond 404
+		error 404
 	}
 
 	# A self-hosted reader is private: nothing on it belongs in search results, even
@@ -188,10 +188,10 @@ Sitemap: https://{host}/sitemap.xml
 	# clerk-only, so their files are refused here like /legal.
 	header X-Robots-Tag "noindex, nofollow"
 	handle /landing.html {
-		respond 404
+		error 404
 	}
 	handle /from/* {
-		respond 404
+		error 404
 	}
 	handle /robots.txt {
 		header Content-Type "text/plain; charset=utf-8"
@@ -374,5 +374,26 @@ Disallow: /
 		# alone, so a typo is still a 404 rather than a copy of some other page.
 		try_files {path} {path}.html
 		file_server
+	}
+
+	# The template itself is not a page: asked for by name it is just another 404.
+	handle /error.html {
+		error 404
+	}
+
+	# Errors on pages people open get a page (deploy/landing/error.html): a 404 for
+	# an unknown address, an apology for anything else. The API and the app keep
+	# their bare errors, because code reads those, not people: the app handles API
+	# failures itself, and a missing /app/assets chunk must stay a plain 404.
+	handle_errors {
+		@page not path /api/* /app/* /otlp/* /grafana*
+		handle @page {
+			import alo_headers
+			header Cache-Control "no-cache"
+			root * /srv
+			rewrite * /error.html
+			templates
+			file_server
+		}
 	}
 }

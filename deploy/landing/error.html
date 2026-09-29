@@ -1,0 +1,88 @@
+<!doctype html>
+{{- /* Every error Caddy answers outside /api and /app (deploy/Caddyfile, handle_errors):
+       a 404 gets the unread-article joke, anything else a plain apology. Self-host
+       instances (AUTH_MODE=none) have no landing page, sign-up or guides, so their
+       version points at the app instead. */ -}}
+{{- $notFound := eq (printf "%v" (placeholder "http.error.status_code")) "404" -}}
+{{- $selfHost := eq (env "AUTH_MODE") "none" -}}
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{if $notFound}}Page not found{{else}}Something went wrong{{end}} · alo reader</title>
+    <meta name="robots" content="noindex" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link
+      rel="preload"
+      href="/inter-latin-wght-normal.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="stylesheet" href="/tokens.css" />
+    <link rel="stylesheet" href="/landing.css" />
+    <link rel="stylesheet" href="/error.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <nav class="nav">
+        <a class="brand" href="/">
+          <span class="mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16" />
+              <circle cx="5" cy="19" r="1.6" fill="currentColor" stroke="none" />
+            </svg>
+          </span>
+          alo reader
+        </a>
+        <div class="navlinks">
+          {{- if $selfHost}}
+          <a class="cta" href="/app/">Open alo reader</a>
+          {{- else}}
+          <a href="/app/">Sign in</a>
+          <a class="cta" href="/app/">Create an account</a>
+          {{- end}}
+        </div>
+      </nav>
+    </div>
+
+    <main class="wrap nf">
+      {{- if $notFound}}
+      <h1>This page is not here.</h1>
+      <p class="sub">The link may be old, or it has a typo in it.</p>
+      <div class="nf-pane">
+        <div class="s-head"><span>All items</span><span class="s-count">1 unread</span></div>
+        <div class="s-ent unread sel">
+          <span class="s-fav"></span><span class="s-feed-n">alo reader</span
+          ><span class="s-time">just now</span>
+          <span class="s-title">404: Page not found</span>
+          <span class="s-sum"
+            >Nothing was published at this address. Everything else is where you left it.</span
+          >
+        </div>
+      </div>
+      {{- else}}
+      <h1>Something went wrong on our side.</h1>
+      <p class="sub">
+        The server could not answer this request. It was not anything you did; try again in a
+        minute.
+      </p>
+      {{- end}}
+      {{- if $selfHost}}
+      <a class="btn" href="/app/">Open alo reader</a>
+      {{- else}}
+      <a class="btn" href="/">Go to the front page</a>
+      <div class="nf-links">
+        <a href="/from/feedly">Moving from Feedly</a>
+        <a href="/from/inoreader">Moving from Inoreader</a>
+        <a href="/legal">Terms &amp; privacy</a>
+      </div>
+      {{- end}}
+    </main>
+    {{- if not $selfHost}}
+
+    <!-- Swaps "Create an account" for "Open alo reader" when a session cookie is present. -->
+    <script src="/landing.js" defer></script>
+    {{- end}}
+  </body>
+</html>

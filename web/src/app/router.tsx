@@ -5,9 +5,12 @@
 import { createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
 
 import { AppLayout } from "../features/layout/AppLayout";
+import { NotFound } from "../features/notFound/NotFound";
 import { StreamView } from "../features/stream/StreamView";
 
-const rootRoute = createRootRoute({ component: AppLayout });
+// notFoundComponent renders inside AppLayout's outlet, so a mistyped /app/...
+// address keeps the sidebar and shows NotFound where the article list would be.
+const rootRoute = createRootRoute({ component: AppLayout, notFoundComponent: NotFound });
 
 const allRoute = createRoute({
   getParentRoute: () => rootRoute,

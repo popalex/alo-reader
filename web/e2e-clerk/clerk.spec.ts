@@ -285,6 +285,17 @@ test.describe.serial("clerk mode", () => {
     await expect(page.getByRole("link", { name: "from Inoreader" })).toHaveAttribute("href", "/from/inoreader");
   });
 
+  test("an unknown address gets the 404 page, with sign-up and the guides", async ({ page }) => {
+    const r = await page.goto("/some-old-link");
+    expect(r?.status()).toBe(404);
+    await expect(page).toHaveTitle("Page not found · alo reader");
+    await expect(page.getByRole("heading", { name: "This page is not here.", level: 1 })).toBeVisible();
+    await expect(page.getByText("404: Page not found")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Go to the front page" })).toHaveAttribute("href", "/");
+    await expect(page.getByRole("link", { name: "Create an account" })).toHaveAttribute("href", "/app/");
+    await expect(page.getByRole("link", { name: "Moving from Feedly" })).toHaveAttribute("href", "/from/feedly");
+  });
+
   test("the landing page and /legal are served in clerk mode", async ({ page }) => {
     const landing = await page.goto("/");
     expect(landing?.status()).toBe(200);
