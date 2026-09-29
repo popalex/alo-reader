@@ -47,3 +47,33 @@ test("a self-hosted instance keeps out of search results", async ({ request }) =
     expect((await request.get(path, { maxRedirects: 0 })).status(), path).toBe(404);
   }
 });
+
+test("unknown addresses: a 404 page outside the app, a not-found screen inside it", async ({
+  page,
+  request,
+}) => {
+  // Outside the app: the error page, with a real 404 and the self-host wording.
+  for (const path of ["/some-old-link", "/from/feedly", "/error.html"]) {
+    const r = await request.get(path, { maxRedirects: 0 });
+    expect(r.status(), path).toBe(404);
+    const html = await r.text();
+    expect(html, path).toContain("This page is not here.");
+    expect(html, path).toContain("Open alo reader");
+    expect(html, path).not.toContain("Create an account");
+    expect(html, path).not.toContain("{{");
+  }
+  // Code reads these, so they stay bare.
+  const api = await request.get("/api/v1/nope");
+  expect(api.status()).toBe(404);
+  expect(api.headers()["content-type"]).toContain("application/json");
+  const chunk = await request.get("/app/assets/missing.js");
+  expect(chunk.status()).toBe(404);
+  expect(await chunk.text()).not.toContain("This page is not here.");
+
+  // Inside the app: the sidebar stays, the list pane says so, and the way out works.
+  await page.goto("/app/no-such-page");
+  await expect(page.getByRole("heading", { name: "Nothing here.", level: 1 })).toBeVisible();
+  await page.getByRole("link", { name: "Go to All items" }).click();
+  await expect(page).toHaveURL(/\/app\/$/);
+  await expect(page.getByRole("heading", { name: "All items", level: 1 })).toBeVisible();
+});
