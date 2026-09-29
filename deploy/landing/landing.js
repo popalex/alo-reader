@@ -11,7 +11,12 @@
   "use strict";
   // Clerk sets __session on the app's own domain; the __client_uat timestamp is
   // readable even when __session is httpOnly, which is why both are checked.
-  var signedIn = /(^|;\s*)(__session|__client_uat)=[^;]/.test(document.cookie);
+  // __client_uat is the time of the last sign-in, and "0" once signed out: Clerk
+  // keeps the cookie after sign-out, so its presence alone said "signed in" to
+  // someone who had just signed out (caught by e2e-clerk).
+  var cookies = document.cookie;
+  var signedIn =
+    /(^|;\s*)__session=[^;]/.test(cookies) || /(^|;\s*)__client_uat=[1-9]/.test(cookies);
   if (!signedIn) return;
 
   var links = document.querySelectorAll('a[href="/app/"]');
