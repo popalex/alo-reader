@@ -208,7 +208,19 @@ Makefile   MILESTONES.md   DESIGN.md
 
 ---
 
-### WP-17 · Public launch surface — 📋 PLANNED
+### WP-17 · Public launch surface — 🚧 PARTLY DONE (3 of 7 deliverables, #84–#86)
+
+**Status, checked against the repo on 2026-09-29.**
+- ✅ **`/` — the landing page** (#84): static `deploy/landing/landing.html`, no app bundle referenced, `<title>`, meta description, `og:type` / `og:title`. Mode-aware, as revised on 2026-09-17: the landing page and `/legal` exist only in `AUTH_MODE=clerk`; in `none`, `/` redirects to `/app/`. One Caddyfile picks the behaviour with `import root_{$AUTH_MODE:clerk}` (`root_clerk` / `root_none` snippets). No second variable, no second Caddyfile.
+- ✅ **The `/app` move** (#84): Vite `base: "/app/"`, router basepath, PWA scope, e2e and Lighthouse paths. Clerk's post-sign-in redirect was left at `/` until #93, and the hosted sign-up's redirect is an Account Portal setting (README, "Setting up a Clerk instance").
+- ✅ **Session-aware CTA** (#84): `deploy/landing/landing.js` swaps the CTA to "Open alo reader" for a signed-in visitor.
+- ✅ Beyond the list: one `/legal` page for terms, privacy and contact (#85), made true to what the stack actually does (#86).
+- ⬜ **The signed-out shell at `/app`**: still the bare centred `<SignIn />` in `ClerkApp.tsx`: no product name, theme toggle or legal links.
+- ⬜ **Assets**: no `og:image` / Twitter card, and no per-theme screenshots generated from the e2e stack.
+- ⬜ **`QUOTA_SUBS_DEFAULT`**: `quota_subs` is still hardcoded in `api/app/store/users.py` (also in the parking lot).
+- ⬜ **`docs/LAUNCH.md`**: not written. The README's Clerk checklist and the Cloudflare Tunnel section cover part of it.
+- ⬜ **Acceptance** not yet shown: Lighthouse ≥ 95 on `/` in all four categories, and an e2e test that a signed-in browser at `/` sees "Open alo reader" (e2e-clerk now makes that testable).
+
 **Depends:** WP-16 (needs the terms/privacy pages and the tag). **Read:** DESIGN.md §0.1 (public-first), §1.4 (quotas), §1.5 (deploy).
 
 **Why this exists.** DESIGN.md §0.1 makes public multi-tenant hosting the primary target, and today an anonymous visitor gets `ClerkApp.tsx`'s signed-out branch: a centred Clerk `<SignIn />` in inline styles, no product name, no explanation, no theme, and *sign in* as the only action — which a first-time visitor cannot do. The front door of the primary deployment mode is the least finished screen in the product. 1.0 can ship without this (a self-hoster never sees it); public sign-ups cannot open without it.
