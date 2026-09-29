@@ -155,3 +155,41 @@ footer a:hover {
 footer .sep {
   flex: 1;
 }
+
+/* The guides: numbered steps, a closing call to action. */
+ol {
+  margin: 0 0 14px;
+  padding-left: 22px;
+}
+ol li {
+  padding-left: 4px;
+}
+code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+.next {
+  margin-top: 40px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-radius: var(--radius);
+  padding: 11px 19px;
+  font-size: 14.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.next p {
+  margin-top: 14px;
+  font-size: 14.5px;
+}

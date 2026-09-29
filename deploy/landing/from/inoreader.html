@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Moving from Inoreader to alo reader</title>
+    <meta
+      name="description"
+      content="Export your feeds from Inoreader as one OPML file and import them into alo reader, a free RSS reader, in a couple of minutes. What comes across, what stays behind, and what is different."
+    />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://{{.Host}}/from/inoreader" />
+    <meta property="og:type" content="article" />
+    <meta property="og:title" content="Moving from Inoreader to alo reader" />
+    <meta
+      property="og:description"
+      content="Your Inoreader feeds and folders move in one file. What comes across, what stays behind, and what is different."
+    />
+    <meta property="og:url" content="https://{{.Host}}/from/inoreader" />
+    <meta property="og:image" content="https://{{.Host}}/og-card.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="stylesheet" href="/tokens.css" />
+    <link rel="stylesheet" href="/prose.css" />
+  </head>
+  <body>
+    <nav class="nav">
+      <a class="brand" href="/">
+        <span class="mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16" />
+            <circle cx="5" cy="19" r="1.6" fill="currentColor" stroke="none" />
+          </svg>
+        </span>
+        alo reader
+      </a>
+      <a class="back" href="/">Back to the front page</a>
+    </nav>
+
+    <main class="wrap">
+      <h1>Moving from Inoreader</h1>
+      <p class="updated">Your feeds and folders move in one file. It takes a couple of minutes.</p>
+
+      <div class="summary">
+        <p>
+          <strong>The short version.</strong> Export your subscriptions from Inoreader's
+          preferences as an OPML file, create a free alo reader account, click
+          <strong>Subscribe</strong> and choose the file. Your feeds arrive in their folders, up to
+          300 of them.
+        </p>
+      </div>
+
+      <h2>Export your feeds from Inoreader</h2>
+      <ol>
+        <li>Sign in to Inoreader in a web browser.</li>
+        <li>Open <strong>Preferences</strong>, then <strong>Import/Export</strong>.</li>
+        <li>
+          Export your subscriptions as OPML. Your browser downloads a file ending in
+          <code>.opml</code>.
+        </li>
+      </ol>
+      <p>
+        Inoreader has renamed that section before, as "Import, export, backup". If the name has
+        changed again, look for where it manages import and export.
+      </p>
+
+      <h2>Import it into alo reader</h2>
+      <ol>
+        <li>
+          <a href="/app/">Create an account</a>. It is free: an email address and a password, no
+          card.
+        </li>
+        <li>
+          Click <strong>Subscribe</strong>, then <strong>Choose OPML file</strong>, and pick the file
+          you downloaded.
+        </li>
+        <li>
+          A short report says how many feeds came in, how many you already had, and which ones
+          failed and why.
+        </li>
+      </ol>
+      <p>Articles appear as each feed is fetched, so a long list takes a few minutes to fill in.</p>
+
+      <h2>What comes across</h2>
+      <ul>
+        <li>Every feed that has an RSS or Atom address.</li>
+        <li>Your folders. Each feed lands in the folder it had in Inoreader.</li>
+        <li>
+          Up to 300 feeds. If the file holds more, the first 300 come in and the report lists the
+          rest.
+        </li>
+      </ul>
+
+      <h2>What stays behind</h2>
+      <p>An OPML file lists feeds and nothing else, so these stay in Inoreader:</p>
+      <ul>
+        <li>Starred and saved articles, and your tags.</li>
+        <li>Rules, filters and monitoring feeds.</li>
+        <li>Which articles you have read.</li>
+      </ul>
+      <p>
+        Newsletter feeds and web feeds are made by Inoreader for you. If they are in the file,
+        they keep working only as long as Inoreader keeps serving them.
+      </p>
+
+      <h2>What is different here</h2>
+      <ul>
+        <li>
+          Every article from every feed, newest first. No priority ranking and no AI summaries.
+        </li>
+        <li>
+          The whole app runs from the keyboard: <code>j</code> and <code>k</code> move between
+          articles, as they do in Inoreader. <code>?</code> shows the rest.
+        </li>
+        <li>
+          No app store. alo reader runs in the browser, you can add it to your home screen, and
+          articles you have opened stay readable offline.
+        </li>
+        <li>Free. There is no paid plan, so nothing here is held back for one.</li>
+      </ul>
+
+      <div class="next">
+        <a class="btn" href="/app/">Create an account</a>
+        <p>Moving from Feedly instead? <a href="/from/feedly">That guide is here</a>.</p>
+      </div>
+    </main>
+
+    <div class="wrap">
+      <footer>
+        <span>© 2026 alo reader</span>
+        <span class="sep"></span>
+        <a href="https://github.com/popalex/alo-reader">Source (AGPL-3.0)</a>
+        <a href="/legal">Terms &amp; privacy</a>
+      </footer>
+    </div>
+
+    <!-- Same returning-visitor swap as the landing page: "Create an account" becomes
+         "Open alo reader" when a Clerk session cookie is present. -->
+    <script src="/landing.js" defer></script>
+  </body>
+</html>
