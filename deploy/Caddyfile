@@ -117,14 +117,44 @@
 	# address, a sign-in provider and a deletion flow, none of which exist in
 	# AUTH_MODE=none — a single-user self-host instance would be publishing a
 	# privacy policy about a relationship it does not have.
-	@legal path /legal /legal.html
-	handle @legal {
+	# One URL per page. The files behind / and /legal are reachable under their own
+	# names too, and /landing.html skipped the templates step, so a crawler found
+	# the page twice and its og:image as literal text. Permanent redirects make the
+	# clean URL the only one with content.
+	redir /landing.html / 301
+	redir /legal.html /legal 301
+
+	handle /legal {
 		import alo_headers
 		root * /srv
 		header Cache-Control "no-cache"
 		rewrite * /legal.html
 		templates
 		file_server
+	}
+
+	# For crawlers, generated per request so every instance names its own host. The
+	# app and the API are not for search results: they carry X-Robots-Tag: noindex
+	# (see those routes), which a crawler can only see if it may fetch them, so
+	# robots.txt disallows only what has nothing to read.
+	handle /robots.txt {
+		header Content-Type "text/plain; charset=utf-8"
+		respond `User-agent: *
+Disallow: /api/
+Disallow: /otlp/
+Disallow: /grafana
+
+Sitemap: https://{host}/sitemap.xml
+` 200
+	}
+	handle /sitemap.xml {
+		header Content-Type "application/xml; charset=utf-8"
+		respond `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://{host}/</loc></url>
+  <url><loc>https://{host}/legal</loc></url>
+</urlset>
+` 200
 	}
 }
 
@@ -135,6 +165,20 @@
 	@legal path /legal /legal.html
 	handle @legal {
 		respond 404
+	}
+
+	# A self-hosted reader is private: nothing on it belongs in search results, even
+	# when it is reachable from the internet. The landing page is clerk-only, so its
+	# file is refused here like /legal.
+	header X-Robots-Tag "noindex, nofollow"
+	handle /landing.html {
+		respond 404
+	}
+	handle /robots.txt {
+		header Content-Type "text/plain; charset=utf-8"
+		respond `User-agent: *
+Disallow: /
+` 200
 	}
 
 	handle / {
@@ -199,6 +243,8 @@
 	# global options), and header_up overwrites any value a client tried to send.
 	@api path /api/*
 	handle @api {
+		# JSON for the app, never a search result.
+		header ?X-Robots-Tag "noindex"
 		# Cap the request body at the edge. The app's own OPML cap (OPML_MAX_BYTES,
 		# 1 MiB) is checked after Starlette's multipart parser has already read the
 		# upload and spooled anything large to a temp file, so without this an
@@ -249,6 +295,10 @@
 	redir /app /app/ 308
 	handle_path /app/* {
 		import alo_headers
+		# The app is behind sign-in, and every /app/... path answers with the same shell
+		# (including /app/index.html, which the service worker needs as its offline
+		# fallback, so it is not redirected). None of it belongs in search results.
+		header ?X-Robots-Tag "noindex"
 		root * /srv
 		# The build writes .br and .gz next to every text file, at maximum compression
 		# (web/scripts/precompress.mjs). Brotli-11 makes app.js about 15% smaller than

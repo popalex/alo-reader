@@ -25,6 +25,12 @@ terminates TLS). Where they differ, the step says so.
    ```
    **Direct:** also `ALO_SITE_ADDRESS=reader.example.com`, which is what turns TLS on.
    **Tunnel:** leave `ALO_SITE_ADDRESS` alone; the tunnel overlay serves plain `:80`.
+   In Cloudflare, turn on **SSL/TLS → Edge Certificates → Always Use HTTPS**, so a
+   plain `http://` link redirects instead of serving the page twice.
+4. **One hostname.** Serve the site under exactly one name. If `www.` also points
+   here, redirect it to the bare domain (direct: an extra Caddy site block with
+   `redir https://<domain>{uri} 308`; tunnel: a Cloudflare redirect rule), or search
+   engines see two copies of every page.
 
 **Check.** Start it (`make up` direct, `make tunnel-up` tunnel) and run
 `curl -s https://reader.example.com/api/v1/healthz`: it answers with your
@@ -124,18 +130,22 @@ and its retention numbers match your `.env`.
 
 1. **Landing page.** `https://<domain>/` loads; `curl -s https://<domain>/ | grep og:image`
    shows `https://<domain>/og-card.png`, and that URL returns the card.
-2. **Sign up** with a real address (allow it through the restriction from step 3.1, or
+2. **Search engines.** `https://<domain>/robots.txt` and `/sitemap.xml` name your
+   domain; `curl -sI http://<domain>/` redirects to `https://`; `curl -sI
+   https://<domain>/app/` carries `X-Robots-Tag: noindex`. Then add the domain in
+   Google Search Console and Bing Webmaster Tools and submit the sitemap.
+3. **Sign up** with a real address (allow it through the restriction from step 3.1, or
    invite it). You land in the app, not on the landing page.
-3. **The webhook arrived.** In the Clerk dashboard, the endpoint's log shows the
+4. **The webhook arrived.** In the Clerk dashboard, the endpoint's log shows the
    `user.created` delivery answered `204`. A `401` there means `CLERK_WEBHOOK_SECRET` is
    not this endpoint's secret.
-4. **Use it.** Subscribe to a feed, open an article, sign out (you land on the landing
+5. **Use it.** Subscribe to a feed, open an article, sign out (you land on the landing
    page), sign back in (you are back in the same account).
-5. **Delete that test account** from the account menu (Manage account → Security →
+6. **Delete that test account** from the account menu (Manage account → Security →
    Delete account; the production instance must allow users to delete their own
    accounts). The endpoint log shows `user.deleted` answered `204`: its local data is
    gone.
-6. **Real visitor addresses (tunnel).** Caddy's log shows your own public IP as
+7. **Real visitor addresses (tunnel).** Caddy's log shows your own public IP as
    `client_ip`, not the tunnel's `172.31.254.2`. If it shows the tunnel's address, the
    per-IP rate limit is treating everyone as one visitor.
 

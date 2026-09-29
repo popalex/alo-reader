@@ -211,6 +211,46 @@ test.describe.serial("clerk mode", () => {
     await expect(page.locator(".reassure")).not.toHaveText("You are already signed in.");
   });
 
+  test("search engines: one URL per page, robots and sitemap, noindex where it belongs", async ({
+    request,
+  }) => {
+    const get = (path: string) => request.get(path, { maxRedirects: 0 });
+
+    // Duplicates redirect to the clean URL.
+    for (const [from, to] of [["/landing.html", "/"], ["/legal.html", "/legal"]]) {
+      const r = await get(from);
+      expect(r.status(), from).toBe(301);
+      expect(r.headers()["location"], from).toBe(to);
+    }
+
+    const robots = await (await get("/robots.txt")).text();
+    expect(robots).toContain("Disallow: /api/");
+    expect(robots).toContain("Sitemap: https://localhost/sitemap.xml");
+    const sitemap = await (await get("/sitemap.xml")).text();
+    expect(sitemap).toContain("<loc>https://localhost/</loc>");
+    expect(sitemap).toContain("<loc>https://localhost/legal</loc>");
+
+    // Public pages: indexable, canonical, host filled in.
+    for (const [path, canonical] of [["/", "https://localhost/"], ["/legal", "https://localhost/legal"]]) {
+      const r = await get(path);
+      expect(r.headers()["x-robots-tag"], path).toBeUndefined();
+      expect(await r.text(), path).toContain(`<link rel="canonical" href="${canonical}" />`);
+    }
+    const landing = await (await get("/")).text();
+    const ld = JSON.parse(landing.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)![1]);
+    expect(ld["@graph"][0]).toMatchObject({ "@type": "WebSite", name: "alo reader", url: "https://localhost/" });
+    expect(ld["@graph"][1]).toMatchObject({
+      "@type": "WebApplication",
+      isAccessibleForFree: true,
+      offers: { price: "0" },
+    });
+
+    // Behind sign-in, or not a page at all: noindex.
+    for (const path of ["/app/", "/app/starred", "/app/index.html", "/api/v1/config"]) {
+      expect((await get(path)).headers()["x-robots-tag"], path).toBe("noindex");
+    }
+  });
+
   test("the landing page and /legal are served in clerk mode", async ({ page }) => {
     const landing = await page.goto("/");
     expect(landing?.status()).toBe(200);

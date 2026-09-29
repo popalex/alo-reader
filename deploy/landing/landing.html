@@ -25,6 +25,31 @@
       content="alo reader: the headline 'Nothing decides what you read.' above the app, showing a feed list and an article."
     />
     <meta name="twitter:card" content="summary_large_image" />
+    <link rel="canonical" href="https://{{.Host}}/" />
+    <!-- Structured data for search engines: the site's name, and what the product is.
+         A data block, not a script, so the script-src 'self' policy does not apply. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "name": "alo reader",
+            "url": "https://{{.Host}}/"
+          },
+          {
+            "@type": "WebApplication",
+            "name": "alo reader",
+            "url": "https://{{.Host}}/",
+            "description": "A calm RSS reader: every Atom and RSS feed you follow, in the order it was published. Keyboard-driven, works offline, imports your OPML in one step.",
+            "applicationCategory": "NewsApplication",
+            "operatingSystem": "Any (web browser)",
+            "isAccessibleForFree": true,
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" }
+          }
+        ]
+      }
+    </script>
     <link
       rel="preload"
       href="/inter-latin-wght-normal.woff2"
