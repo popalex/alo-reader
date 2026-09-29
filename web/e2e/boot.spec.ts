@@ -34,3 +34,14 @@ test.describe("app boot (AUTH_MODE=none)", () => {
     await expect(page.getByRole("heading", { name: "Hacker News", level: 1 })).toBeVisible();
   });
 });
+
+test("a self-hosted instance keeps out of search results", async ({ request }) => {
+  // AUTH_MODE=none is a private reader, even when it is reachable from the internet.
+  const robots = await request.get("/robots.txt");
+  expect(await robots.text()).toContain("Disallow: /");
+  for (const path of ["/app/", "/api/v1/config"]) {
+    expect((await request.get(path)).headers()["x-robots-tag"], path).toBe("noindex, nofollow");
+  }
+  // The landing page belongs to clerk mode only.
+  expect((await request.get("/landing.html", { maxRedirects: 0 })).status()).toBe(404);
+});

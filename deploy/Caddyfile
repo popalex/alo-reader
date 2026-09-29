@@ -167,6 +167,20 @@ Sitemap: https://{host}/sitemap.xml
 		respond 404
 	}
 
+	# A self-hosted reader is private: nothing on it belongs in search results, even
+	# when it is reachable from the internet. The landing page is clerk-only, so its
+	# file is refused here like /legal.
+	header X-Robots-Tag "noindex, nofollow"
+	handle /landing.html {
+		respond 404
+	}
+	handle /robots.txt {
+		header Content-Type "text/plain; charset=utf-8"
+		respond `User-agent: *
+Disallow: /
+` 200
+	}
+
 	handle / {
 		# `redir * /app/ 302`, not `redir /app/ 302`: a destination beginning with a
 		# slash parses as a path *matcher*, so the short form means "for requests to
@@ -229,6 +243,8 @@ Sitemap: https://{host}/sitemap.xml
 	# global options), and header_up overwrites any value a client tried to send.
 	@api path /api/*
 	handle @api {
+		# JSON for the app, never a search result.
+		header ?X-Robots-Tag "noindex"
 		# Cap the request body at the edge. The app's own OPML cap (OPML_MAX_BYTES,
 		# 1 MiB) is checked after Starlette's multipart parser has already read the
 		# upload and spooled anything large to a temp file, so without this an
@@ -279,6 +295,10 @@ Sitemap: https://{host}/sitemap.xml
 	redir /app /app/ 308
 	handle_path /app/* {
 		import alo_headers
+		# The app is behind sign-in, and every /app/... path answers with the same shell
+		# (including /app/index.html, which the service worker needs as its offline
+		# fallback, so it is not redirected). None of it belongs in search results.
+		header ?X-Robots-Tag "noindex"
 		root * /srv
 		# The build writes .br and .gz next to every text file, at maximum compression
 		# (web/scripts/precompress.mjs). Brotli-11 makes app.js about 15% smaller than
