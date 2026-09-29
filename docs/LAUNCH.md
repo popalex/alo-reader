@@ -157,3 +157,30 @@ and its retention numbers match your `.env`.
   and what each one means.
 - **Opening sign-up:** when you are ready, switch the Clerk sign-up mode from
   restricted or waitlist to public. Nothing on the server changes.
+
+## 8. Getting found
+
+For its first months a new domain ranks for nothing broad: "best RSS reader" is held
+by list articles on established sites. Visitors come from being on those lists and
+in the places RSS readers talk, and each mention there is a link that helps search
+rankings later. Do this once sign-up is public.
+
+1. **Get listed.**
+   - AlternativeTo: add alo reader as an alternative to Feedly, Inoreader and
+     NewsBlur.
+   - Self-hosters: awesome-selfhosted and selfh.st (read each list's inclusion
+     rules first; some want a project to be a few months old).
+   - Communities: r/rss and r/selfhosted, and a Show HN on Hacker News. Post once,
+     answer every reply, don't repost.
+   - The authors of "best RSS readers" articles: a short, factual note with what
+     differs (free, 300 feeds, no ranking, open source).
+2. **A few pages that last, not a blog.** Each answers something a person switching
+   readers searches for:
+   - Moving from Feedly: exporting the OPML there, importing it here.
+   - The same for Inoreader.
+   - What alo reader deliberately does not do: no ranking, no AI summaries, no
+     tracking.
+
+   Add them to `sitemap.xml` (deploy/Caddyfile) as they go up.
+3. **Read what people searched.** After a month or two, Search Console shows the
+   queries that found the site. Pick the next pages from those, not from guesses.
