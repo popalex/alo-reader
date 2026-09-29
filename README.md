@@ -54,6 +54,9 @@ make lint typecheck test-api test-web
 
 ## Running it in production
 
+Launching the public instance, with Clerk? Follow [`docs/LAUNCH.md`](docs/LAUNCH.md):
+the same steps in the order they have to happen, each with a check.
+
 The same compose file, plus an `.env` and a domain. There is no separate
 production stack.
 

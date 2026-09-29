@@ -208,7 +208,7 @@ Makefile   MILESTONES.md   DESIGN.md
 
 ---
 
-### WP-17 · Public launch surface — 🚧 PARTLY DONE (6 of 7 deliverables)
+### WP-17 · Public launch surface — ✅ DONE (7 of 7 deliverables)
 
 **Status, checked against the repo on 2026-09-29.**
 - ✅ **`/` — the landing page** (#84): static `deploy/landing/landing.html`, no app bundle referenced, `<title>`, meta description, `og:type` / `og:title`. Mode-aware, as revised on 2026-09-17: the landing page and `/legal` exist only in `AUTH_MODE=clerk`; in `none`, `/` redirects to `/app/`. One Caddyfile picks the behaviour with `import root_{$AUTH_MODE:clerk}` (`root_clerk` / `root_none` snippets). No second variable, no second Caddyfile.
@@ -218,7 +218,7 @@ Makefile   MILESTONES.md   DESIGN.md
 - ✅ **The signed-out shell at `/app`** (branch `feat/signed-out-shell`): the landing's mark, wordmark and footer around Clerk's form, theme toggle, legal links, Clerk drawn in the app's tokens in both themes; sign-up happens in the same form (`withSignUp`), not on Clerk's hosted page.
 - ✅ **Assets** (branch `feat/social-card`): `og-card.png` is the landing page rendered at 1200×630 by `web/scripts/social-card.mjs` (`make social-card`), with `og:image`/`og:url` made absolute by Caddy templates, `twitter:card summary_large_image`, and the favicon set already in place. No per-theme screenshots: the landing page shows the app as a live HTML mock, not images, so there is nothing to go stale; the card is generated for the same reason. Also fixed: the landing page named Inter but never loaded it.
 - ✅ **`QUOTA_SUBS_DEFAULT`** (branch `feat/quota-subs-default`): a setting, default 300, read by every path that creates an account; the value stays per-row.
-- ⬜ **`docs/LAUNCH.md`**: not written. The README's Clerk checklist and the Cloudflare Tunnel section cover part of it.
+- ✅ **`docs/LAUNCH.md`** (branch `docs/launch-checklist`): domain → Clerk production instance and its DNS → Clerk settings (restricted sign-up, bot protection on, redirects, webhook) → clerk mode → legal values → smoke test with a real account → after launch, for both direct TLS and Cloudflare Tunnel, with both traps (the Clerk origin, accounts not moving between instances).
 - ✅ **Acceptance** (branch `test/wp17-acceptance`): e2e-clerk checks the landing CTA in all three states (stranger, signed in, signed out), which caught and fixed a signed-out visitor being told "You are already signed in"; Lighthouse on `/` scored 100 in all four categories in 3 of 3 local runs (2026-09-29). Not yet a CI gate: `scripts/lighthouse.sh` still measures only `/app/`.
 
 **Depends:** WP-16 (needs the terms/privacy pages and the tag). **Read:** DESIGN.md §0.1 (public-first), §1.4 (quotas), §1.5 (deploy).
