@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>alo reader · a calm RSS reader</title>
+    <title>alo reader · a free, calm RSS reader</title>
     <meta
       name="description"
-      content="A calm RSS reader: every Atom and RSS feed you follow, newest first. Keyboard-driven, works offline, imports your OPML in one step."
+      content="A free RSS reader with no algorithm: every feed you follow, newest first. Keyboard-driven, works offline, and imports your Feedly or Inoreader OPML in one step."
     />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Nothing decides what you read." />
@@ -41,7 +41,7 @@
             "@type": "WebApplication",
             "name": "alo reader",
             "url": "https://{{.Host}}/",
-            "description": "A calm RSS reader: every Atom and RSS feed you follow, in the order it was published. Keyboard-driven, works offline, imports your OPML in one step.",
+            "description": "A free RSS reader with no algorithm: every feed you follow, in the order it was published. Keyboard-driven, works offline, and imports your Feedly or Inoreader OPML in one step.",
             "applicationCategory": "NewsApplication",
             "operatingSystem": "Any (web browser)",
             "isAccessibleForFree": true,
@@ -59,9 +59,9 @@
     />
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
-    <!-- Inter is self-hosted by the app build; this page deliberately stays on the
-         system stack rather than pulling a 48 kB font file in front of the first
-         paint. font-src is 'self' anyway, so a font CDN would be blocked. -->
+    <!-- Inter comes from this server (@font-face in tokens.css, preloaded above);
+         font-src is 'self', so a font CDN would be blocked. font-display: swap
+         paints the system font first, so the 48 kB file does not hold up the page. -->
     <link rel="stylesheet" href="/tokens.css" />
     <style>
       * {
@@ -396,6 +396,33 @@
         text-underline-offset: 2px;
       }
 
+      .faqband {
+        border-top: 1px solid var(--line);
+      }
+      .faq {
+        max-width: 62ch;
+        margin: 0 auto;
+      }
+      .faq h2 {
+        margin: 0 0 18px;
+        font-size: 22px;
+        letter-spacing: -0.015em;
+      }
+      .faq h3 {
+        margin: 0 0 4px;
+        font-size: 15.5px;
+        font-weight: 600;
+      }
+      .faq p {
+        margin: 0 0 18px;
+        font-size: 15px;
+        line-height: 1.7;
+        color: var(--text-2);
+      }
+      .faq p:last-child {
+        margin-bottom: 0;
+      }
+
       footer {
         display: flex;
         flex-wrap: wrap;
@@ -443,7 +470,7 @@
 
     <main>
       <div class="wrap hero">
-        <span class="eyebrow">A calm RSS reader</span>
+        <span class="eyebrow">A free, calm RSS reader</span>
         <h1>Nothing decides what you read.</h1>
         <p class="sub">
           An inbox for the web: every article from every feed you follow, in the order it was
@@ -451,7 +478,7 @@
           anything you have ever read before you finish typing.
         </p>
         <a class="btn" href="/app/">Create an account</a>
-        <p class="reassure">Email and a password. No card.</p>
+        <p class="reassure">Email and a password. No card. No cost.</p>
       </div>
 
       <div class="wrap shotwrap">
@@ -536,14 +563,14 @@
             <p>No analytics, no ad network, no tracking pixels. Nothing to opt out of.</p>
           </div>
           <div class="fig">
-            <div class="n">0</div>
-            <div class="l">Notifications</div>
-            <p>It never asks for your attention. It is there when you come to it.</p>
+            <div class="n">300</div>
+            <div class="l">Feeds, free</div>
+            <p>Every account. No card, no trial that runs out.</p>
           </div>
           <div class="fig">
             <div class="n">1</div>
             <div class="l">File to move in</div>
-            <p>Export OPML from the reader you have now, drop it here, done.</p>
+            <p>Export OPML from Feedly, Inoreader or any other reader, drop it here, done.</p>
           </div>
         </div>
       </div>
@@ -568,16 +595,37 @@
         </div>
       </div>
 
+      <div class="band faqband">
+        <div class="wrap faq">
+          <h2>Questions people ask first</h2>
+          <h3>Is it free?</h3>
+          <p>Yes. An account is free and follows up to 300 feeds. There is no card to enter
+            and no trial that runs out.</p>
+          <h3>Can I bring my feeds from Feedly or Inoreader?</h3>
+          <p>Yes. Every RSS reader can export your subscriptions as one OPML file. Import it
+            here and your feeds and folders arrive in one step.</p>
+          <h3>Does it work on my phone?</h3>
+          <p>It runs in any browser, on any device, and you can add it to your home screen
+            like an app. Articles you have opened stay readable offline.</p>
+          <h3>Does it use AI or decide what I see?</h3>
+          <p>No. There are no summaries, no ranking and no recommendations. You see every
+            article, newest first.</p>
+          <h3>Can I run it myself?</h3>
+          <p>Yes. alo reader is open source under AGPL-3.0, and the same stack runs on your
+            own server from one compose file.</p>
+        </div>
+      </div>
+
       <div class="band closeband">
         <div class="wrap">
           <a class="btn" href="/app/">Create an account</a>
           <p class="opml">
-            Bring the OPML file from your current reader and you are moved in before the kettle
-            boils. Up to 300 feeds per account.
+            Free, up to 300 feeds per account. Bring the OPML file from your current reader and
+            you are moved in before the kettle boils.
           </p>
           <p class="selfhost">
-            <a href="https://github.com/popalex/alo-reader">Or run it on your own server</a>. Same
-            stack, AGPL-3.0, one compose file.
+            <a href="https://github.com/popalex/alo-reader">Or run it on your own server</a>. Open
+            source (AGPL-3.0), same stack, one compose file.
           </p>
         </div>
       </div>
