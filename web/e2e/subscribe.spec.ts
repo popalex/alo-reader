@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { resetSeedData } from "./reset";
+
 // Drives the feed-management UI added on wp-feed-management-ui against the real
 // stack (AUTH_MODE=none). The discover→subscribe path needs a reachable feed
 // server (unit-tested in tests/subscribe.test.tsx); OPML import creates the
@@ -9,9 +11,9 @@ import { expect, test } from "@playwright/test";
 
 /** An OPML naming two feeds nobody has subscribed to yet. The importer counts an
  *  already-subscribed feed as skipped, so a fixed document could only ever report
- *  "imported 2" on the first attempt — a retry against the shared seeded stack would
- *  get "imported 0 · skipped 2" and fail every time. The tag keeps each attempt's
- *  URLs and titles distinct, so the strong assertion stays strong on a retry. */
+ *  "imported 2" on the first attempt — a retry against data the first attempt had
+ *  changed would get "imported 0 · skipped 2". A retry now starts from reseeded data
+ *  (reset.ts), so the per-attempt tag is a second safeguard, kept because it is free. */
 const opmlFor = (tag: string) => `<?xml version="1.0" encoding="UTF-8"?>
 <opml version="1.0">
   <body>
@@ -19,6 +21,8 @@ const opmlFor = (tag: string) => `<?xml version="1.0" encoding="UTF-8"?>
     <outline text="E2E Feed Two ${tag}" type="rss" xmlUrl="https://e2e-two.example/${tag}.xml"/>
   </body>
 </opml>`;
+
+test.beforeAll(resetSeedData);
 
 test.describe("feed management (AUTH_MODE=none)", () => {
   test("subscribe button opens the add-feed dialog", async ({ page }) => {
@@ -31,9 +35,9 @@ test.describe("feed management (AUTH_MODE=none)", () => {
   test("category: rename then delete (feeds fall back to Uncategorized)", async ({ page }) => {
     await page.goto("/app/");
     // The seeded "Tech" category holds Hacker News — hover its header, rename inline.
-    // Retries share the one seeded stack, so match either name: a failed attempt may
-    // already have renamed the category, and a locator that only knew the seeded name
-    // would block here for the whole test timeout instead of re-running the rename.
+    // Matches either name, a safeguard from before reset.ts reseeded ahead of retries:
+    // a failed attempt might have renamed the category already, and a locator that only
+    // knew the seeded name would block for the whole test timeout.
     const category = page.getByRole("link", { name: /^(tech|reading)$/i });
     // Assert before hovering: if an attempt ever got as far as deleting the category,
     // hover() would sit here for the whole 30s timeout and report nothing useful.
@@ -93,10 +97,9 @@ test.describe("feed management (AUTH_MODE=none)", () => {
 
   test("feed settings: rename a feed and see it update", async ({ page }) => {
     await page.goto("/app/");
-    // Renames a feed the other tests don't touch (they use Hacker News). Retries
-    // share the one seeded stack, so match either name and re-save the same title:
-    // a failed attempt may already have renamed the feed, and if the locator only
-    // knew the seeded name the retry could never find the row again.
+    // Renames a feed the other tests don't touch (they use Hacker News). Matches either
+    // name and re-saves the same title, a safeguard from before reset.ts reseeded ahead
+    // of retries: a failed attempt might have renamed the feed already.
     const feed = page.getByRole("link", { name: /The Verge|Verge Renamed/ });
     await feed.hover(); // reveal the hover-only gear (desktop)
     await page.getByRole("button", { name: /settings for (the verge|verge renamed)/i }).click();

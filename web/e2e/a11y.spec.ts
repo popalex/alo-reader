@@ -1,6 +1,8 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
+import { resetSeedData } from "./reset";
+
 // WP-12 accessibility gate: axe-core finds no violations on the main surfaces
 // (list, reader, help overlay). Non-destructive — opens a single entry — so
 // order among the serial specs doesn't matter.
@@ -12,6 +14,8 @@ import { expect, test } from "@playwright/test";
 // owns: roles, names, landmarks, focus order.
 const axe = (page: import("@playwright/test").Page) =>
   new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).disableRules(["color-contrast"]);
+
+test.beforeAll(resetSeedData);
 
 test.describe("accessibility", () => {
   test("no violations on list, reader and help overlay", async ({ page }) => {

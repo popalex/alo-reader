@@ -45,6 +45,10 @@ done
 log "Seeding the dataset (20 feeds / ~5k entries) inside the api container"
 "${COMPOSE[@]}" exec -T api python - < scripts/seed_dev.py
 
+# Each spec file resets the seeded data before it runs (web/e2e/reset.ts), so no
+# file depends on what an earlier one changed.
+export E2E_RESET_CMD="${COMPOSE[*]} exec -T api python - < scripts/seed_dev.py"
+
 log "Running Playwright against the SPA"
 # Capture Playwright's status explicitly (rather than relying on set -e to abort
 # here) so the exit code can't be masked by anything added after this point, and
