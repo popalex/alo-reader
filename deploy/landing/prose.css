@@ -24,7 +24,10 @@ body {
   gap: 16px;
   padding-block: 16px;
   border-bottom: 1px solid var(--line);
-  max-width: 980px;
+  /* The landing page's header sits in a 980px wrap with 20px sides; this matches it
+     and keeps the same 20px off the screen edge on a phone. */
+  width: calc(100% - 40px);
+  max-width: 940px;
   margin: 0 auto;
 }
 .brand {
