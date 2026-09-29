@@ -130,10 +130,14 @@ catch them being missed except `make e2e-clerk`:
    as 401s on deliveries. Without working deliveries, local rows never learn an
    email address and deleted accounts keep their data.
 3. **Account Portal redirects.** Account Portal → Redirects: set *After sign-up
-   fallback* and *After sign-in fallback* to `/app` on your host. Sign-up runs on
-   Clerk's hosted page, which sends the user to this fallback; left at its
-   default it is `/`, the landing page, and a new user arrives there instead of
-   in the app.
+   fallback* and *After sign-in fallback* to `/app` on your host. Sign-up and
+   sign-in happen in the app's own page, but anyone who reaches Clerk's hosted
+   pages another way is sent to this fallback; left at its default it is `/`,
+   the landing page.
+
+For the Clerk-mode e2e suite's dedicated instance only, turn **Attack protection →
+Bot sign-up protection** off: sign-up is in-page, and Cloudflare's interactive
+check cannot be passed by an automated browser there. Keep it on everywhere else.
 
 ### Upgrading
 
