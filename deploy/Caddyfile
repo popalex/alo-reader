@@ -117,8 +117,14 @@
 	# address, a sign-in provider and a deletion flow, none of which exist in
 	# AUTH_MODE=none — a single-user self-host instance would be publishing a
 	# privacy policy about a relationship it does not have.
-	@legal path /legal /legal.html
-	handle @legal {
+	# One URL per page. The files behind / and /legal are reachable under their own
+	# names too, and /landing.html skipped the templates step, so a crawler found
+	# the page twice and its og:image as literal text. Permanent redirects make the
+	# clean URL the only one with content.
+	redir /landing.html / 301
+	redir /legal.html /legal 301
+
+	handle /legal {
 		import alo_headers
 		root * /srv
 		header Cache-Control "no-cache"
