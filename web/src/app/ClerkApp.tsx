@@ -85,7 +85,9 @@ export default function ClerkApp({ publishableKey }: { publishableKey: string })
     >
       <Show when="signed-out">
         <SignedOutShell>
-          <SignIn />
+          {/* withSignUp: an address with no account continues into sign-up in this
+              same form, instead of leaving for Clerk's hosted sign-up page. */}
+          <SignIn withSignUp />
         </SignedOutShell>
       </Show>
       <Show when="signed-in">
