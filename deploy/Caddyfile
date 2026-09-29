@@ -187,7 +187,7 @@
 			max_size 8MB
 		}
 		reverse_proxy api:8000 {
-			header_up X-Real-IP {http.request.client_ip}
+			header_up X-Real-IP {client_ip}
 		}
 	}
 
