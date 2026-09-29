@@ -187,6 +187,30 @@ test.describe.serial("clerk mode", () => {
     await expect(page.locator('input[name="identifier"]')).toBeVisible();
   });
 
+  test("the landing page's call to action follows the session", async ({ page }) => {
+    // A returning reader must not be pitched a sign-up, and a signed-out one must not
+    // be told they are signed in (deploy/landing/landing.js).
+    const cta = () => page.locator("a.cta").first();
+
+    await page.goto("/");
+    await expect(cta()).toHaveText("Create an account"); // a stranger
+
+    await signIn(page);
+    await page.goto("/");
+    await expect(cta()).toHaveText("Open alo reader");
+    await expect(page.locator(".reassure")).toHaveText("You are already signed in.");
+
+    await page.goto("/app/");
+    await page.waitForFunction(() => (window as unknown as { Clerk?: { loaded?: boolean } }).Clerk?.loaded);
+    await page.evaluate(async () => {
+      const w = window as unknown as { Clerk: { signOut(): Promise<void> } };
+      await w.Clerk.signOut();
+    });
+    await expect(page).toHaveURL(/localhost\/$/);
+    await expect(cta()).toHaveText("Create an account"); // signed out again
+    await expect(page.locator(".reassure")).not.toHaveText("You are already signed in.");
+  });
+
   test("the landing page and /legal are served in clerk mode", async ({ page }) => {
     const landing = await page.goto("/");
     expect(landing?.status()).toBe(200);
