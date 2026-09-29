@@ -38,7 +38,28 @@
 # the app's own rate limiter returns, are not errors. The access log below is what
 # makes those visible. Rate limiting itself never consults a log — the token bucket
 # reads X-Real-IP at request time (auth/middleware.py).
+#
+# ── Who the client is, behind a proxy ────────────────────────────────────────
+# {client_ip} feeds X-Real-IP (the API's per-IP rate limit) and both loggers. Served
+# directly, it is the TCP peer. Behind Cloudflare Tunnel every request arrives from
+# the cloudflared connector, so without this every visitor would be one address: one
+# shared rate-limit bucket (random 429s for everybody) and logs that cannot tell
+# anyone apart. From a trusted proxy only, Caddy instead takes the client from
+# Cf-Connecting-IP, which Cloudflare's edge sets, falling back to X-Forwarded-For.
+#
+# ALO_TRUSTED_PROXIES must name the proxy exactly and nothing else: a header from an
+# untrusted peer is ignored, but a too-wide range lets anyone inside it claim any
+# address. The default is Caddy's own loopback, which no outside request comes from,
+# so a stack served directly behaves as before. The tunnel overlay
+# (docker-compose.tunnel.yml) pins cloudflared to a fixed address and sets it here.
+# The /grafana and /otlp allow-lists deliberately match remote_ip, the TCP peer, not
+# this: a forged header must never open them.
 {
+	servers {
+		trusted_proxies static {$ALO_TRUSTED_PROXIES:127.0.0.1/32}
+		client_ip_headers Cf-Connecting-Ip X-Forwarded-For
+	}
+
 	log {
 		format filter {
 			wrap console
@@ -170,11 +191,9 @@
 		reverse_proxy otel-collector:4318
 	}
 
-	# Pass the real client IP to the API for its per-IP pre-auth rate limit. Caddy is
-	# the edge, so {client_ip} is the direct peer and header_up overwrites any value a
-	# client tried to send. If you later put a CDN/LB in front of Caddy, add a global
-	# `servers { trusted_proxies static <cidrs> }` so {client_ip} resolves the true
-	# client through X-Forwarded-For.
+	# Pass the real client IP to the API for its per-IP pre-auth rate limit.
+	# {client_ip} is the direct peer, or the visitor behind a trusted proxy (see the
+	# global options), and header_up overwrites any value a client tried to send.
 	@api path /api/*
 	handle @api {
 		# Cap the request body at the edge. The app's own OPML cap (OPML_MAX_BYTES,
@@ -187,7 +206,7 @@
 			max_size 8MB
 		}
 		reverse_proxy api:8000 {
-			header_up X-Real-IP {http.request.client_ip}
+			header_up X-Real-IP {client_ip}
 		}
 	}
 

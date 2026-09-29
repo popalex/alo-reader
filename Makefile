@@ -32,7 +32,7 @@ COMPOSE_DEV_OTEL := $(DC) -f deploy/docker-compose.yml -f deploy/docker-compose.
 # (see `make db`). Postgres itself is never installed on the host.
 TEST_DATABASE_URL ?= postgresql+asyncpg://alo:alo@localhost:5432/alo
 
-.PHONY: venv lock lock-upgrade lint typecheck test-api test-web e2e e2e-clerk lighthouse size up seed dev down db db-down migrate generate-client bench-search loadtest pg-image
+.PHONY: venv lock lock-upgrade lint typecheck test-api test-web e2e e2e-clerk lighthouse size up tunnel-up tunnel-down seed dev down db db-down migrate generate-client bench-search loadtest pg-image
 
 ## Optional: a local virtualenv, for editor tooling (autocomplete, go-to-def).
 ## The gates below do not use it — they run in the toolchain container — so this
@@ -134,6 +134,15 @@ up:
 ## Full stack + OpenTelemetry → Grafana LGTM (collector + otel-lgtm). Grafana on :3001.
 otel-up:
 	$(COMPOSE_OTEL) up --build -d
+
+## Public instance behind Cloudflare Tunnel: no host ports, Caddy trusts only the
+## connector's Cf-Connecting-IP. Needs CLOUDFLARE_TUNNEL_TOKEN in .env.
+COMPOSE_TUNNEL := $(DC) -f deploy/docker-compose.yml -f deploy/docker-compose.tunnel.yml
+tunnel-up:
+	$(COMPOSE_TUNNEL) up --build -d
+
+tunnel-down:
+	$(COMPOSE_TUNNEL) down
 
 otel-down:
 	$(COMPOSE_OTEL) down
