@@ -42,6 +42,8 @@ test("a self-hosted instance keeps out of search results", async ({ request }) =
   for (const path of ["/app/", "/api/v1/config"]) {
     expect((await request.get(path)).headers()["x-robots-tag"], path).toBe("noindex, nofollow");
   }
-  // The landing page belongs to clerk mode only.
-  expect((await request.get("/landing.html", { maxRedirects: 0 })).status()).toBe(404);
+  // The landing page and the moving guides belong to clerk mode only.
+  for (const path of ["/landing.html", "/from/feedly", "/from/feedly.html"]) {
+    expect((await request.get(path, { maxRedirects: 0 })).status(), path).toBe(404);
+  }
 });
