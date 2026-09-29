@@ -1,0 +1,35 @@
+/* The error page (error.html): 404s and anything else Caddy answers with an error.
+   Nav, headline, button and the app mock's list styles come from landing.css. */
+.nf {
+  text-align: center;
+  padding-block: 64px 72px;
+}
+.nf h1 {
+  margin-bottom: 12px;
+}
+.nf .sub {
+  margin-bottom: 28px;
+}
+.nf-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 22px;
+  margin-top: 22px;
+  font-size: 14px;
+}
+.nf-links a {
+  color: var(--accent);
+  font-weight: 500;
+  text-underline-offset: 2px;
+}
+/* The list pane, as in the landing page's mock of the app. */
+.nf-pane {
+  max-width: 460px;
+  margin: 0 auto 32px;
+  text-align: left;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface);
+}
