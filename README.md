@@ -81,6 +81,28 @@ all for a few days.
 **3. Confirm what is running:** `curl -s https://your-domain/api/v1/healthz`
 returns the status and the `APP_VERSION` the image was built with.
 
+### Behind Cloudflare Tunnel
+
+Instead of step 2's open ports: nothing listens on the host, and Cloudflare
+terminates TLS.
+
+1. In Cloudflare Zero Trust, **Networks → Tunnels → Create a tunnel**. Add a
+   public hostname for your domain with service `http://caddy:80`.
+2. Put the tunnel's token in `.env` as `CLOUDFLARE_TUNNEL_TOKEN`.
+3. `make tunnel-up` instead of `make up`.
+
+The overlay (`deploy/docker-compose.tunnel.yml`) runs `cloudflared` beside Caddy,
+drops the 80/443 host ports, and serves Caddy on plain `:80`, so leave
+`ALO_SITE_ADDRESS` alone. Every request now reaches Caddy from `cloudflared`; the
+overlay pins it to a fixed address and trusts that address alone for the visitor's
+`Cf-Connecting-IP`. Without that, all visitors would be one client: one shared
+per-IP rate-limit bucket, and logs that cannot tell anyone apart. A forged header
+from anywhere else is ignored.
+
+`/grafana` and `/otlp` stay closed through the tunnel: their allow-lists match the
+TCP peer, which is always `cloudflared`, on purpose, so no header can open them.
+Reach Grafana over SSH (`ssh -L 3001:127.0.0.1:3001`), as without a tunnel.
+
 ### Auth mode
 
 `AUTH_MODE` has no default and the API exits at startup without it. That is
