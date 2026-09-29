@@ -1,0 +1,56 @@
+# Cloudflare Tunnel overlay: the public instance is reached only through a tunnel, with
+# no inbound ports open on the host.
+#
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.tunnel.yml up --build -d
+#   (or `make tunnel-up`)
+#
+# Setup, once: in Cloudflare Zero Trust, Networks → Tunnels → create a tunnel, add a
+# public hostname for your domain with service `http://caddy:80`, and put the tunnel's
+# token in .env as CLOUDFLARE_TUNNEL_TOKEN. Cloudflare terminates TLS; Caddy serves
+# plain HTTP on :80 inside the stack, so ALO_SITE_ADDRESS is forced to :80 here (a
+# hostname would make Caddy chase ACME certificates it cannot get and redirect the
+# tunnel's HTTP to HTTPS).
+#
+# Why the fixed addresses: every request now reaches Caddy from cloudflared, so Caddy
+# must trust that one peer's Cf-Connecting-IP to know who the visitor is (per-IP rate
+# limit, logs). A trust rule has to name the proxy exactly, and a container address on
+# a default network is whatever Docker hands out. This overlay gives cloudflared and
+# Caddy a small network of their own with a fixed subnet, and trusts cloudflared's
+# address alone.
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:2026.9.3
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN in .env (Cloudflare Zero Trust → Tunnels)}
+    networks:
+      edge:
+        ipv4_address: 172.31.254.2
+    depends_on:
+      - caddy
+    restart: unless-stopped
+    logging: *default-logging
+
+  caddy:
+    environment:
+      ALO_SITE_ADDRESS: ":80"
+      ALO_TRUSTED_PROXIES: 172.31.254.2/32
+    # Tunnel only: nothing listens on the host. `!reset` drops the base file's 80/443.
+    ports: !reset []
+    networks:
+      default: {}
+      edge:
+        ipv4_address: 172.31.254.3
+
+networks:
+  edge:
+    ipam:
+      config:
+        - subnet: 172.31.254.0/29
