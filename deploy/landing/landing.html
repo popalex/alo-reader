@@ -59,9 +59,9 @@
     />
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
-    <!-- Inter is self-hosted by the app build; this page deliberately stays on the
-         system stack rather than pulling a 48 kB font file in front of the first
-         paint. font-src is 'self' anyway, so a font CDN would be blocked. -->
+    <!-- Inter comes from this server (@font-face in tokens.css, preloaded above);
+         font-src is 'self', so a font CDN would be blocked. font-display: swap
+         paints the system font first, so the 48 kB file does not hold up the page. -->
     <link rel="stylesheet" href="/tokens.css" />
     <style>
       * {
