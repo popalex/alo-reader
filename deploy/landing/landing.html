@@ -396,6 +396,33 @@
         text-underline-offset: 2px;
       }
 
+      .faqband {
+        border-top: 1px solid var(--line);
+      }
+      .faq {
+        max-width: 62ch;
+        margin: 0 auto;
+      }
+      .faq h2 {
+        margin: 0 0 18px;
+        font-size: 22px;
+        letter-spacing: -0.015em;
+      }
+      .faq h3 {
+        margin: 0 0 4px;
+        font-size: 15.5px;
+        font-weight: 600;
+      }
+      .faq p {
+        margin: 0 0 18px;
+        font-size: 15px;
+        line-height: 1.7;
+        color: var(--text-2);
+      }
+      .faq p:last-child {
+        margin-bottom: 0;
+      }
+
       footer {
         display: flex;
         flex-wrap: wrap;
@@ -536,9 +563,9 @@
             <p>No analytics, no ad network, no tracking pixels. Nothing to opt out of.</p>
           </div>
           <div class="fig">
-            <div class="n">0</div>
-            <div class="l">Notifications</div>
-            <p>It never asks for your attention. It is there when you come to it.</p>
+            <div class="n">300</div>
+            <div class="l">Feeds, free</div>
+            <p>Every account. No card, no trial that runs out.</p>
           </div>
           <div class="fig">
             <div class="n">1</div>
@@ -565,6 +592,27 @@
             This is on the front page rather than buried in the privacy policy because it is the
             part that should decide whether you hand over five years of reading.
           </p>
+        </div>
+      </div>
+
+      <div class="band faqband">
+        <div class="wrap faq">
+          <h2>Questions people ask first</h2>
+          <h3>Is it free?</h3>
+          <p>Yes. An account is free and follows up to 300 feeds. There is no card to enter
+            and no trial that runs out.</p>
+          <h3>Can I bring my feeds from Feedly or Inoreader?</h3>
+          <p>Yes. Every RSS reader can export your subscriptions as one OPML file. Import it
+            here and your feeds and folders arrive in one step.</p>
+          <h3>Does it work on my phone?</h3>
+          <p>It runs in any browser, on any device, and you can add it to your home screen
+            like an app. Articles you have opened stay readable offline.</p>
+          <h3>Does it use AI or decide what I see?</h3>
+          <p>No. There are no summaries, no ranking and no recommendations. You see every
+            article, newest first.</p>
+          <h3>Can I run it myself?</h3>
+          <p>Yes. alo reader is open source under AGPL-3.0, and the same stack runs on your
+            own server from one compose file.</p>
         </div>
       </div>
 
