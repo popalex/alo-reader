@@ -41,11 +41,21 @@ test.describe("search", () => {
     await page.keyboard.press("/");
     await page.getByRole("searchbox", { name: "Search articles" }).fill("paragraph");
     await expect(page.locator("[data-index] b").first()).toBeVisible();
-    const scoped = await page.locator("[data-index]").count();
 
-    // Switch scope to "All" — searches every subscription, so at least as many hits.
+    // Assert on what the rows are, not how many are on screen. The list is
+    // virtualized, so the DOM holds only the rows that fit, and "All" rows (longer
+    // feed names and snippets) can fit fewer: comparing rendered counts failed in CI
+    // with 19 scoped rows and 17 unscoped ones. Every row shows its feed's title.
+    const rowTexts = () => page.locator("[data-index]").allInnerTexts();
+    const scoped = await rowTexts();
+    expect(scoped.length).toBeGreaterThan(0);
+    expect(scoped.every((text) => text.includes("Nature"))).toBe(true);
+
+    // Switch scope to "All": every subscription is searched, so other feeds appear.
     await page.getByRole("button", { name: "All", exact: true }).click();
     await expect(page.locator("[data-index] b").first()).toBeVisible();
-    await expect.poll(() => page.locator("[data-index]").count()).toBeGreaterThanOrEqual(scoped);
+    await expect
+      .poll(async () => (await rowTexts()).some((text) => !text.includes("Nature")))
+      .toBe(true);
   });
 });
