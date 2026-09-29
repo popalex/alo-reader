@@ -3,6 +3,7 @@
 import base64
 import json
 import secrets
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
@@ -67,6 +68,17 @@ async def test_user_created(api_client: httpx.AsyncClient, webhook_secret: str) 
         user = await users_store.get_by_clerk_id(s, "user_wh1")
     assert user is not None
     assert user.email == "primary@example.com"  # primary picked, not the first entry
+
+
+async def test_user_created_gets_the_configured_quota(
+    api_client: httpx.AsyncClient, webhook_secret: str, quota_default: Callable[[int], None]
+) -> None:
+    quota_default(42)
+    response = await post_event(api_client, webhook_secret, user_event("user.created", "user_wh_q"))
+    assert response.status_code == 204
+    async with app_db.get_sessionmaker()() as s:
+        user = await users_store.get_by_clerk_id(s, "user_wh_q")
+    assert user is not None and user.quota_subs == 42
 
 
 async def test_user_updated_and_created_idempotent(

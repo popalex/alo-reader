@@ -97,6 +97,13 @@ class Settings(BaseSettings):
     # past the cap is a 422 quota_exceeded, so a script can't mint unbounded tokens.
     quota_api_tokens: int = 20
 
+    # Subscription cap given to each NEW account, stored on its row (users.quota_subs),
+    # so one account can later be raised with an UPDATE and no migration. Changing this
+    # affects accounts created afterwards, not existing ones. 300 because people arrive
+    # with an OPML of 50-300 feeds, and a lower cap turns their first action into a
+    # list of quota_exceeded lines.
+    quota_subs_default: int = Field(default=300, gt=0)
+
     # Minimum spacing between /discover calls per user (per API replica). Discovery
     # makes the server fetch an arbitrary page, so it's rate-limited harder than the
     # coarse global bucket to bound that SSRF/cost surface.

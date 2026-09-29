@@ -3,7 +3,7 @@
 import asyncio
 import json
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -90,7 +90,9 @@ async def test_valid_jwt_maps_to_local_user(
     api_client: httpx.AsyncClient, clerk_env: ClerkEnv
 ) -> None:
     async with app_db.get_sessionmaker()() as s, s.begin():
-        user = await users_store.create(s, clerk_user_id="user_abc", email="a@example.com")
+        user = await users_store.create(
+            s, clerk_user_id="user_abc", email="a@example.com", quota_subs=300
+        )
         user_id = user.id
 
     response = await api_client.get(
@@ -146,7 +148,7 @@ async def test_get_or_create_by_clerk_id_under_concurrent_transactions(api_db: s
 
     async def provision() -> int:
         async with factory() as session, session.begin():
-            user = await users_store.get_or_create_by_clerk_id(session, "user_race")
+            user = await users_store.get_or_create_by_clerk_id(session, "user_race", quota_subs=300)
             assert user is not None  # no tombstone for this id
             return user.id
 
@@ -189,6 +191,17 @@ async def test_provisioning_failure_other_than_the_race_is_503_not_a_sign_out(
         "/api/v1/me", headers=clerk_env.headers(clerk_env.make_jwt("user_unlucky"))
     )
     assert response.status_code == 503
+
+
+async def test_auto_provisioned_user_gets_the_configured_quota(
+    api_client: httpx.AsyncClient, clerk_env: ClerkEnv, quota_default: Callable[[int], None]
+) -> None:
+    quota_default(42)
+    response = await api_client.get(
+        "/api/v1/me", headers=clerk_env.headers(clerk_env.make_jwt("user_quota"))
+    )
+    assert response.status_code == 200
+    assert response.json()["quotas"]["subscriptions"] == 42
 
 
 @pytest.mark.parametrize(

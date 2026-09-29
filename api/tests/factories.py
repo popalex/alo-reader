@@ -16,6 +16,7 @@ _seq = itertools.count(1)
 
 async def make_user(session: AsyncSession, **kwargs: object) -> User:
     kwargs.setdefault("email", f"user{next(_seq)}@example.com")
+    kwargs.setdefault("quota_subs", 300)
     return await users_store.create(session, **kwargs)  # type: ignore[arg-type]
 
 

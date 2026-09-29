@@ -27,7 +27,7 @@ async def create(
     *,
     clerk_user_id: str | None = None,
     email: str = "",
-    quota_subs: int = 300,
+    quota_subs: int,
 ) -> User:
     user = User(clerk_user_id=clerk_user_id, email=email, quota_subs=quota_subs)
     session.add(user)
@@ -35,7 +35,9 @@ async def create(
     return user
 
 
-async def get_or_create_by_clerk_id(session: AsyncSession, clerk_user_id: str) -> User | None:
+async def get_or_create_by_clerk_id(
+    session: AsyncSession, clerk_user_id: str, *, quota_subs: int
+) -> User | None:
     """The user for this Clerk id, creating the row if there is none. None if the id
     belongs to a deleted Clerk account.
 
@@ -58,8 +60,8 @@ async def get_or_create_by_clerk_id(session: AsyncSession, clerk_user_id: str) -
     await session.execute(
         pg_insert(User)
         .from_select(
-            ["clerk_user_id"],
-            select(literal(clerk_user_id)).where(~tombstoned.exists()),
+            ["clerk_user_id", "quota_subs"],
+            select(literal(clerk_user_id), literal(quota_subs)).where(~tombstoned.exists()),
         )
         .on_conflict_do_nothing(index_elements=[User.clerk_user_id])
     )
