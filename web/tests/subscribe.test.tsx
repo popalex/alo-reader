@@ -77,8 +77,8 @@ describe("AddSubscriptionDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: /find/i }));
     await screen.findByRole("button", { name: /^add$/i });
 
-    fireEvent.change(screen.getByLabelText(/^category$/i), { target: { value: "__new__" } });
-    fireEvent.change(screen.getByLabelText(/new category name/i), { target: { value: "Podcasts" } });
+    fireEvent.change(screen.getByLabelText(/^folder$/i), { target: { value: "__new__" } });
+    fireEvent.change(screen.getByLabelText(/new folder name/i), { target: { value: "Podcasts" } });
     fireEvent.click(screen.getByRole("button", { name: /^add$/i }));
 
     await waitFor(() => expect(createFolder).toHaveBeenCalledWith(null, "Podcasts"));

@@ -17,10 +17,14 @@ import { Sidebar } from "../sidebar/Sidebar";
 import { FeedSettingsFlow } from "../subscribe/FeedSettingsFlow";
 import { AddFeedContext } from "./addFeed";
 import { FeedSettingsContext } from "./feedSettings";
+import { KeyboardHelpContext } from "./keyboardHelp";
 import { MobileNavContext } from "./mobileNav";
 import styles from "./AppLayout.module.css";
 
 const MobileSidebar = lazyDialog(() => import("./MobileSidebar").then((m) => m.MobileSidebar));
+const KeyboardHelp = lazyDialog(() =>
+  import("../../keyboard/KeyboardHelp").then((m) => m.KeyboardHelp),
+);
 const AddSubscriptionDialog = lazyDialog(() =>
   import("../subscribe/AddSubscriptionDialog").then((m) => m.AddSubscriptionDialog),
 );
@@ -30,6 +34,7 @@ export function AppLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [addFeedOpen, setAddFeedOpen] = useState(false);
   const [settingsSub, setSettingsSub] = useState<Subscription | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
   const folders = useFolders();
   usePendingFeedPolling(); // auto-refresh a just-added feed until the worker fills it in
 
@@ -41,39 +46,42 @@ export function AppLayout() {
     <MobileNavContext.Provider value={{ openSidebar: () => setDrawerOpen(true) }}>
       <AddFeedContext.Provider value={{ openAddFeed: () => setAddFeedOpen(true) }}>
         <FeedSettingsContext.Provider value={{ openFeedSettings: setSettingsSub }}>
-          <div className={styles.shell}>
-            {!isMobile && <Sidebar />}
-            <div className={styles.content}>
-              {/* A render error in one stream shouldn't blank the whole app; reset on
-                  navigation so moving to another view recovers. */}
-              <ErrorBoundary
-                resetKey={pathname}
-                fallback={
-                  <div className={styles.crash} role="alert">
-                    <p className={styles.crashTitle}>Something went wrong</p>
-                    <p>This view ran into an error. Try reloading the page.</p>
-                    <button
-                      type="button"
-                      className={styles.crashBtn}
-                      onClick={() => window.location.reload()}
-                    >
-                      Reload
-                    </button>
-                  </div>
-                }
-              >
-                <Outlet />
-              </ErrorBoundary>
+          <KeyboardHelpContext.Provider value={{ openKeyboardHelp: () => setHelpOpen(true) }}>
+            <div className={styles.shell}>
+              {!isMobile && <Sidebar />}
+              <div className={styles.content}>
+                {/* A render error in one stream shouldn't blank the whole app; reset on
+                    navigation so moving to another view recovers. */}
+                <ErrorBoundary
+                  resetKey={pathname}
+                  fallback={
+                    <div className={styles.crash} role="alert">
+                      <p className={styles.crashTitle}>Something went wrong</p>
+                      <p>This view ran into an error. Try reloading the page.</p>
+                      <button
+                        type="button"
+                        className={styles.crashBtn}
+                        onClick={() => window.location.reload()}
+                      >
+                        Reload
+                      </button>
+                    </div>
+                  }
+                >
+                  <Outlet />
+                </ErrorBoundary>
+              </div>
+              <UnreadAnnouncer />
             </div>
-            <UnreadAnnouncer />
-          </div>
-          {isMobile && <MobileSidebar open={drawerOpen} onOpenChange={setDrawerOpen} />}
-          <AddSubscriptionDialog
-            open={addFeedOpen}
-            onOpenChange={setAddFeedOpen}
-            folders={folders.data ?? []}
-          />
-          <FeedSettingsFlow sub={settingsSub} onClose={() => setSettingsSub(null)} />
+            {isMobile && <MobileSidebar open={drawerOpen} onOpenChange={setDrawerOpen} />}
+            <AddSubscriptionDialog
+              open={addFeedOpen}
+              onOpenChange={setAddFeedOpen}
+              folders={folders.data ?? []}
+            />
+            <FeedSettingsFlow sub={settingsSub} onClose={() => setSettingsSub(null)} />
+            <KeyboardHelp open={helpOpen} onOpenChange={setHelpOpen} />
+          </KeyboardHelpContext.Provider>
         </FeedSettingsContext.Provider>
       </AddFeedContext.Provider>
     </MobileNavContext.Provider>

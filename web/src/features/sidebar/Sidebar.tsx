@@ -7,15 +7,17 @@
 import { useMemo, useState } from "react";
 
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { ChevronDown, Inbox, Loader2, Pencil, Plus, Settings2, Star, Trash2 } from "lucide-react";
+import { ChevronDown, Inbox, Keyboard, Loader2, Pencil, Plus, Settings2, Star, Trash2 } from "lucide-react";
 
 import type { Folder, Subscription } from "../../api/endpoints";
 import { useDeleteFolder, useUpdateFolder } from "../../api/feedMutations";
 import { useCounts, useFolders, useSubscriptions } from "../../api/queries";
 import { useAccountSlot } from "../../app/accountSlot";
+import { ThemeToggle } from "../../app/ThemeToggle";
 import { Favicon } from "../../components/Favicon";
 import { lazyDialog } from "../../components/lazyDialog";
 import { useFeedSettings } from "../layout/feedSettings";
+import { useKeyboardHelp } from "../layout/keyboardHelp";
 import styles from "./Sidebar.module.css";
 
 const ConfirmDialog = lazyDialog(() =>
@@ -137,7 +139,7 @@ function FolderHeader({
           <button
             type="button"
             className={styles.folderAction}
-            title="Rename category"
+            title="Rename folder"
             aria-label={`Rename ${folder.name}`}
             onClick={() => {
               setName(folder.name);
@@ -149,7 +151,7 @@ function FolderHeader({
           <button
             type="button"
             className={styles.folderAction}
-            title="Delete category"
+            title="Delete folder"
             aria-label={`Delete ${folder.name}`}
             onClick={() => onDelete(folder)}
           >
@@ -171,6 +173,8 @@ export function Sidebar() {
   const [addOpen, setAddOpen] = useState(false);
   const [pendingDeleteFolder, setPendingDeleteFolder] = useState<Folder | null>(null);
   const { openFeedSettings } = useFeedSettings();
+  const [editing, setEditing] = useState(false);
+  const { openKeyboardHelp } = useKeyboardHelp();
   const deleteFolder = useDeleteFolder();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -221,11 +225,22 @@ export function Sidebar() {
     feeds.reduce((sum, f) => sum + (unreadBySub.get(f.id) ?? 0), 0);
 
   return (
-    <aside className={styles.side}>
+    <aside className={styles.side} data-editing={editing || undefined}>
       <div className={styles.head}>
         <span className={styles.logo}>
           alo<span className={styles.dot}>.</span>
         </span>
+        {/* Touch screens only (CSS): with no hover to reveal them, the rename, delete
+            and settings buttons used to sit on every row. They now appear while
+            editing. */}
+        <button
+          type="button"
+          className={styles.edit}
+          aria-pressed={editing}
+          onClick={() => setEditing((on) => !on)}
+        >
+          {editing ? "Done" : "Edit feeds"}
+        </button>
         <button
           type="button"
           className={styles.subscribe}
@@ -246,13 +261,13 @@ export function Sidebar() {
       <ConfirmDialog
         open={pendingDeleteFolder !== null}
         onOpenChange={(open) => !open && setPendingDeleteFolder(null)}
-        title="Delete this category?"
+        title="Delete this folder?"
         body={(() => {
           if (!pendingDeleteFolder) return "";
           const n = grouped.get(pendingDeleteFolder.id)?.length ?? 0;
           return n > 0
-            ? `"${pendingDeleteFolder.name}" will be removed. Its ${n} feed${n === 1 ? "" : "s"} will move to Uncategorized.`
-            : `The empty category "${pendingDeleteFolder.name}" will be removed.`;
+            ? `"${pendingDeleteFolder.name}" will be removed. Its ${n} feed${n === 1 ? "" : "s"} will move out of it, to the top level.`
+            : `The empty folder "${pendingDeleteFolder.name}" will be removed.`;
         })()}
         confirmLabel="Delete"
         onConfirm={() => {
@@ -339,7 +354,22 @@ export function Sidebar() {
         )}
       </div>
 
-      {account && <div className={styles.foot}>{account}</div>}
+      {/* Account (clerk mode), theme and the shortcut sheet: settings for the whole
+          app, so they sit with the sidebar rather than in the article list's toolbar. */}
+      <div className={styles.foot}>
+        {account}
+        <span className={styles.footSpacer} />
+        <ThemeToggle />
+        <button
+          type="button"
+          className={styles.shortcuts}
+          aria-label="Keyboard shortcuts"
+          title="Keyboard shortcuts (?)"
+          onClick={openKeyboardHelp}
+        >
+          <Keyboard size={16} />
+        </button>
+      </div>
     </aside>
   );
 }

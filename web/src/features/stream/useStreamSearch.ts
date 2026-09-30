@@ -14,7 +14,7 @@ export function scopeLabel(stream: StreamDescriptor): string {
     case "feed":
       return "This feed";
     case "folder":
-      return "This category";
+      return "This folder";
     case "starred":
       return "Starred";
     case "all":

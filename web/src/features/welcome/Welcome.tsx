@@ -148,13 +148,13 @@ export function Welcome() {
         </div>
 
         <div className={styles.option}>
-          <h2 className={styles.optionTitle}>Add a feed or a site</h2>
+          <h2 className={styles.optionTitle}>Subscribe to a feed or a site</h2>
           <p className={styles.optionBody}>
             Paste a site&rsquo;s address and Alo Reader finds its feed, or paste the feed itself.
           </p>
           <button type="button" className={styles.btnSecondary} onClick={openAddFeed}>
             <Plus size={16} />
-            <span>Add a feed</span>
+            <span>Subscribe to a feed</span>
           </button>
         </div>
 

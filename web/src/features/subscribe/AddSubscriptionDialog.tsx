@@ -104,7 +104,7 @@ export function AddSubscriptionDialog({
       if (folderId === NEW_FOLDER) {
         const name = newFolderName.trim();
         if (!name) {
-          setError("Enter a name for the new category.");
+          setError("Enter a name for the new folder.");
           return;
         }
         // Reuse the folder if one is already being (or has been) created for this
@@ -152,7 +152,7 @@ export function AddSubscriptionDialog({
       <Dialog.Portal>
         <Dialog.Overlay className={styles.overlay} />
         <Dialog.Content className={styles.content} aria-describedby={undefined}>
-          <Dialog.Title className={styles.title}>Add a feed</Dialog.Title>
+          <Dialog.Title className={styles.title}>Subscribe to a feed</Dialog.Title>
 
           <form className={styles.section} onSubmit={onFind}>
             <label className={styles.label} htmlFor="add-feed-url">

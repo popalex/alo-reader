@@ -51,7 +51,7 @@ describe("FeedSettingsDialog", () => {
     renderDialog();
 
     fireEvent.change(screen.getByLabelText(/^title$/i), { target: { value: "New Title" } });
-    fireEvent.change(screen.getByLabelText(/^category$/i), { target: { value: "3" } });
+    fireEvent.change(screen.getByLabelText(/^folder$/i), { target: { value: "3" } });
     fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
     await waitFor(() =>
@@ -73,7 +73,7 @@ describe("FeedSettingsDialog", () => {
   it("delete routes to onDelete", () => {
     const onDelete = vi.fn();
     renderDialog(onDelete);
-    fireEvent.click(screen.getByRole("button", { name: /delete feed/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^unsubscribe$/i }));
     expect(onDelete).toHaveBeenCalledWith(sub);
   });
 });
