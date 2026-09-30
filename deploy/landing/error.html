@@ -9,7 +9,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{{if $notFound}}Page not found{{else}}Something went wrong{{end}} · alo reader</title>
+    <title>{{if $notFound}}Page not found{{else}}Something went wrong{{end}} · Alo Reader</title>
     <meta name="robots" content="noindex" />
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link
@@ -33,11 +33,11 @@
               <circle cx="5" cy="19" r="1.6" fill="currentColor" stroke="none" />
             </svg>
           </span>
-          alo reader
+          Alo Reader
         </a>
         <div class="navlinks">
           {{- if $selfHost}}
-          <a class="cta" href="/app/">Open alo reader</a>
+          <a class="cta" href="/app/">Open Alo Reader</a>
           {{- else}}
           <a href="/app/">Sign in</a>
           <a class="cta" href="/app/">Create an account</a>
@@ -53,7 +53,7 @@
       <div class="nf-pane">
         <div class="s-head"><span>All items</span><span class="s-count">1 unread</span></div>
         <div class="s-ent unread sel">
-          <span class="s-fav"></span><span class="s-feed-n">alo reader</span
+          <span class="s-fav"></span><span class="s-feed-n">Alo Reader</span
           ><span class="s-time">just now</span>
           <span class="s-title">404: Page not found</span>
           <span class="s-sum"
@@ -69,7 +69,7 @@
       </p>
       {{- end}}
       {{- if $selfHost}}
-      <a class="btn" href="/app/">Open alo reader</a>
+      <a class="btn" href="/app/">Open Alo Reader</a>
       {{- else}}
       <a class="btn" href="/">Go to the front page</a>
       <div class="nf-links">
@@ -81,7 +81,7 @@
     </main>
     {{- if not $selfHost}}
 
-    <!-- Swaps "Create an account" for "Open alo reader" when a session cookie is present. -->
+    <!-- Swaps "Create an account" for "Open Alo Reader" when a session cookie is present. -->
     <script src="/landing.js" defer></script>
     {{- end}}
   </body>

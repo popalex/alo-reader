@@ -25,7 +25,7 @@ function BootError({ message, onRetry }: { message: string; onRetry?: () => void
   return (
     <main style={{ display: "grid", placeItems: "center", minHeight: "100vh" }}>
       <div style={{ display: "grid", placeItems: "center", gap: 12, textAlign: "center" }}>
-        <p role="alert">Could not start alo-reader — {message}</p>
+        <p role="alert">Could not start Alo Reader: {message}</p>
         {onRetry ? (
           <button type="button" onClick={onRetry}>
             Try again

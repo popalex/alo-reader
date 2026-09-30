@@ -14,7 +14,7 @@ describe("SignedOutShell", () => {
       </SignedOutShell>,
     );
     expect(screen.getByRole("heading", { name: "Sign in or create an account" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "alo reader" }).getAttribute("href")).toBe("/");
+    expect(screen.getByRole("link", { name: "Alo Reader" }).getAttribute("href")).toBe("/");
     expect(screen.getByRole("group", { name: "Colour theme" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Terms & privacy" }).getAttribute("href")).toBe("/legal");
     expect(screen.getByRole("form", { name: "clerk form" })).toBeTruthy();

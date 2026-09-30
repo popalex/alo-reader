@@ -44,7 +44,7 @@ describe("Welcome", () => {
   it("imports the chosen OPML file straight from the welcome screen", async () => {
     importOpml.mockResolvedValue({ imported: 3, skipped: 0, failed: [] });
     const { container } = renderWelcome();
-    expect(screen.getByRole("heading", { name: "Welcome to alo reader", level: 1 })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Welcome to Alo Reader", level: 1 })).toBeTruthy();
 
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
     const file = opml();

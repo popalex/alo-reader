@@ -28,7 +28,7 @@ export function SignedOutShell({ children }: { children: ReactNode }) {
       <header className={styles.nav}>
         <a className={styles.brand} href="/">
           <Mark className={styles.markSmall} />
-          alo reader
+          Alo Reader
         </a>
         <ThemeToggle />
       </header>
@@ -43,7 +43,7 @@ export function SignedOutShell({ children }: { children: ReactNode }) {
       </main>
 
       <footer className={styles.footer}>
-        <span>© 2026 alo reader</span>
+        <span>© 2026 Alo Reader</span>
         <span className={styles.sep} />
         <a href="https://github.com/popalex/alo-reader">Source (AGPL-3.0)</a>
         <a href="/legal">Terms &amp; privacy</a>

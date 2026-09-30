@@ -58,7 +58,7 @@ test("unknown addresses: a 404 page outside the app, a not-found screen inside i
     expect(r.status(), path).toBe(404);
     const html = await r.text();
     expect(html, path).toContain("This page is not here.");
-    expect(html, path).toContain("Open alo reader");
+    expect(html, path).toContain("Open Alo Reader");
     expect(html, path).not.toContain("Create an account");
     expect(html, path).not.toContain("{{");
   }

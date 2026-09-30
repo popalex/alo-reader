@@ -1,4 +1,4 @@
-# alo-reader
+# Alo Reader
 
 A chronological RSS reader — an inbox for the web: no algorithms, no
 recommendations, no engagement mechanics. Fast, calm, keyboard-driven.

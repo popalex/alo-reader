@@ -107,7 +107,7 @@ export function Welcome() {
         </div>
       )}
       <div className={styles.body}>
-        <h1 className={styles.title}>Welcome to alo reader</h1>
+        <h1 className={styles.title}>Welcome to Alo Reader</h1>
         <p className={styles.lead}>Bring the feeds you already follow, or start with one.</p>
 
         <div className={`${styles.option} ${styles.primary}`}>
@@ -150,7 +150,7 @@ export function Welcome() {
         <div className={styles.option}>
           <h2 className={styles.optionTitle}>Add a feed or a site</h2>
           <p className={styles.optionBody}>
-            Paste a site&rsquo;s address and alo reader finds its feed, or paste the feed itself.
+            Paste a site&rsquo;s address and Alo Reader finds its feed, or paste the feed itself.
           </p>
           <button type="button" className={styles.btnSecondary} onClick={openAddFeed}>
             <Plus size={16} />
