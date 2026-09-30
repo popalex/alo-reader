@@ -2,8 +2,9 @@
 //
 // A reader who already has a session should not be shown a signup pitch, so if a
 // Clerk session cookie is present the two "Create an account" links become "Open
-// Alo Reader". Cookie presence is a hint, not authentication: it decides wording
-// only, and /app resolves the real session with Clerk.
+// Alo Reader" and "Sign in" is hidden. Cookie presence is a hint, not
+// authentication: it decides wording only, and /app resolves the real session with
+// Clerk.
 //
 // Served as a file rather than inlined because the CSP is `script-src 'self'`
 // with no 'unsafe-inline' (deploy/Caddyfile).
@@ -22,7 +23,12 @@
   var links = document.querySelectorAll('a[href="/app/"]');
   for (var i = 0; i < links.length; i++) {
     var a = links[i];
-    if (a.textContent.trim() === "Sign in") continue;
+    // A signed-in visitor has nothing to sign in to: the call to action already
+    // says "Open Alo Reader".
+    if (a.textContent.trim() === "Sign in") {
+      a.hidden = true;
+      continue;
+    }
     a.textContent = "Open Alo Reader";
   }
   var reassure = document.querySelector(".reassure");
