@@ -122,7 +122,10 @@
   color: var(--text);
 }
 
-.btnPrimary:focus-within,
+/* Keyboard focus only: :focus-within also matched a mouse click, which left a ring
+   around the button. The import button is a label, so it asks its file input. */
+.btnPrimary:focus-visible,
+.btnPrimary:has(input:focus-visible),
 .btnSecondary:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -201,10 +204,6 @@
   cursor: default;
 }
 
-.btnPrimary:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
 
 .guides {
   margin: 12px 0 0;
