@@ -57,6 +57,12 @@ export function createSubscription(
   return apiFetch<Subscription>("/subscriptions", { token, method: "POST", body: input });
 }
 
+/** Ask the worker to fetch a feed again now. 202 when queued; 429 when the feed was
+ *  already refreshed within the cooldown (SUBSCRIPTION_REFRESH_WINDOW_S). */
+export function refreshSubscription(token: string | null, id: number): Promise<unknown> {
+  return apiFetch<unknown>(`/subscriptions/${id}/refresh`, { token, method: "POST" });
+}
+
 /** Import an OPML file (multipart) and return the per-file import report. */
 export function importOpml(token: string | null, file: File): Promise<ImportReport> {
   const form = new FormData();
