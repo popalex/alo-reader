@@ -173,6 +173,7 @@ export function Sidebar() {
   const [addOpen, setAddOpen] = useState(false);
   const [pendingDeleteFolder, setPendingDeleteFolder] = useState<Folder | null>(null);
   const { openFeedSettings } = useFeedSettings();
+  const [editing, setEditing] = useState(false);
   const { openKeyboardHelp } = useKeyboardHelp();
   const deleteFolder = useDeleteFolder();
   const navigate = useNavigate();
@@ -224,11 +225,22 @@ export function Sidebar() {
     feeds.reduce((sum, f) => sum + (unreadBySub.get(f.id) ?? 0), 0);
 
   return (
-    <aside className={styles.side}>
+    <aside className={styles.side} data-editing={editing || undefined}>
       <div className={styles.head}>
         <span className={styles.logo}>
           alo<span className={styles.dot}>.</span>
         </span>
+        {/* Touch screens only (CSS): with no hover to reveal them, the rename, delete
+            and settings buttons used to sit on every row. They now appear while
+            editing. */}
+        <button
+          type="button"
+          className={styles.edit}
+          aria-pressed={editing}
+          onClick={() => setEditing((on) => !on)}
+        >
+          {editing ? "Done" : "Edit feeds"}
+        </button>
         <button
           type="button"
           className={styles.subscribe}

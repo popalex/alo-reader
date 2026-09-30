@@ -58,16 +58,18 @@ test.describe("feed management (AUTH_MODE=none)", () => {
     await expect(page.getByRole("link", { name: /Hacker News/ })).toBeVisible();
   });
 
-  test("mobile: the settings gear is visible without hover in the drawer", async ({ page }) => {
+  test("mobile: the drawer's row buttons appear with Edit feeds", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 780 });
     await page.goto("/app/");
     await page.getByRole("button", { name: "Open feeds" }).click();
     const drawer = page.getByRole("dialog");
-    // No hover on touch → the gear must be visible on its own (before any test
-    // renames/deletes Hacker News).
-    await expect(
-      drawer.getByRole("button", { name: /settings for hacker news/i }),
-    ).toBeVisible();
+    // No hover on touch: the row buttons stay out of the way until "Edit feeds",
+    // then show without hover (before any test renames/deletes Hacker News).
+    const gear = drawer.getByRole("button", { name: /settings for hacker news/i });
+    await expect(gear).toBeHidden();
+    await drawer.getByRole("button", { name: "Edit feeds" }).click();
+    await expect(gear).toBeVisible();
+    await expect(drawer.getByRole("button", { name: "Done" })).toBeVisible();
   });
 
   test("mobile: add-feed dialog opens above the drawer and is interactable", async ({ page }) => {
@@ -87,6 +89,7 @@ test.describe("feed management (AUTH_MODE=none)", () => {
     await page.setViewportSize({ width: 390, height: 780 });
     await page.goto("/app/");
     await page.getByRole("button", { name: "Open feeds" }).click();
+    await page.getByRole("button", { name: "Edit feeds" }).click();
     await page.getByRole("button", { name: /settings for hacker news/i }).click();
 
     await expect(page.getByRole("heading", { name: "Feed settings" })).toBeVisible();

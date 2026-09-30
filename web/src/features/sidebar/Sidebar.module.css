@@ -67,6 +67,7 @@
 .head {
   display: flex;
   align-items: center;
+  gap: 8px;
   justify-content: space-between;
   padding: 2px 6px 0;
 }
@@ -218,11 +219,17 @@
   background: var(--hover);
 }
 
-/* Touch / mobile drawer: no hover, so keep the actions in flow and visible. */
+/* Touch / mobile drawer: no hover, so the actions sit in the row's flow, shown while
+   editing ("Edit feeds" in the header) rather than on every row all the time. */
 @media (hover: none), (max-width: 768px) {
   .folderActions {
     position: static;
     opacity: 1;
+    display: none;
+  }
+
+  .side[data-editing] .folderActions {
+    display: flex;
   }
 
   .folderHead:hover .count {
@@ -346,7 +353,7 @@
 }
 
 /* No hover (touch) or the mobile drawer layout (≤768px, matching useIsMobile): a
-   hover-revealed gear is unreachable, so show it permanently in the row's flow
+   hover-revealed gear is unreachable, so while editing it sits in the row's flow
    (after the count, no overlap) with a bigger tap target. */
 @media (hover: none), (max-width: 768px) {
   .del {
@@ -356,6 +363,11 @@
     opacity: 1;
     padding: 8px;
     margin-left: 2px;
+    display: none;
+  }
+
+  .side[data-editing] .del {
+    display: inline-flex;
   }
 
   .feedRow:hover .count {
@@ -395,5 +407,31 @@
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* "Edit feeds" / "Done": only where there is no hover to reveal the row buttons. */
+.edit {
+  display: none;
+  margin-left: auto;
+  padding: 6px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.edit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+@media (hover: none), (max-width: 768px) {
+  .edit {
+    display: inline-flex;
   }
 }
