@@ -12,6 +12,8 @@ single user, so the SPA sees this data).
   DATABASE_URL=postgresql+asyncpg://alo:alo@localhost:5432/alo \
     .venv/bin/python scripts/seed_dev.py
   # scale knobs: SEED_ENTRIES_PER_FEED (default 250)
+  # SEED_EMPTY=1: reset only, leaving the user with no folders or feeds (a new
+  # account, for the welcome-screen e2e)
 
   # inside the compose stack (CI/e2e), no host Python needed:
   docker compose exec -T api python - < scripts/seed_dev.py
@@ -159,6 +161,8 @@ async def main() -> None:
             await session.execute(delete(Folder).where(Folder.user_id == user.id))
             await session.execute(delete(Feed).where(Feed.feed_url.in_(seeded_urls)))
             await session.flush()
+            if os.environ.get("SEED_EMPTY"):
+                return  # a brand-new account: nothing but the user row
 
             folders = {}
             for pos, name in enumerate(FOLDERS):
