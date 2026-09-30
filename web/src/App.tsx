@@ -9,6 +9,7 @@ import { Suspense, lazy, useEffect, useState } from "react";
 
 import { ApiError, getConfig, type ApiConfig } from "./api/client";
 import { AppProviders } from "./app/AppProviders";
+import { setAuthMode } from "./app/instance";
 
 const ClerkApp = lazy(() => import("./app/ClerkApp"));
 
@@ -52,6 +53,7 @@ export function App() {
             t.initBrowserTelemetry({ serviceName: "alo-web", exportUrl: c.otel_traces_url! }),
           );
         }
+        setAuthMode(c.auth_mode);
         setConfig(c);
       })
       .catch((err: unknown) => {
