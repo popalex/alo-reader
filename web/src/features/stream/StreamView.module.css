@@ -11,19 +11,27 @@
 
 /* Below the tablet breakpoint the two panes become one view: the list by
  * default, swapping to the reader once an entry is selected (ReaderPane shows a
- * Back button that clears the selection). */
+ * Back button that clears the selection).
+ *
+ * Both panes share the one grid cell, and the list is hidden with visibility, not
+ * display: none. A display: none list measured every row at 0 px; when it came back
+ * the virtualizer re-measured them and shifted the scroll position by the
+ * difference, so Back landed about 15 rows further down, and the scroll-read marker
+ * then marked the rows it had skipped as read. Invisible but laid out, the list
+ * keeps its sizes and its place. Hidden this way it also leaves the tab order and
+ * the accessibility tree. */
 @media (max-width: 768px) {
   .panes {
     grid-template-columns: 1fr;
   }
   .panes > * {
-    display: none;
+    grid-area: 1 / 1;
   }
-  .panes > :first-child {
-    display: flex;
+  .panes > :last-child {
+    display: none;
   }
   .panes[data-reading] > :first-child {
-    display: none;
+    visibility: hidden;
   }
   .panes[data-reading] > :last-child {
     display: flex;

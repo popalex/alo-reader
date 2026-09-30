@@ -37,11 +37,36 @@ export function selectionReducer(state: SelectionState, action: SelectionAction)
   }
 }
 
+/** One row of the list as the reader needs it to offer the next article: the list
+ *  publishes these in display order (search results included), so "next" means the
+ *  row below in what the reader sees, not in some other query. */
+export interface ReadingOrderItem {
+  id: number;
+  title: string;
+  is_read: boolean;
+}
+
+/** The row `delta` places away from `id` in the reading order, or null at either end
+ *  (or when `id` is not in it). */
+export function adjacentEntry(
+  order: readonly ReadingOrderItem[],
+  id: number | null,
+  delta: 1 | -1,
+): ReadingOrderItem | null {
+  if (id == null) return null;
+  const i = order.findIndex((e) => e.id === id);
+  if (i < 0) return null;
+  return order[i + delta] ?? null;
+}
+
 export interface SelectionApi extends SelectionState {
   setCursor: (id: number) => void;
   open: (id: number) => void;
   close: () => void;
   clear: () => void;
+  /** The list's rows in display order, for the reader's next/previous. */
+  readingOrder: readonly ReadingOrderItem[];
+  setReadingOrder: (order: readonly ReadingOrderItem[]) => void;
 }
 
 export const SelectionContext = createContext<SelectionApi | null>(null);
