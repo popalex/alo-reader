@@ -24,7 +24,7 @@ export default defineConfig({
       devOptions: { enabled: true, type: "module", navigateFallback: "/app/index.html" },
       includeAssets: ["favicon.ico", "apple-touch-icon-180x180.png"],
       manifest: {
-        name: "alo reader",
+        name: "Alo Reader",
         short_name: "alo",
         description: "A calm, keyboard-first RSS reader — early Gmail, for feeds.",
         theme_color: "#0e7c6d",

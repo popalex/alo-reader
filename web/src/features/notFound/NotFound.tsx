@@ -15,7 +15,7 @@ export function NotFound() {
       </div>
       <h1 className={styles.title}>Nothing here.</h1>
       <p className={styles.body}>
-        This address has no page in alo reader. The link may be old, or it has a typo in it.
+        This address has no page in Alo Reader. The link may be old, or it has a typo in it.
       </p>
       <Link to="/" className={styles.action}>
         Go to All items
