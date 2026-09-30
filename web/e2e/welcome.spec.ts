@@ -22,7 +22,7 @@ test.describe("welcome screen (an account with no feeds)", () => {
 
   test("replaces the empty panes, and importing from it brings the reader back", async ({ page }) => {
     await page.goto("/app/");
-    await expect(page.getByRole("heading", { name: "Welcome to alo reader", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Welcome to Alo Reader", level: 1 })).toBeVisible();
     // No empty reader pane beside it.
     await expect(page.getByText("Select an article")).toHaveCount(0);
 
@@ -32,7 +32,7 @@ test.describe("welcome screen (an account with no feeds)", () => {
       .setInputFiles({ name: "feeds.opml", mimeType: "text/xml", buffer: Buffer.from(opml) });
 
     await expect(page.getByText("Imported 2 feeds.")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Welcome to alo reader" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Welcome to Alo Reader" })).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "All items", level: 1 })).toBeVisible();
     await expect(page.getByRole("link", { name: /Welcome One/ })).toBeVisible();
   });
@@ -68,7 +68,7 @@ test.describe("welcome screen (an account with no feeds)", () => {
     // Both are subscribed before the welcome screen gives way. Whether the feeds can
     // be fetched from here does not matter: the subscriptions exist either way.
     await expect(page.getByText("Subscribed to 2 feeds.")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Welcome to alo reader" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Welcome to Alo Reader" })).toHaveCount(0);
     await expect(page.getByRole("link", { name: /NASA Image of the Day/ })).toBeVisible();
     await expect(page.getByRole("link", { name: /Quanta Magazine/ })).toBeVisible();
   });

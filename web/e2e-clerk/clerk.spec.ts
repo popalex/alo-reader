@@ -197,7 +197,7 @@ test.describe.serial("clerk mode", () => {
 
     await signIn(page);
     await page.goto("/");
-    await expect(cta()).toHaveText("Open alo reader");
+    await expect(cta()).toHaveText("Open Alo Reader");
     await expect(page.locator(".reassure")).toHaveText("You are already signed in.");
 
     await page.goto("/app/");
@@ -250,7 +250,7 @@ test.describe.serial("clerk mode", () => {
     }
     const landing = await (await get("/")).text();
     const ld = JSON.parse(landing.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)![1]);
-    expect(ld["@graph"][0]).toMatchObject({ "@type": "WebSite", name: "alo reader", url: "https://localhost/" });
+    expect(ld["@graph"][0]).toMatchObject({ "@type": "WebSite", name: "Alo Reader", url: "https://localhost/" });
     expect(ld["@graph"][1]).toMatchObject({
       "@type": "WebApplication",
       isAccessibleForFree: true,
@@ -288,7 +288,7 @@ test.describe.serial("clerk mode", () => {
   test("an unknown address gets the 404 page, with sign-up and the guides", async ({ page }) => {
     const r = await page.goto("/some-old-link");
     expect(r?.status()).toBe(404);
-    await expect(page).toHaveTitle("Page not found · alo reader");
+    await expect(page).toHaveTitle("Page not found · Alo Reader");
     await expect(page.getByRole("heading", { name: "This page is not here.", level: 1 })).toBeVisible();
     await expect(page.getByText("404: Page not found")).toBeVisible();
     await expect(page.getByRole("link", { name: "Go to the front page" })).toHaveAttribute("href", "/");
@@ -311,7 +311,7 @@ test.describe.serial("clerk mode", () => {
   }) => {
     await page.goto("/app/");
     await expect(page.getByRole("heading", { name: "Sign in or create an account" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "alo reader" })).toHaveAttribute("href", "/");
+    await expect(page.getByRole("link", { name: "Alo Reader" })).toHaveAttribute("href", "/");
     await expect(page.getByRole("group", { name: "Colour theme" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Terms & privacy" })).toHaveAttribute("href", "/legal");
     await expect(page.locator('input[name="identifier"]')).toBeVisible();
@@ -352,7 +352,7 @@ test.describe.serial("clerk mode", () => {
 
     // A brand-new account has no feeds: the welcome screen, with the export guides
     // that only the public instance serves.
-    await expect(page.getByRole("heading", { name: "Welcome to alo reader", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Welcome to Alo Reader", level: 1 })).toBeVisible();
     await expect(page.getByRole("link", { name: "from Feedly" })).toHaveAttribute("href", "/from/feedly");
     await expect(page.getByRole("link", { name: "from Inoreader" })).toHaveAttribute("href", "/from/inoreader");
   });
