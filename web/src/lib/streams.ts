@@ -20,3 +20,29 @@ export function streamToPath(stream: StreamDescriptor): string {
       return `folder/${stream.id}`;
   }
 }
+
+/** The fields of a subscription that say whether its feed has been fetched yet. */
+interface FetchState {
+  feed_id: number;
+  folder_id: number | null;
+  last_fetched_at: string | null;
+  last_error: string | null;
+}
+
+/** Whether a stream is still waiting for the first fetch of any of its feeds: the
+ *  reason an empty list is empty right after subscribing or importing. A feed counts
+ *  as waiting until it has been fetched once or has failed (the same test
+ *  usePendingFeedPolling uses). Starred never waits: it holds only what you star. */
+export function awaitingFirstFetch(stream: StreamDescriptor, subs: FetchState[]): boolean {
+  const waiting = (s: FetchState) => !s.last_fetched_at && !s.last_error;
+  switch (stream.kind) {
+    case "all":
+      return subs.some(waiting);
+    case "starred":
+      return false;
+    case "feed":
+      return subs.some((s) => s.feed_id === stream.id && waiting(s));
+    case "folder":
+      return subs.some((s) => s.folder_id === stream.id && waiting(s));
+  }
+}

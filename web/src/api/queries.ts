@@ -37,12 +37,23 @@ export function useSubscriptions() {
   });
 }
 
+const PENDING_POLL_GIVE_UP_MS = 10 * 60_000;
+
+/** How long to wait before the next check of not-yet-fetched feeds, given how long
+ *  they have been pending: quickly at first, then at a pace that costs nothing. */
+export function pendingPollDelay(elapsedMs: number): number {
+  return elapsedMs < 90_000 ? 2500 : 30_000;
+}
+
 /** While any subscribed feed hasn't been polled yet (no last_fetched_at, no error),
  *  refetch the lightweight feed list + counts on a short interval so its title and
  *  unread count appear on their own once the worker fetches it — no manual refresh.
  *  Entries are refetched only when a feed actually finishes its first fetch, so the
- *  stream the user is reading isn't churned every tick. Stops when nothing is
- *  pending (or after a safety cap). */
+ *  stream the user is reading isn't churned every tick. Polls every 2.5 s for the
+ *  first 90 s, when a new feed usually lands, then every 30 s, and stops when nothing
+ *  is pending or after 10 minutes. Stopping at 90 s left a feed that took longer
+ *  (a slow site, a busy worker) looking empty, under "Fetching your feeds", until a
+ *  reload. */
 export function usePendingFeedPolling(): void {
   const qc = useQueryClient();
   const subs = useSubscriptions();
@@ -57,7 +68,7 @@ export function usePendingFeedPolling(): void {
     [subsData],
   );
   // Key the effect on WHICH feeds are pending, not merely whether any are. With a
-  // boolean, a feed added after the 90s safety cap cleared the interval never starts
+  // boolean, a feed added after the give-up cap stopped the polling never starts
   // a new one — the boolean is still true — so its title, entries and unread count
   // never arrive until the user reloads.
   const pendingKey = useMemo(() => [...pendingIds].sort((a, b) => a - b).join(","), [pendingIds]);
@@ -65,15 +76,16 @@ export function usePendingFeedPolling(): void {
   useEffect(() => {
     if (!pendingKey) return;
     const startedAt = Date.now();
-    const id = window.setInterval(() => {
-      if (Date.now() - startedAt > 90_000) {
-        window.clearInterval(id);
-        return;
-      }
+    let timer = 0;
+    const tick = () => {
+      const elapsed = Date.now() - startedAt;
+      if (elapsed > PENDING_POLL_GIVE_UP_MS) return;
       void qc.invalidateQueries({ queryKey: queryKeys.subscriptions });
       void qc.invalidateQueries({ queryKey: queryKeys.counts });
-    }, 2500);
-    return () => window.clearInterval(id);
+      timer = window.setTimeout(tick, pendingPollDelay(elapsed));
+    };
+    timer = window.setTimeout(tick, pendingPollDelay(0));
+    return () => window.clearTimeout(timer);
   }, [pendingKey, qc]);
 
   // Refetch entries once, only when a previously-pending feed gains its first

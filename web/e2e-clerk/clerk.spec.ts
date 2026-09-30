@@ -349,6 +349,12 @@ test.describe.serial("clerk mode", () => {
     await expect(page).toHaveURL(/localhost\/app\/?/, { timeout: 30_000 });
     await expect(page.getByRole("button", { name: "Subscribe", exact: true })).toBeVisible();
     expect(offSite).toEqual([]);
+
+    // A brand-new account has no feeds: the welcome screen, with the export guides
+    // that only the public instance serves.
+    await expect(page.getByRole("heading", { name: "Welcome to alo reader", level: 1 })).toBeVisible();
+    await expect(page.getByRole("link", { name: "from Feedly" })).toHaveAttribute("href", "/from/feedly");
+    await expect(page.getByRole("link", { name: "from Inoreader" })).toHaveAttribute("href", "/from/inoreader");
   });
 
   test("webhooks: user.updated fills the email, user.deleted removes the account for good", async ({

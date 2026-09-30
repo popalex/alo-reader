@@ -21,3 +21,15 @@ export function resetSeedData(): void {
   }
   execSync(command, { stdio: ["ignore", "ignore", "inherit"], cwd: new URL("../..", import.meta.url).pathname });
 }
+
+/** Leave the seeded user with no folders and no feeds: a brand-new account. Done in
+ *  the database (scripts/e2e.sh provides the command) rather than by deleting feeds
+ *  through the API, where 20 deletes in a row ran into the per-user rate limit and
+ *  left the test itself without requests to spend. */
+export function emptyAccount(): void {
+  const command = process.env.E2E_EMPTY_CMD;
+  if (!command) {
+    throw new Error("E2E_EMPTY_CMD is not set: the welcome-screen specs need scripts/e2e.sh");
+  }
+  execSync(command, { stdio: ["ignore", "ignore", "inherit"], cwd: new URL("../..", import.meta.url).pathname });
+}

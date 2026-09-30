@@ -10,6 +10,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { useTokenGetter } from "../app/auth";
 import { pushToast } from "../app/toast";
+import { ApiError } from "./client";
 import {
   createSubscription,
   deleteFolder,
@@ -46,6 +47,44 @@ export function useCreateSubscription() {
     onSuccess: (sub) => {
       refresh();
       pushToast(`Subscribed to ${sub.title || "the feed"}.`, "info");
+    },
+  });
+}
+
+/** Subscribe to several feeds in one go: the welcome screen's starter feeds. They are
+ *  created one after another and the feed lists refresh once at the end, because the
+ *  first refresh to show a subscription swaps the welcome screen for the article list,
+ *  and the rest of the choice must be in by then. A feed that fails does not stop the
+ *  others; the toast counts it. */
+export function useSubscribeMany() {
+  const getToken = useTokenGetter();
+  const refresh = useRefreshFeedLists();
+  return useMutation({
+    mutationFn: async (inputs: CreateSubscriptionInput[]) => {
+      const token = await getToken();
+      let added = 0;
+      let firstError: string | null = null;
+      for (const input of inputs) {
+        try {
+          await createSubscription(token, input);
+          added += 1;
+        } catch (err) {
+          // Counted below; the next feed still gets its turn.
+          firstError ??= err instanceof ApiError ? err.message : "the request failed";
+        }
+      }
+      return { added, failed: inputs.length - added, firstError };
+    },
+    onSuccess: ({ added, failed, firstError }) => {
+      refresh();
+      if (added === 0) {
+        // Nothing happened: say so as an error, with the reason, rather than a
+        // cheerful "Subscribed to 0 feeds".
+        pushToast(`Couldn't subscribe: ${firstError}.`, "error");
+        return;
+      }
+      const failures = failed ? ` ${failed} could not be added (${firstError}).` : "";
+      pushToast(`Subscribed to ${added} feed${added === 1 ? "" : "s"}.${failures}`, "info");
     },
   });
 }
@@ -146,8 +185,17 @@ export function useImportOpml() {
     mutationFn: async (file: File): Promise<ImportReport> => importOpml(await getToken(), file),
     onSuccess: (report) => {
       refresh();
+      // Also the only report an import from the welcome screen gets (no dialog there),
+      // so failures are counted here too; the dialog lists them one by one.
       const n = report.imported;
-      pushToast(`Imported ${n} feed${n === 1 ? "" : "s"}.`, "info");
+      const failed = report.failed.length;
+      const reason = report.failed[0]?.reason;
+      if (n === 0 && failed > 0) {
+        pushToast(`Couldn't import any feeds: ${failed} failed (${reason}).`, "error");
+        return;
+      }
+      const failures = failed ? ` ${failed} could not be added (${reason}).` : "";
+      pushToast(`Imported ${n} feed${n === 1 ? "" : "s"}.${failures}`, "info");
     },
   });
 }

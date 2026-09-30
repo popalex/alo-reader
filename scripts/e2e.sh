@@ -48,6 +48,8 @@ log "Seeding the dataset (20 feeds / ~5k entries) inside the api container"
 # Each spec file resets the seeded data before it runs (web/e2e/reset.ts), so no
 # file depends on what an earlier one changed.
 export E2E_RESET_CMD="${COMPOSE[*]} exec -T api python - < scripts/seed_dev.py"
+# The same reset, stopped before the seed: an account with no folders or feeds.
+export E2E_EMPTY_CMD="${COMPOSE[*]} exec -T -e SEED_EMPTY=1 api python - < scripts/seed_dev.py"
 
 log "Running Playwright against the SPA"
 # Capture Playwright's status explicitly (rather than relying on set -e to abort
