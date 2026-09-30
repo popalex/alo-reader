@@ -16,6 +16,7 @@ import { ApiError } from "../../api/client";
 import { useImportOpml, useSubscribeMany } from "../../api/feedMutations";
 import { hasPublicSite } from "../../app/instance";
 import { useIsMobile } from "../../lib/useMediaQuery";
+import { useAddFeed } from "../layout/addFeed";
 import { useMobileNav } from "../layout/mobileNav";
 import styles from "./Welcome.module.css";
 
@@ -57,9 +58,10 @@ const STARTERS = [
   },
 ];
 
-export function Welcome({ onAddFeed }: { onAddFeed: () => void }) {
+export function Welcome() {
   const isMobile = useIsMobile();
   const { openSidebar } = useMobileNav();
+  const { openAddFeed } = useAddFeed();
   const importer = useImportOpml();
   const [error, setError] = useState<string | null>(null);
   const subscribeMany = useSubscribeMany();
@@ -150,7 +152,7 @@ export function Welcome({ onAddFeed }: { onAddFeed: () => void }) {
           <p className={styles.optionBody}>
             Paste a site&rsquo;s address and alo reader finds its feed, or paste the feed itself.
           </p>
-          <button type="button" className={styles.btnSecondary} onClick={onAddFeed}>
+          <button type="button" className={styles.btnSecondary} onClick={openAddFeed}>
             <Plus size={16} />
             <span>Add a feed</span>
           </button>

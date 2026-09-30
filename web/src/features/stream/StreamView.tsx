@@ -2,10 +2,9 @@
 // per-stream selection store. On mobile the panes become a single view that
 // swaps to the reader (with a Back button) once an entry is selected.
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import { useFolders, useSubscriptions } from "../../api/queries";
-import { lazyDialog } from "../../components/lazyDialog";
 import { streamToPath, type StreamDescriptor } from "../../lib/streams";
 import { EntryList } from "./EntryList";
 import { ReaderPane } from "./ReaderPane";
@@ -13,10 +12,6 @@ import { SelectionProvider } from "./SelectionProvider";
 import { useSelection } from "./selection";
 import { Welcome } from "../welcome/Welcome";
 import styles from "./StreamView.module.css";
-
-const AddSubscriptionDialog = lazyDialog(() =>
-  import("../subscribe/AddSubscriptionDialog").then((m) => m.AddSubscriptionDialog),
-);
 
 export type { StreamDescriptor };
 
@@ -52,25 +47,15 @@ function Panes({ stream, title }: { stream: StreamDescriptor; title: string }) {
 export function StreamView({ stream }: { stream: StreamDescriptor }) {
   const title = useStreamTitle(stream);
   const subs = useSubscriptions();
-  const folders = useFolders();
-  const [addOpen, setAddOpen] = useState(false);
   // An account with no feeds gets the welcome screen instead of two empty panes.
   // Only a loaded, empty list counts: while loading, or offline with nothing cached,
   // the panes show their own loading and error states.
   const noFeeds = subs.data?.length === 0;
+  if (noFeeds) return <Welcome />;
   return (
-    <>
-      {noFeeds ? (
-        <Welcome onAddFeed={() => setAddOpen(true)} />
-      ) : (
-        // Key by stream so selection resets when the stream changes.
-        <SelectionProvider key={streamToPath(stream)}>
-          <Panes stream={stream} title={title} />
-        </SelectionProvider>
-      )}
-      {/* Here rather than inside Welcome: adding the first feed swaps Welcome for the
-          panes, and the dialog has to stay open through that. */}
-      <AddSubscriptionDialog open={addOpen} onOpenChange={setAddOpen} folders={folders.data ?? []} />
-    </>
+    // Key by stream so selection resets when the stream changes.
+    <SelectionProvider key={streamToPath(stream)}>
+      <Panes stream={stream} title={title} />
+    </SelectionProvider>
   );
 }

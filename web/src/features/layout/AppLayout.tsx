@@ -7,20 +7,26 @@ import { useEffect, useState } from "react";
 
 import { Outlet, useRouterState } from "@tanstack/react-router";
 
-import { usePendingFeedPolling } from "../../api/queries";
+import { useFolders, usePendingFeedPolling } from "../../api/queries";
 import { UnreadAnnouncer } from "../../app/UnreadAnnouncer";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { lazyDialog } from "../../components/lazyDialog";
 import { useIsMobile } from "../../lib/useMediaQuery";
 import { Sidebar } from "../sidebar/Sidebar";
+import { AddFeedContext } from "./addFeed";
 import { MobileNavContext } from "./mobileNav";
 import styles from "./AppLayout.module.css";
 
 const MobileSidebar = lazyDialog(() => import("./MobileSidebar").then((m) => m.MobileSidebar));
+const AddSubscriptionDialog = lazyDialog(() =>
+  import("../subscribe/AddSubscriptionDialog").then((m) => m.AddSubscriptionDialog),
+);
 
 export function AppLayout() {
   const isMobile = useIsMobile();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [addFeedOpen, setAddFeedOpen] = useState(false);
+  const folders = useFolders();
   usePendingFeedPolling(); // auto-refresh a just-added feed until the worker fills it in
 
   // Close the drawer whenever the stream changes (tapping a feed navigates).
@@ -29,33 +35,40 @@ export function AppLayout() {
 
   return (
     <MobileNavContext.Provider value={{ openSidebar: () => setDrawerOpen(true) }}>
-      <div className={styles.shell}>
-        {!isMobile && <Sidebar />}
-        <div className={styles.content}>
-          {/* A render error in one stream shouldn't blank the whole app; reset on
-              navigation so moving to another view recovers. */}
-          <ErrorBoundary
-            resetKey={pathname}
-            fallback={
-              <div className={styles.crash} role="alert">
-                <p className={styles.crashTitle}>Something went wrong</p>
-                <p>This view ran into an error. Try reloading the page.</p>
-                <button
-                  type="button"
-                  className={styles.crashBtn}
-                  onClick={() => window.location.reload()}
-                >
-                  Reload
-                </button>
-              </div>
-            }
-          >
-            <Outlet />
-          </ErrorBoundary>
+      <AddFeedContext.Provider value={{ openAddFeed: () => setAddFeedOpen(true) }}>
+        <div className={styles.shell}>
+          {!isMobile && <Sidebar />}
+          <div className={styles.content}>
+            {/* A render error in one stream shouldn't blank the whole app; reset on
+                navigation so moving to another view recovers. */}
+            <ErrorBoundary
+              resetKey={pathname}
+              fallback={
+                <div className={styles.crash} role="alert">
+                  <p className={styles.crashTitle}>Something went wrong</p>
+                  <p>This view ran into an error. Try reloading the page.</p>
+                  <button
+                    type="button"
+                    className={styles.crashBtn}
+                    onClick={() => window.location.reload()}
+                  >
+                    Reload
+                  </button>
+                </div>
+              }
+            >
+              <Outlet />
+            </ErrorBoundary>
+          </div>
+          <UnreadAnnouncer />
         </div>
-        <UnreadAnnouncer />
-      </div>
-      {isMobile && <MobileSidebar open={drawerOpen} onOpenChange={setDrawerOpen} />}
+        {isMobile && <MobileSidebar open={drawerOpen} onOpenChange={setDrawerOpen} />}
+        <AddSubscriptionDialog
+          open={addFeedOpen}
+          onOpenChange={setAddFeedOpen}
+          folders={folders.data ?? []}
+        />
+      </AddFeedContext.Provider>
     </MobileNavContext.Provider>
   );
 }
