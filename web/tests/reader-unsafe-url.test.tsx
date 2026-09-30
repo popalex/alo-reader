@@ -27,6 +27,8 @@ vi.mock("../src/features/stream/selection", async () => {
       open: () => {},
       close: () => {},
       clear: () => {},
+      readingOrder: [],
+      setReadingOrder: () => {},
     }),
   };
 });

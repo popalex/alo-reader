@@ -7,22 +7,40 @@
 
 import { useEffect, useMemo, useRef } from "react";
 
-import { Check, ChevronLeft, Circle, ExternalLink, Star } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Circle, ExternalLink, Star } from "lucide-react";
 
 import { useSetEntryState } from "../../api/mutations";
 import { useEntry, useSubscriptions } from "../../api/queries";
 import { useOnline } from "../../app/offline/useOffline";
+import { markUiEvent } from "../../app/traceUiAction";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { Favicon } from "../../components/Favicon";
 import { useSanitizer } from "../../lib/sanitize";
 import { formatDateTime } from "../../lib/time";
 import { safeExternalUrl } from "../../lib/url";
-import { useSelection } from "./selection";
+import { adjacentEntry, useSelection } from "./selection";
 import styles from "./ReaderPane.module.css";
 
 export function ReaderPane() {
   const subs = useSubscriptions();
-  const { openId, close } = useSelection();
+  const { openId, close, open, readingOrder } = useSelection();
+  const articleRef = useRef<HTMLElement>(null);
+  const next = adjacentEntry(readingOrder, openId, 1);
+
+  // The article element is reused from one entry to the next: start each at the top,
+  // or "Next article" would open the next one scrolled to where this one ended.
+  useEffect(() => {
+    articleRef.current?.scrollTo({ top: 0 });
+  }, [openId]);
+
+  // The end of an article offers the next one in the list, marked read on open like
+  // a click in the list. On a phone it is the way on without going Back.
+  const openNext = () => {
+    if (!next) return;
+    markUiEvent("ui.open_article", { "alo.entry.id": next.id });
+    open(next.id);
+    if (!next.is_read) setState.mutate({ ids: [next.id], read: true });
+  };
   const query = useEntry(openId);
   const online = useOnline();
   const setState = useSetEntryState();
@@ -93,7 +111,7 @@ export function ReaderPane() {
     .join(" · ");
 
   return (
-    <article className={styles.reader}>
+    <article className={styles.reader} ref={articleRef}>
       <div className={styles.bar}>
         <button type="button" className={styles.back} onClick={close}>
           <ChevronLeft size={16} /> Back
@@ -158,6 +176,17 @@ export function ReaderPane() {
           />
         )}
       </ErrorBoundary>
+      {next ? (
+        <div className={styles.next}>
+          <button type="button" className={styles.nextBtn} onClick={openNext}>
+            <span className={styles.nextText}>
+              <span className={styles.nextLabel}>Next article</span>
+              <span className={styles.nextTitle}>{next.title || "Untitled"}</span>
+            </span>
+            <ChevronRight size={18} aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
     </article>
   );
 }
