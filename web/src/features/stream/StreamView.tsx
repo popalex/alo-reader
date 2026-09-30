@@ -2,7 +2,7 @@
 // per-stream selection store. On mobile the panes become a single view that
 // swaps to the reader (with a Back button) once an entry is selected.
 
-import { useMemo } from "react";
+import { lazy, Suspense, useMemo } from "react";
 
 import { useFolders, useSubscriptions } from "../../api/queries";
 import { streamToPath, type StreamDescriptor } from "../../lib/streams";
@@ -10,8 +10,13 @@ import { EntryList } from "./EntryList";
 import { ReaderPane } from "./ReaderPane";
 import { SelectionProvider } from "./SelectionProvider";
 import { useSelection } from "./selection";
-import { Welcome } from "../welcome/Welcome";
 import styles from "./StreamView.module.css";
+
+// Only a brand-new account ever sees the welcome screen, so it is a chunk of its own
+// rather than startup code every returning reader downloads. If the chunk fails to
+// load (a deploy while the tab was open), the stream's error boundary offers a reload,
+// which is the only thing that recovers a failed import anyway.
+const Welcome = lazy(() => import("../welcome/Welcome").then((m) => ({ default: m.Welcome })));
 
 export type { StreamDescriptor };
 
@@ -51,7 +56,13 @@ export function StreamView({ stream }: { stream: StreamDescriptor }) {
   // Only a loaded, empty list counts: while loading, or offline with nothing cached,
   // the panes show their own loading and error states.
   const noFeeds = subs.data?.length === 0;
-  if (noFeeds) return <Welcome />;
+  if (noFeeds) {
+    return (
+      <Suspense fallback={null}>
+        <Welcome />
+      </Suspense>
+    );
+  }
   return (
     // Key by stream so selection resets when the stream changes.
     <SelectionProvider key={streamToPath(stream)}>
