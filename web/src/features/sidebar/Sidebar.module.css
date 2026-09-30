@@ -4,7 +4,31 @@
   gap: 14px;
   padding: 16px 12px;
   border-right: 1px solid var(--border);
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Views and feeds scroll; the header above and the footer below stay in place. The
+   negative margin lets the scrollbar sit at the sidebar's edge, as it did when the
+   whole sidebar scrolled. */
+.body {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-inline: -12px;
+  padding-inline: 12px;
+}
+
+/* The account control (clerk mode). */
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
 }
 
 .head {

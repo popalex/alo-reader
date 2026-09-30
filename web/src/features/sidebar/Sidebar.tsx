@@ -12,6 +12,7 @@ import { ChevronDown, Inbox, Loader2, Pencil, Plus, Settings2, Star, Trash2 } fr
 import type { Folder, Subscription } from "../../api/endpoints";
 import { useDeleteFolder, useDeleteSubscription, useUpdateFolder } from "../../api/feedMutations";
 import { useCounts, useFolders, useSubscriptions } from "../../api/queries";
+import { useAccountSlot } from "../../app/accountSlot";
 import { Favicon } from "../../components/Favicon";
 import { lazyDialog } from "../../components/lazyDialog";
 import styles from "./Sidebar.module.css";
@@ -218,6 +219,7 @@ export function Sidebar() {
     });
   }
 
+  const account = useAccountSlot();
   const byTitle = (a: Subscription, b: Subscription) => (a.title || "").localeCompare(b.title || "");
   const folderUnread = (feeds: Subscription[]) =>
     feeds.reduce((sum, f) => sum + (unreadBySub.get(f.id) ?? 0), 0);
@@ -302,70 +304,75 @@ export function Sidebar() {
         }}
       />
 
-      <nav className={styles.views} aria-label="Views">
-        <Link
-          to="/"
-          activeOptions={{ exact: true }}
-          className={styles.view}
-          activeProps={{ className: `${styles.view} ${styles.active}` }}
-        >
-          <Inbox size={16} className={styles.viewIcon} />
-          <span>All items</span>
-          {totalUnread > 0 ? <span className={styles.count}>{totalUnread}</span> : null}
-        </Link>
-        <Link
-          to="/starred"
-          className={styles.view}
-          activeProps={{ className: `${styles.view} ${styles.active}` }}
-        >
-          <Star size={16} className={styles.viewIcon} />
-          <span>Starred</span>
-        </Link>
-      </nav>
+      {/* The one part that scrolls: the header and the footer stay put. */}
+      <div className={styles.body}>
+        <nav className={styles.views} aria-label="Views">
+          <Link
+            to="/"
+            activeOptions={{ exact: true }}
+            className={styles.view}
+            activeProps={{ className: `${styles.view} ${styles.active}` }}
+          >
+            <Inbox size={16} className={styles.viewIcon} />
+            <span>All items</span>
+            {totalUnread > 0 ? <span className={styles.count}>{totalUnread}</span> : null}
+          </Link>
+          <Link
+            to="/starred"
+            className={styles.view}
+            activeProps={{ className: `${styles.view} ${styles.active}` }}
+          >
+            <Star size={16} className={styles.viewIcon} />
+            <span>Starred</span>
+          </Link>
+        </nav>
 
-      {loading ? (
-        <div className={styles.status}>Loading feeds…</div>
-      ) : (
-        <div className={styles.folders}>
-          {sortedFolders.map((folder) => {
-            const feeds = (grouped.get(folder.id) ?? []).slice().sort(byTitle);
-            const isCollapsed = collapsed.has(folder.id);
-            const fUnread = folderUnread(feeds);
-            return (
-              <div className={styles.folder} key={folder.id}>
-                <FolderHeader
-                  folder={folder}
-                  unread={fUnread}
-                  isCollapsed={isCollapsed}
-                  onToggle={() => toggle(folder.id)}
-                  onDelete={setPendingDeleteFolder}
-                />
-                {!isCollapsed &&
-                  feeds.map((sub) => (
+        {loading ? (
+          <div className={styles.status}>Loading feeds…</div>
+        ) : (
+          <div className={styles.folders}>
+            {sortedFolders.map((folder) => {
+              const feeds = (grouped.get(folder.id) ?? []).slice().sort(byTitle);
+              const isCollapsed = collapsed.has(folder.id);
+              const fUnread = folderUnread(feeds);
+              return (
+                <div className={styles.folder} key={folder.id}>
+                  <FolderHeader
+                    folder={folder}
+                    unread={fUnread}
+                    isCollapsed={isCollapsed}
+                    onToggle={() => toggle(folder.id)}
+                    onDelete={setPendingDeleteFolder}
+                  />
+                  {!isCollapsed &&
+                    feeds.map((sub) => (
+                      <FeedLink key={sub.id} sub={sub} unread={unreadBySub.get(sub.id) ?? 0} onSettings={setSettingsSub} />
+                    ))}
+                </div>
+              );
+            })}
+
+            {ungrouped.length > 0 && (
+              <div className={styles.folder}>
+                {ungrouped
+                  .slice()
+                  .sort(byTitle)
+                  .map((sub) => (
                     <FeedLink key={sub.id} sub={sub} unread={unreadBySub.get(sub.id) ?? 0} onSettings={setSettingsSub} />
                   ))}
               </div>
-            );
-          })}
+            )}
 
-          {ungrouped.length > 0 && (
-            <div className={styles.folder}>
-              {ungrouped
-                .slice()
-                .sort(byTitle)
-                .map((sub) => (
-                  <FeedLink key={sub.id} sub={sub} unread={unreadBySub.get(sub.id) ?? 0} onSettings={setSettingsSub} />
-                ))}
-            </div>
-          )}
+            {sortedFolders.length === 0 && ungrouped.length === 0 && (
+              <button type="button" className={styles.empty} onClick={() => setAddOpen(true)}>
+                No feeds yet — add your first feed.
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
-          {sortedFolders.length === 0 && ungrouped.length === 0 && (
-            <button type="button" className={styles.empty} onClick={() => setAddOpen(true)}>
-              No feeds yet — add your first feed.
-            </button>
-          )}
-        </div>
-      )}
+      {account && <div className={styles.foot}>{account}</div>}
     </aside>
   );
 }
