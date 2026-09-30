@@ -137,7 +137,7 @@ function FolderHeader({
           <button
             type="button"
             className={styles.folderAction}
-            title="Rename category"
+            title="Rename folder"
             aria-label={`Rename ${folder.name}`}
             onClick={() => {
               setName(folder.name);
@@ -149,7 +149,7 @@ function FolderHeader({
           <button
             type="button"
             className={styles.folderAction}
-            title="Delete category"
+            title="Delete folder"
             aria-label={`Delete ${folder.name}`}
             onClick={() => onDelete(folder)}
           >
@@ -246,13 +246,13 @@ export function Sidebar() {
       <ConfirmDialog
         open={pendingDeleteFolder !== null}
         onOpenChange={(open) => !open && setPendingDeleteFolder(null)}
-        title="Delete this category?"
+        title="Delete this folder?"
         body={(() => {
           if (!pendingDeleteFolder) return "";
           const n = grouped.get(pendingDeleteFolder.id)?.length ?? 0;
           return n > 0
-            ? `"${pendingDeleteFolder.name}" will be removed. Its ${n} feed${n === 1 ? "" : "s"} will move to Uncategorized.`
-            : `The empty category "${pendingDeleteFolder.name}" will be removed.`;
+            ? `"${pendingDeleteFolder.name}" will be removed. Its ${n} feed${n === 1 ? "" : "s"} will move out of it, to the top level.`
+            : `The empty folder "${pendingDeleteFolder.name}" will be removed.`;
         })()}
         confirmLabel="Delete"
         onConfirm={() => {

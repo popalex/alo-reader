@@ -37,10 +37,10 @@ test.describe("welcome screen (an account with no feeds)", () => {
     await expect(page.getByRole("link", { name: /Welcome One/ })).toBeVisible();
   });
 
-  test("Add a feed opens the add-feed dialog", async ({ page }) => {
+  test("Subscribe to a feed opens the subscribe dialog", async ({ page }) => {
     await page.goto("/app/");
-    await page.getByRole("button", { name: "Add a feed" }).click();
-    await expect(page.getByRole("heading", { name: "Add a feed" })).toBeVisible();
+    await page.getByRole("button", { name: "Subscribe to a feed" }).click();
+    await expect(page.getByRole("heading", { name: "Subscribe to a feed" })).toBeVisible();
     await expect(page.getByLabel(/feed or site url/i)).toBeVisible();
   });
 
@@ -48,8 +48,8 @@ test.describe("welcome screen (an account with no feeds)", () => {
     await page.goto("/app/");
     await page.getByRole("link", { name: "Starred" }).click();
     await expect(page).toHaveURL(/\/app\/starred$/);
-    await page.getByRole("button", { name: "Add a feed" }).click();
-    const heading = page.getByRole("heading", { name: "Add a feed" });
+    await page.getByRole("button", { name: "Subscribe to a feed" }).click();
+    const heading = page.getByRole("heading", { name: "Subscribe to a feed" });
     await expect(heading).toBeVisible();
 
     await page.goBack(); // back to All items, which mounts a new stream view
@@ -77,7 +77,7 @@ test.describe("welcome screen (an account with no feeds)", () => {
     await page.setViewportSize({ width: 390, height: 780 });
     await page.goto("/app/");
     await expect(page.getByText("Import an OPML file")).toBeInViewport();
-    await expect(page.getByRole("button", { name: "Add a feed" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Subscribe to a feed" })).toBeVisible();
     await page.getByRole("button", { name: "Open feeds" }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
   });

@@ -28,11 +28,11 @@ test.describe("feed management (AUTH_MODE=none)", () => {
   test("subscribe button opens the add-feed dialog", async ({ page }) => {
     await page.goto("/app/");
     await page.getByRole("button", { name: "Subscribe", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Add a feed" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Subscribe to a feed" })).toBeVisible();
     await expect(page.getByLabel(/feed or site url/i)).toBeVisible();
   });
 
-  test("category: rename then delete (feeds fall back to Uncategorized)", async ({ page }) => {
+  test("folder: rename then delete (its feeds move to the top level)", async ({ page }) => {
     await page.goto("/app/");
     // The seeded "Tech" category holds Hacker News — hover its header, rename inline.
     // Matches either name, a safeguard from before reset.ts reseeded ahead of retries:
@@ -49,7 +49,7 @@ test.describe("feed management (AUTH_MODE=none)", () => {
     await input.press("Enter");
     await expect(page.getByRole("link", { name: /^reading$/i })).toBeVisible();
 
-    // Delete it → category gone, its feed stays (now uncategorized). The delete
+    // Delete it → folder gone, its feed stays (now at the top level). The delete
     // button must be clickable (regression: the opacity:0 count once swallowed it).
     await page.getByRole("link", { name: /^reading$/i }).hover();
     await page.getByRole("button", { name: /delete reading/i }).click();
@@ -76,7 +76,7 @@ test.describe("feed management (AUTH_MODE=none)", () => {
     await page.getByRole("button", { name: "Open feeds" }).click();
     await page.getByRole("button", { name: "Subscribe", exact: true }).click();
 
-    await expect(page.getByRole("heading", { name: "Add a feed" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Subscribe to a feed" })).toBeVisible();
     // Filling would fail if the drawer/hamburger covered the dialog (regression).
     const url = page.getByLabel(/feed or site url/i);
     await url.fill("example.com");
@@ -121,8 +121,11 @@ test.describe("feed management (AUTH_MODE=none)", () => {
     const feed = page.getByRole("link", { name: /Hacker News/ });
     await feed.hover(); // reveal the hover-only gear
     await page.getByRole("button", { name: /settings for hacker news/i }).click();
-    await page.getByRole("button", { name: /delete feed/i }).click(); // inside the settings dialog
-    await page.getByRole("button", { name: /^delete$/i }).click(); // confirm dialog
+    await page.getByRole("button", { name: /^unsubscribe$/i }).click(); // inside the settings dialog
+    await page
+      .getByRole("dialog", { name: /unsubscribe from this feed/i })
+      .getByRole("button", { name: /^unsubscribe$/i })
+      .click(); // confirm dialog
 
     await expect(page.getByRole("link", { name: /Hacker News/ })).toHaveCount(0);
     await expect(page).toHaveURL(/\/$/); // bounced back to All items, not left on the dead feed

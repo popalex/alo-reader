@@ -84,7 +84,7 @@ describe("Welcome", () => {
   it("opens the app-wide add-feed dialog", () => {
     const openAddFeed = vi.fn();
     renderWelcome(openAddFeed);
-    fireEvent.click(screen.getByRole("button", { name: "Add a feed" }));
+    fireEvent.click(screen.getByRole("button", { name: "Subscribe to a feed" }));
     expect(openAddFeed).toHaveBeenCalledTimes(1);
   });
 

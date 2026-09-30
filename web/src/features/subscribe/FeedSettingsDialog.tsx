@@ -75,7 +75,7 @@ export function FeedSettingsDialog({
       if (folderId === NEW_FOLDER) {
         const name = newFolderName.trim();
         if (!name) {
-          setError("Enter a name for the new category.");
+          setError("Enter a name for the new folder.");
           return;
         }
         // Cache the in-flight creation by name, the way AddSubscriptionDialog does:
@@ -160,7 +160,7 @@ export function FeedSettingsDialog({
               }}
             >
               <Trash2 size={14} />
-              <span>Delete feed</span>
+              <span>Unsubscribe</span>
             </button>
             <div className={styles.right}>
               <Dialog.Close asChild>

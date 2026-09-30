@@ -147,7 +147,7 @@ export function useUpdateFolder() {
     onSuccess: () => refresh(),
     onError: (_err, _vars, ctx) => {
       qc.setQueryData(queryKeys.folders, ctx?.prevFolders);
-      pushToast("Couldn't rename the category.", "error");
+      pushToast("Couldn't rename the folder.", "error");
     },
   });
 }
@@ -160,9 +160,9 @@ export function useDeleteFolder() {
     onSuccess: () => {
       // refresh() re-fetches subscriptions too, so feeds now show under Uncategorized.
       refresh();
-      pushToast("Category deleted.", "info");
+      pushToast("Folder deleted.", "info");
     },
-    onError: () => pushToast("Couldn't delete the category.", "error"),
+    onError: () => pushToast("Couldn't delete the folder.", "error"),
   });
 }
 

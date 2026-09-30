@@ -15,7 +15,7 @@ export function FolderSelect({
   onChange,
   newName,
   onNewNameChange,
-  label = "Category",
+  label = "Folder",
 }: {
   folders: Folder[];
   value: string;
@@ -29,23 +29,23 @@ export function FolderSelect({
       <label className={styles.field}>
         <span className={styles.label}>{label}</span>
         <select className={styles.select} value={value} onChange={(e) => onChange(e.target.value)}>
-          <option value="">No category</option>
+          <option value="">No folder</option>
           {folders.map((f) => (
             <option key={f.id} value={String(f.id)}>
               {f.name}
             </option>
           ))}
-          <option value={NEW_FOLDER}>+ New category…</option>
+          <option value={NEW_FOLDER}>+ New folder…</option>
         </select>
       </label>
       {value === NEW_FOLDER && (
         <input
           className={styles.input}
           type="text"
-          placeholder="New category name"
+          placeholder="New folder name"
           value={newName}
           onChange={(e) => onNewNameChange(e.target.value)}
-          aria-label="New category name"
+          aria-label="New folder name"
         />
       )}
     </>

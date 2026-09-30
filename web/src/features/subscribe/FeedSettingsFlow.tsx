@@ -44,9 +44,9 @@ export function FeedSettingsFlow({
       <ConfirmDialog
         open={pendingDelete !== null}
         onOpenChange={(open) => !open && setPendingDelete(null)}
-        title="Delete this feed?"
-        body={`"${pendingDelete?.title || "Untitled feed"}" will be removed along with its articles and your read/star history. Re-subscribing later starts fresh.`}
-        confirmLabel="Delete"
+        title="Unsubscribe from this feed?"
+        body={`You'll stop following "${pendingDelete?.title || "Untitled feed"}". Its articles and your read and star history for it go too; subscribing again later starts fresh.`}
+        confirmLabel="Unsubscribe"
         onConfirm={() => {
           if (!pendingDelete) return;
           const { id, title, feed_id } = pendingDelete;
