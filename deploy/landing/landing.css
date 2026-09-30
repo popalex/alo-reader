@@ -343,13 +343,54 @@ kbd {
   font-size: 22px;
   letter-spacing: -0.015em;
 }
-.faq h3 {
-  margin: 0 0 4px;
+/* Questions fold: each opens on a click on the question. */
+.qa {
+  border-top: 1px solid var(--line);
+}
+.qa:last-of-type {
+  border-bottom: 1px solid var(--line);
+}
+.qa summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 2px;
   font-size: 15.5px;
   font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+.qa summary::-webkit-details-marker {
+  display: none;
+}
+/* A chevron drawn in CSS: points down closed, up open. */
+.qa summary::after {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  border-right: 2px solid var(--text-dim);
+  border-bottom: 2px solid var(--text-dim);
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 0.15s ease;
+}
+.qa[open] summary::after {
+  transform: translateY(2px) rotate(-135deg);
+}
+.qa summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .qa summary::after {
+    transition: none;
+  }
 }
 .faq p {
-  margin: 0 0 18px;
+  margin: 0 0 16px;
   font-size: 15px;
   line-height: 1.7;
   color: var(--text-2);
@@ -359,9 +400,7 @@ kbd {
   font-weight: 500;
   text-underline-offset: 2px;
 }
-.faq p:last-child {
-  margin-bottom: 0;
-}
+
 
 footer {
   display: flex;
