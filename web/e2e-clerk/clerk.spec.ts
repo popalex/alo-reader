@@ -219,6 +219,8 @@ test.describe.serial("clerk mode", () => {
     await page.goto("/");
     await expect(cta()).toHaveText("Open Alo Reader");
     await expect(page.locator(".reassure")).toHaveText("You are already signed in.");
+    // Nothing to sign in to: the nav's "Sign in" is gone.
+    await expect(page.locator(".navlinks").getByRole("link", { name: "Sign in" })).toBeHidden();
 
     await page.goto("/app/");
     await page.waitForFunction(() => (window as unknown as { Clerk?: { loaded?: boolean } }).Clerk?.loaded);
@@ -229,6 +231,22 @@ test.describe.serial("clerk mode", () => {
     await expect(page).toHaveURL(/localhost\/$/);
     await expect(cta()).toHaveText("Create an account"); // signed out again
     await expect(page.locator(".reassure")).not.toHaveText("You are already signed in.");
+    await expect(page.locator(".navlinks").getByRole("link", { name: "Sign in" })).toBeVisible();
+  });
+
+  test("the landing FAQ folds: questions open on a click", async ({ page }) => {
+    await page.goto("/");
+    const questions = page.locator("details.qa");
+    await expect(questions).toHaveCount(5);
+    for (const q of await questions.all()) await expect(q).not.toHaveAttribute("open", "");
+
+    const free = page.locator("details.qa", { hasText: "Is it free?" });
+    const answer = free.getByText(/An account is free and follows up to 300 feeds/);
+    await expect(answer).toBeHidden();
+    await free.getByText("Is it free?").click();
+    await expect(answer).toBeVisible();
+    await free.getByText("Is it free?").click();
+    await expect(answer).toBeHidden();
   });
 
   test("search engines: one URL per page, robots and sitemap, noindex where it belongs", async ({
@@ -301,6 +319,8 @@ test.describe.serial("clerk mode", () => {
     expect((await request.get("/from/nowhere", { maxRedirects: 0 })).status()).toBe(404);
 
     await page.goto("/");
+    // The FAQ folds: the links are in an answer, shown once its question is opened.
+    await page.getByText("Can I bring my feeds from Feedly or Inoreader?").click();
     await expect(page.getByRole("link", { name: "from Feedly" })).toHaveAttribute("href", "/from/feedly");
     await expect(page.getByRole("link", { name: "from Inoreader" })).toHaveAttribute("href", "/from/inoreader");
   });
