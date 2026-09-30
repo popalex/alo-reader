@@ -16,10 +16,12 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { CircleAlert, Loader2 } from "lucide-react";
 
 import type { EntryListItem } from "../../api/endpoints";
+import { useRetryFeed } from "../../api/feedMutations";
 import { useMarkStreamRead, useSetEntryState } from "../../api/mutations";
 import { usePrefetchEntry, useStreamEntries, useSubscriptions } from "../../api/queries";
 import { useOnline } from "../../app/offline/useOffline";
 import { lazyDialog } from "../../components/lazyDialog";
+import { useFeedSettings } from "../layout/feedSettings";
 import { useMobileNav } from "../layout/mobileNav";
 import { useAnyModalOpen } from "../../keyboard/modalLock";
 import { useKeyboard, type KeyboardActions } from "../../keyboard/useKeyboard";
@@ -76,6 +78,8 @@ const WARM_SPACING_MS = 250;
 export function EntryList({ stream, title }: { stream: StreamDescriptor; title: string }) {
   const [density, setDensity] = useDensity();
   const { cursorId, openId, setCursor, open, close, setReadingOrder } = useSelection();
+  const retryFeed = useRetryFeed();
+  const { openFeedSettings } = useFeedSettings();
   const setState = useSetEntryState();
   const { mutate: mutateEntryState } = setState;
   const markStreamRead = useMarkStreamRead(stream);
@@ -294,10 +298,8 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
   const modalOpen = useAnyModalOpen();
   useKeyboard(actions, !helpOpen && !modalOpen);
 
-  const feedError =
-    stream.kind === "feed"
-      ? (subs.data?.find((s) => s.feed_id === stream.id)?.last_error ?? null)
-      : null;
+  const feedSub = stream.kind === "feed" ? subs.data?.find((s) => s.feed_id === stream.id) : undefined;
+  const feedError = feedSub?.last_error ?? null;
 
   let body: React.ReactNode;
   if (query.isPending) {
@@ -385,7 +387,28 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
       {feedError ? (
         <div className={styles.errorBanner} role="alert">
           <CircleAlert size={15} />
-          <span>This feed failed to update: {feedError}</span>
+          <span className={styles.errorText}>This feed failed to update: {feedError}</span>
+          {/* Something to do about it: fetch again now, or the settings (address,
+              folder, delete). The message alone left people with nowhere to go. */}
+          {feedSub ? (
+            <span className={styles.errorActions}>
+              <button
+                type="button"
+                className={styles.bannerBtn}
+                onClick={() => retryFeed.mutate(feedSub)}
+                disabled={retryFeed.isPending}
+              >
+                Try again
+              </button>
+              <button
+                type="button"
+                className={styles.bannerBtn}
+                onClick={() => openFeedSettings(feedSub)}
+              >
+                Feed settings
+              </button>
+            </span>
+          ) : null}
         </div>
       ) : null}
       {markStreamRead.isPending ? (
