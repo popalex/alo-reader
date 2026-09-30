@@ -62,9 +62,10 @@ function useClerkAppearance() {
     () => ({
       variables: { ...colors },
       elements: {
-        // The signed-out shell already frames the form, and has its own heading.
+        // The signed-out shell already frames the form. Its heading stands in for
+        // Clerk's on the first step only (SignedOutShell.module.css); later steps keep
+        // theirs, which is where "Verify your email … sent to <address>" is shown.
         cardBox: { boxShadow: "none", border: `1px solid ${colors.colorBorder}` },
-        header: { display: "none" },
       },
     }),
     [colors],

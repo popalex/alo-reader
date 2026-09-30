@@ -128,3 +128,27 @@
   outline-offset: 3px;
   border-radius: 4px;
 }
+
+/* The first step of Clerk's form repeats this page's own heading ("Continue to Alo
+   Reader"), so its header is hidden there. Only there: the later steps' headers say
+   what just happened, like "Verify your email … sent to <address>", with a way to
+   change the address. Hiding every header left the code step without either. */
+.form :global(.cl-signIn-start .cl-header),
+.form :global(.cl-signUp-start .cl-header) {
+  display: none;
+}
+
+/* Clerk outlines its inputs with a box-shadow made from its border colour at about
+   11% opacity: the unfocused code boxes all but vanished (1.2:1 on the card). Inputs
+   need an edge people can see (3:1 or more, WCAG 1.4.11), so the outline is drawn
+   here in --text-faint (4.9:1), and focus gets an accent ring. !important because
+   Clerk's own rules are generated classes that would otherwise win. */
+.form :global(.cl-formFieldInput),
+.form :global(.cl-otpCodeFieldInput) {
+  box-shadow: 0 0 0 1px var(--text-faint) !important;
+}
+
+.form :global(.cl-formFieldInput:focus),
+.form :global(.cl-otpCodeFieldInput:focus) {
+  box-shadow: 0 0 0 2px var(--accent) !important;
+}
