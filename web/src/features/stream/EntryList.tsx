@@ -24,7 +24,7 @@ import { useMobileNav } from "../layout/mobileNav";
 import { useAnyModalOpen } from "../../keyboard/modalLock";
 import { useKeyboard, type KeyboardActions } from "../../keyboard/useKeyboard";
 import { safeExternalUrl } from "../../lib/url";
-import type { StreamDescriptor } from "../../lib/streams";
+import { awaitingFirstFetch, type StreamDescriptor } from "../../lib/streams";
 import { markUiEvent } from "../../app/traceUiAction";
 import { useIsMobile } from "../../lib/useMediaQuery";
 import { useDensity } from "./density";
@@ -43,7 +43,18 @@ const KeyboardHelp = lazyDialog(() =>
   import("../../keyboard/KeyboardHelp").then((m) => m.KeyboardHelp),
 );
 
-function EmptyList({ starred }: { starred: boolean }) {
+function EmptyList({ starred, fetching }: { starred: boolean; fetching: boolean }) {
+  // Right after subscribing or importing, a list is empty because nothing has been
+  // fetched yet, not because the feeds are quiet: say so, or a new account's first
+  // look at its own feeds reads "No articles yet".
+  if (fetching) {
+    return (
+      <div className={styles.empty} role="status">
+        <p className={styles.emptyTitle}>Fetching your feeds</p>
+        <p className={styles.emptyBody}>Articles appear here as each feed arrives, newest first.</p>
+      </div>
+    );
+  }
   return (
     <div className={styles.empty}>
       <p className={styles.emptyTitle}>{starred ? "No starred articles" : "No articles yet"}</p>
@@ -283,7 +294,10 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
             </p>
           </div>
         ) : (
-          <EmptyList starred={stream.kind === "starred"} />
+          <EmptyList
+            starred={stream.kind === "starred"}
+            fetching={awaitingFirstFetch(stream, subs.data ?? [])}
+          />
         )}
       </div>
     );
