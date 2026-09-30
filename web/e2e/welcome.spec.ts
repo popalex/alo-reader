@@ -1,28 +1,10 @@
-import { type APIRequestContext, expect, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
-import { resetSeedData } from "./reset";
+import { emptyAccount, resetSeedData } from "./reset";
 
 // A new account has no feeds: the list and reader panes give way to a welcome screen
-// whose main action is importing an OPML file. The seeded user is emptied first, and
-// the seed is put back afterwards for the next spec file.
-
-// The API rate-limits each user (RATE_LIMIT_RPS=10, RATE_LIMIT_BURST=30). Deleting the
-// seeded 20 feeds in a burst spends most of that, and the test's own page load and
-// subscribes then got 429s ("1 could not be added"). So a refused delete is retried,
-// and after a big cleanup the bucket gets time to refill before the test starts.
-async function unsubscribeAll(request: APIRequestContext): Promise<void> {
-  const subs = (await (await request.get("/api/v1/subscriptions")).json()) as { id: number }[];
-  for (const s of subs) {
-    let status = 0;
-    for (let attempt = 0; attempt < 5; attempt++) {
-      status = (await request.delete(`/api/v1/subscriptions/${s.id}`)).status();
-      if (status !== 429) break;
-      await new Promise((r) => setTimeout(r, 1000));
-    }
-    expect(status).toBe(204);
-  }
-  if (subs.length > 5) await new Promise((r) => setTimeout(r, 3000));
-}
+// whose main action is importing an OPML file. Each test starts from an empty account
+// (no folders, no feeds), and the seed is put back afterwards for the next spec file.
 
 const opml = `<?xml version="1.0" encoding="UTF-8"?>
 <opml version="1.0">
@@ -36,7 +18,7 @@ test.beforeAll(resetSeedData);
 test.afterAll(resetSeedData);
 
 test.describe("welcome screen (an account with no feeds)", () => {
-  test.beforeEach(async ({ request }) => unsubscribeAll(request));
+  test.beforeEach(emptyAccount);
 
   test("replaces the empty panes, and importing from it brings the reader back", async ({ page }) => {
     await page.goto("/app/");
@@ -60,6 +42,19 @@ test.describe("welcome screen (an account with no feeds)", () => {
     await page.getByRole("button", { name: "Add a feed" }).click();
     await expect(page.getByRole("heading", { name: "Add a feed" })).toBeVisible();
     await expect(page.getByLabel(/feed or site url/i)).toBeVisible();
+  });
+
+  test("the add-feed dialog stays open through a page change", async ({ page }) => {
+    await page.goto("/app/");
+    await page.getByRole("link", { name: "Starred" }).click();
+    await expect(page).toHaveURL(/\/app\/starred$/);
+    await page.getByRole("button", { name: "Add a feed" }).click();
+    const heading = page.getByRole("heading", { name: "Add a feed" });
+    await expect(heading).toBeVisible();
+
+    await page.goBack(); // back to All items, which mounts a new stream view
+    await expect(page).toHaveURL(/\/app\/$/);
+    await expect(heading).toBeVisible();
   });
 
   test("ticking starter feeds and subscribing brings the reader back with them", async ({ page }) => {

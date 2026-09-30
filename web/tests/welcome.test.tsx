@@ -4,6 +4,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../src/api/client";
 import { setAuthMode } from "../src/app/instance";
+import * as toast from "../src/app/toast";
+import { AddFeedContext } from "../src/features/layout/addFeed";
+import { pendingPollDelay } from "../src/api/queries";
 import { awaitingFirstFetch } from "../src/lib/streams";
 
 const { importOpml, createSubscription } = vi.hoisted(() => ({
@@ -18,11 +21,13 @@ vi.mock("../src/app/auth", () => ({ useTokenGetter: () => async () => null }));
 
 import { Welcome } from "../src/features/welcome/Welcome";
 
-function renderWelcome(onAddFeed = () => {}) {
+function renderWelcome(openAddFeed = () => {}) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <Welcome onAddFeed={onAddFeed} />
+      <AddFeedContext.Provider value={{ openAddFeed }}>
+        <Welcome />
+      </AddFeedContext.Provider>
     </QueryClientProvider>,
   );
 }
@@ -49,6 +54,25 @@ describe("Welcome", () => {
     expect(importOpml.mock.calls[0][1]).toBe(file);
   });
 
+  it("reports an import where no feed could be added as an error, with the reason", async () => {
+    const pushToast = vi.spyOn(toast, "pushToast");
+    importOpml.mockResolvedValue({
+      imported: 0,
+      skipped: 0,
+      failed: [{ url: "https://a.example/feed", reason: "quota exceeded" }],
+    });
+    const { container } = renderWelcome();
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [opml()] } });
+    await waitFor(() =>
+      expect(pushToast).toHaveBeenCalledWith(
+        "Couldn't import any feeds: 1 failed (quota exceeded).",
+        "error",
+      ),
+    );
+    pushToast.mockRestore();
+  });
+
   it("says why an import failed", async () => {
     importOpml.mockRejectedValue(new ApiError(400, "invalid_request", "malformed OPML"));
     const { container } = renderWelcome();
@@ -57,11 +81,11 @@ describe("Welcome", () => {
     expect((await screen.findByRole("alert")).textContent).toContain("malformed OPML");
   });
 
-  it("opens the add-feed dialog through its callback", () => {
-    const onAddFeed = vi.fn();
-    renderWelcome(onAddFeed);
+  it("opens the app-wide add-feed dialog", () => {
+    const openAddFeed = vi.fn();
+    renderWelcome(openAddFeed);
     fireEvent.click(screen.getByRole("button", { name: "Add a feed" }));
-    expect(onAddFeed).toHaveBeenCalledTimes(1);
+    expect(openAddFeed).toHaveBeenCalledTimes(1);
   });
 
   it("links the export guides only where the website serves them", () => {
@@ -107,7 +131,8 @@ describe("Welcome starter feeds", () => {
     expect((screen.getByRole("button", { name: "Subscribe to ticked feeds" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("keeps going when one feed fails", async () => {
+  it("keeps going when one feed fails, and says which reason", async () => {
+    const pushToast = vi.spyOn(toast, "pushToast");
     createSubscription
       .mockRejectedValueOnce(new ApiError(422, "validation_error", "quota exceeded"))
       .mockImplementation(async (_token, input) => ({ id: 2, ...input }));
@@ -116,6 +141,34 @@ describe("Welcome starter feeds", () => {
     fireEvent.click(screen.getByLabelText(/kottke\.org/));
     fireEvent.click(screen.getByRole("button", { name: "Subscribe to 2 feeds" }));
     await waitFor(() => expect(createSubscription).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(pushToast).toHaveBeenCalledWith(
+        "Subscribed to 1 feed. 1 could not be added (quota exceeded).",
+        "info",
+      ),
+    );
+    pushToast.mockRestore();
+  });
+
+  it("reports an error, with the reason, when none could be added", async () => {
+    const pushToast = vi.spyOn(toast, "pushToast");
+    createSubscription.mockRejectedValue(new ApiError(429, "rate_limited", "too many requests"));
+    renderWelcome();
+    fireEvent.click(screen.getByLabelText(/Quanta Magazine/));
+    fireEvent.click(screen.getByRole("button", { name: "Subscribe to 1 feed" }));
+    await waitFor(() =>
+      expect(pushToast).toHaveBeenCalledWith("Couldn't subscribe: too many requests.", "error"),
+    );
+    pushToast.mockRestore();
+  });
+});
+
+describe("pendingPollDelay", () => {
+  it("checks new feeds quickly at first, then slowly instead of giving up", () => {
+    expect(pendingPollDelay(0)).toBe(2500);
+    expect(pendingPollDelay(89_000)).toBe(2500);
+    expect(pendingPollDelay(90_000)).toBe(30_000);
+    expect(pendingPollDelay(9 * 60_000)).toBe(30_000);
   });
 });
 
