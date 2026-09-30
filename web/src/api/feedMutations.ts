@@ -10,6 +10,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { useTokenGetter } from "../app/auth";
 import { pushToast } from "../app/toast";
+import { ApiError } from "./client";
 import {
   createSubscription,
   deleteFolder,
@@ -62,19 +63,27 @@ export function useSubscribeMany() {
     mutationFn: async (inputs: CreateSubscriptionInput[]) => {
       const token = await getToken();
       let added = 0;
+      let firstError: string | null = null;
       for (const input of inputs) {
         try {
           await createSubscription(token, input);
           added += 1;
-        } catch {
+        } catch (err) {
           // Counted below; the next feed still gets its turn.
+          firstError ??= err instanceof ApiError ? err.message : "the request failed";
         }
       }
-      return { added, failed: inputs.length - added };
+      return { added, failed: inputs.length - added, firstError };
     },
-    onSuccess: ({ added, failed }) => {
+    onSuccess: ({ added, failed, firstError }) => {
       refresh();
-      const failures = failed ? ` ${failed} could not be added.` : "";
+      if (added === 0) {
+        // Nothing happened: say so as an error, with the reason, rather than a
+        // cheerful "Subscribed to 0 feeds".
+        pushToast(`Couldn't subscribe: ${firstError}.`, "error");
+        return;
+      }
+      const failures = failed ? ` ${failed} could not be added (${firstError}).` : "";
       pushToast(`Subscribed to ${added} feed${added === 1 ? "" : "s"}.${failures}`, "info");
     },
   });
@@ -180,7 +189,12 @@ export function useImportOpml() {
       // so failures are counted here too; the dialog lists them one by one.
       const n = report.imported;
       const failed = report.failed.length;
-      const failures = failed ? ` ${failed} could not be added.` : "";
+      const reason = report.failed[0]?.reason;
+      if (n === 0 && failed > 0) {
+        pushToast(`Couldn't import any feeds: ${failed} failed (${reason}).`, "error");
+        return;
+      }
+      const failures = failed ? ` ${failed} could not be added (${reason}).` : "";
       pushToast(`Imported ${n} feed${n === 1 ? "" : "s"}.${failures}`, "info");
     },
   });
