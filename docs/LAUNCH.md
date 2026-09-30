@@ -166,7 +166,7 @@ in the places RSS readers talk, and each mention there is a link that helps sear
 rankings later. Do this once sign-up is public.
 
 1. **Get listed.**
-   - AlternativeTo: add alo reader as an alternative to Feedly, Inoreader and
+   - AlternativeTo: add Alo Reader as an alternative to Feedly, Inoreader and
      NewsBlur.
    - Self-hosters: awesome-selfhosted and selfh.st (read each list's inclusion
      rules first; some want a project to be a few months old).
@@ -178,7 +178,7 @@ rankings later. Do this once sign-up is public.
    readers searches for:
    - Moving from Feedly: exporting the OPML there, importing it here.
    - The same for Inoreader.
-   - What alo reader deliberately does not do: no ranking, no AI summaries, no
+   - What Alo Reader deliberately does not do: no ranking, no AI summaries, no
      tracking.
 
    Add them to `sitemap.xml` (deploy/Caddyfile) as they go up.
