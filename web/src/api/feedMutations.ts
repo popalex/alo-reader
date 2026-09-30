@@ -146,8 +146,12 @@ export function useImportOpml() {
     mutationFn: async (file: File): Promise<ImportReport> => importOpml(await getToken(), file),
     onSuccess: (report) => {
       refresh();
+      // Also the only report an import from the welcome screen gets (no dialog there),
+      // so failures are counted here too; the dialog lists them one by one.
       const n = report.imported;
-      pushToast(`Imported ${n} feed${n === 1 ? "" : "s"}.`, "info");
+      const failed = report.failed.length;
+      const failures = failed ? ` ${failed} could not be added.` : "";
+      pushToast(`Imported ${n} feed${n === 1 ? "" : "s"}.${failures}`, "info");
     },
   });
 }
