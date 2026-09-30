@@ -4,6 +4,7 @@
 import { ClerkProvider, Show, SignIn, UserButton, useAuth } from "@clerk/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
+import { AccountSlotContext } from "./accountSlot";
 import { AppProviders } from "./AppProviders";
 import { SignedOutShell } from "./SignedOutShell";
 import { TokenProvider, type TokenGetter } from "./auth";
@@ -61,9 +62,10 @@ function useClerkAppearance() {
     () => ({
       variables: { ...colors },
       elements: {
-        // The signed-out shell already frames the form, and has its own heading.
+        // The signed-out shell already frames the form. Its heading stands in for
+        // Clerk's on the first step only (SignedOutShell.module.css); later steps keep
+        // theirs, which is where "Verify your email … sent to <address>" is shown.
         cardBox: { boxShadow: "none", border: `1px solid ${colors.colorBorder}` },
-        header: { display: "none" },
       },
     }),
     [colors],
@@ -91,12 +93,13 @@ export default function ClerkApp({ publishableKey }: { publishableKey: string })
         </SignedOutShell>
       </Show>
       <Show when="signed-in">
-        <header style={{ display: "flex", justifyContent: "flex-end", padding: "0.5rem 1rem" }}>
-          <UserButton />
-        </header>
-        <ClerkTokenBridge>
-          <AppProviders />
-        </ClerkTokenBridge>
+        {/* The account button lives in the sidebar's footer. It used to sit in a bar of
+            its own above the app, which made the page 44 px taller than the screen. */}
+        <AccountSlotContext.Provider value={<UserButton />}>
+          <ClerkTokenBridge>
+            <AppProviders />
+          </ClerkTokenBridge>
+        </AccountSlotContext.Provider>
       </Show>
     </ClerkProvider>
   );
