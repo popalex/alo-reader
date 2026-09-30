@@ -16,6 +16,7 @@ import {
   deleteFolder,
   deleteSubscription,
   importOpml,
+  refreshSubscription,
   updateFolder,
   updateSubscription,
   type CreateSubscriptionInput,
@@ -85,6 +86,41 @@ export function useSubscribeMany() {
       }
       const failures = failed ? ` ${failed} could not be added (${firstError}).` : "";
       pushToast(`Subscribed to ${added} feed${added === 1 ? "" : "s"}.${failures}`, "info");
+    },
+  });
+}
+
+/** "Try again" on a feed that failed to update: queue an immediate fetch, then re-read
+ *  its state a few times, since the worker usually has it within seconds and nothing
+ *  else polls a feed whose last fetch failed. */
+export function useRetryFeed() {
+  const getToken = useTokenGetter();
+  const qc = useQueryClient();
+  const refresh = useRefreshFeedLists();
+  return useMutation({
+    mutationFn: async (sub: Subscription) => {
+      await refreshSubscription(await getToken(), sub.id);
+      return sub;
+    },
+    onSuccess: (sub) => {
+      pushToast(`Checking ${sub.title || "the feed"} again.`, "info");
+      for (const ms of [3000, 8000, 15000]) {
+        window.setTimeout(() => {
+          refresh();
+          void qc.invalidateQueries({ queryKey: ["entries"] });
+        }, ms);
+      }
+    },
+    onError: (err) => {
+      const cooldown = err instanceof ApiError && err.status === 429;
+      pushToast(
+        cooldown
+          ? "This feed was checked moments ago. Try again in a minute."
+          : err instanceof ApiError
+            ? err.message
+            : "Couldn't check the feed again.",
+        "error",
+      );
     },
   });
 }
