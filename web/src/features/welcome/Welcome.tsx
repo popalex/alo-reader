@@ -20,7 +20,10 @@ import { useMobileNav } from "../layout/mobileNav";
 import styles from "./Welcome.module.css";
 
 /** A few long-running, varied feeds for someone new to RSS. Picked for staying power
- *  and range, not endorsement; every address was checked to serve a working feed. */
+ *  and range, not endorsement. Each address served a working feed when checked
+ *  (2026-09-30), and each title is the one the feed gives itself: the title sent on
+ *  subscribe is only a placeholder that the first fetch replaces, so any other name
+ *  would change in the sidebar right after it was ticked. */
 const STARTERS = [
   {
     title: "NASA Image of the Day",
@@ -28,7 +31,7 @@ const STARTERS = [
     about: "A photograph from NASA, most days.",
   },
   {
-    title: "xkcd",
+    title: "xkcd.com",
     url: "https://xkcd.com/atom.xml",
     about: "A webcomic about science, maths and language.",
   },
