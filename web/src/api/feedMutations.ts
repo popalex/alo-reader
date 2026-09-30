@@ -50,6 +50,36 @@ export function useCreateSubscription() {
   });
 }
 
+/** Subscribe to several feeds in one go: the welcome screen's starter feeds. They are
+ *  created one after another and the feed lists refresh once at the end, because the
+ *  first refresh to show a subscription swaps the welcome screen for the article list,
+ *  and the rest of the choice must be in by then. A feed that fails does not stop the
+ *  others; the toast counts it. */
+export function useSubscribeMany() {
+  const getToken = useTokenGetter();
+  const refresh = useRefreshFeedLists();
+  return useMutation({
+    mutationFn: async (inputs: CreateSubscriptionInput[]) => {
+      const token = await getToken();
+      let added = 0;
+      for (const input of inputs) {
+        try {
+          await createSubscription(token, input);
+          added += 1;
+        } catch {
+          // Counted below; the next feed still gets its turn.
+        }
+      }
+      return { added, failed: inputs.length - added };
+    },
+    onSuccess: ({ added, failed }) => {
+      refresh();
+      const failures = failed ? ` ${failed} could not be added.` : "";
+      pushToast(`Subscribed to ${added} feed${added === 1 ? "" : "s"}.${failures}`, "info");
+    },
+  });
+}
+
 /** Rename a category. This one *does* patch the cache: a rename changes a single
  *  string on a single row, so there is nothing to re-derive. Without the patch the
  *  sidebar keeps the old name for the whole PATCH + refetch round trip, and the

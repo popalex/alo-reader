@@ -13,17 +13,72 @@ import { useState } from "react";
 import { FileUp, Loader2, Menu, Plus } from "lucide-react";
 
 import { ApiError } from "../../api/client";
-import { useImportOpml } from "../../api/feedMutations";
+import { useImportOpml, useSubscribeMany } from "../../api/feedMutations";
 import { hasPublicSite } from "../../app/instance";
 import { useIsMobile } from "../../lib/useMediaQuery";
 import { useMobileNav } from "../layout/mobileNav";
 import styles from "./Welcome.module.css";
+
+/** A few long-running, varied feeds for someone new to RSS. Picked for staying power
+ *  and range, not endorsement; every address was checked to serve a working feed. */
+const STARTERS = [
+  {
+    title: "NASA Image of the Day",
+    url: "https://www.nasa.gov/feeds/iotd-feed/",
+    about: "A photograph from NASA, most days.",
+  },
+  {
+    title: "xkcd",
+    url: "https://xkcd.com/atom.xml",
+    about: "A webcomic about science, maths and language.",
+  },
+  {
+    title: "BBC News",
+    url: "https://feeds.bbci.co.uk/news/rss.xml",
+    about: "Top stories from the BBC, through the day.",
+  },
+  {
+    title: "Quanta Magazine",
+    url: "https://www.quantamagazine.org/feed/",
+    about: "Long reads on mathematics, physics, biology and computing.",
+  },
+  {
+    title: "Hacker News",
+    url: "https://news.ycombinator.com/rss",
+    about: "The front page of a busy technology link site.",
+  },
+  {
+    title: "kottke.org",
+    url: "https://feeds.kottke.org/main",
+    about: "A blog of interesting finds from around the web, since 1998.",
+  },
+];
 
 export function Welcome({ onAddFeed }: { onAddFeed: () => void }) {
   const isMobile = useIsMobile();
   const { openSidebar } = useMobileNav();
   const importer = useImportOpml();
   const [error, setError] = useState<string | null>(null);
+  const subscribeMany = useSubscribeMany();
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+
+  function toggle(url: string) {
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(url)) next.delete(url);
+      else next.add(url);
+      return next;
+    });
+  }
+
+  function subscribePicked() {
+    const inputs = STARTERS.filter((f) => picked.has(f.url)).map((f) => ({
+      feed_url: f.url,
+      title: f.title,
+      folder_id: null,
+    }));
+    if (inputs.length > 0) subscribeMany.mutate(inputs);
+  }
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -95,6 +150,47 @@ export function Welcome({ onAddFeed }: { onAddFeed: () => void }) {
           <button type="button" className={styles.btnSecondary} onClick={onAddFeed}>
             <Plus size={16} />
             <span>Add a feed</span>
+          </button>
+        </div>
+
+        <div className={styles.starters}>
+          <h2 className={styles.optionTitle}>New to RSS? Start with a few</h2>
+          <p className={styles.optionBody}>
+            Tick the ones you like. You can unsubscribe from any of them later.
+          </p>
+          <ul className={styles.starterList}>
+            {STARTERS.map((f) => (
+              <li key={f.url}>
+                <label className={styles.starter}>
+                  <input
+                    type="checkbox"
+                    checked={picked.has(f.url)}
+                    onChange={() => toggle(f.url)}
+                    disabled={subscribeMany.isPending}
+                  />
+                  <span className={styles.starterText}>
+                    <span className={styles.starterTitle}>{f.title}</span>
+                    <span className={styles.starterAbout}>{f.about}</span>
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          {/* Quiet until something is ticked; then it is the next thing to press. */}
+          <button
+            type="button"
+            className={picked.size > 0 ? styles.btnPrimary : styles.btnSecondary}
+            onClick={subscribePicked}
+            disabled={picked.size === 0 || subscribeMany.isPending}
+          >
+            {subscribeMany.isPending ? <Loader2 size={16} className={styles.spin} /> : <Plus size={16} />}
+            <span>
+              {subscribeMany.isPending
+                ? "Subscribing…"
+                : picked.size === 0
+                  ? "Subscribe to ticked feeds" // not bare "Subscribe": the sidebar's button has that name
+                  : `Subscribe to ${picked.size} feed${picked.size === 1 ? "" : "s"}`}
+            </span>
           </button>
         </div>
       </div>
