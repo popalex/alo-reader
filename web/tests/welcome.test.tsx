@@ -6,10 +6,13 @@ import { ApiError } from "../src/api/client";
 import { setAuthMode } from "../src/app/instance";
 import { awaitingFirstFetch } from "../src/lib/streams";
 
-const { importOpml } = vi.hoisted(() => ({ importOpml: vi.fn() }));
+const { importOpml, createSubscription } = vi.hoisted(() => ({
+  importOpml: vi.fn(),
+  createSubscription: vi.fn(),
+}));
 vi.mock("../src/api/endpoints", async () => {
   const actual = await vi.importActual<typeof import("../src/api/endpoints")>("../src/api/endpoints");
-  return { ...actual, importOpml };
+  return { ...actual, importOpml, createSubscription };
 });
 vi.mock("../src/app/auth", () => ({ useTokenGetter: () => async () => null }));
 
@@ -28,6 +31,7 @@ const opml = () => new File(["<opml/>"], "feeds.opml", { type: "text/xml" });
 
 afterEach(() => {
   importOpml.mockReset();
+  createSubscription.mockReset();
   setAuthMode("none");
 });
 
@@ -69,6 +73,49 @@ describe("Welcome", () => {
     renderWelcome();
     expect(screen.getByRole("link", { name: "from Feedly" }).getAttribute("href")).toBe("/from/feedly");
     expect(screen.getByRole("link", { name: "from Inoreader" }).getAttribute("href")).toBe("/from/inoreader");
+  });
+});
+
+describe("Welcome starter feeds", () => {
+  it("subscribes to exactly the ticked feeds, with one button", async () => {
+    createSubscription.mockImplementation(async (_token, input) => ({ id: 1, ...input }));
+    renderWelcome();
+    const button = screen.getByRole("button", { name: "Subscribe to ticked feeds" }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+
+    fireEvent.click(screen.getByLabelText(/NASA Image of the Day/));
+    fireEvent.click(screen.getByLabelText(/Quanta Magazine/));
+    fireEvent.click(screen.getByRole("button", { name: "Subscribe to 2 feeds" }));
+
+    await waitFor(() => expect(createSubscription).toHaveBeenCalledTimes(2));
+    expect(createSubscription.mock.calls.map((c) => c[1].feed_url)).toEqual([
+      "https://www.nasa.gov/feeds/iotd-feed/",
+      "https://www.quantamagazine.org/feed/",
+    ]);
+    expect(createSubscription.mock.calls[0][1]).toMatchObject({
+      title: "NASA Image of the Day",
+      folder_id: null,
+    });
+  });
+
+  it("unticking takes a feed back out of the count", () => {
+    renderWelcome();
+    const xkcd = screen.getByLabelText(/xkcd/);
+    fireEvent.click(xkcd);
+    expect(screen.getByRole("button", { name: "Subscribe to 1 feed" })).toBeTruthy();
+    fireEvent.click(xkcd);
+    expect((screen.getByRole("button", { name: "Subscribe to ticked feeds" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("keeps going when one feed fails", async () => {
+    createSubscription
+      .mockRejectedValueOnce(new ApiError(422, "validation_error", "quota exceeded"))
+      .mockImplementation(async (_token, input) => ({ id: 2, ...input }));
+    renderWelcome();
+    fireEvent.click(screen.getByLabelText(/BBC News/));
+    fireEvent.click(screen.getByLabelText(/kottke\.org/));
+    fireEvent.click(screen.getByRole("button", { name: "Subscribe to 2 feeds" }));
+    await waitFor(() => expect(createSubscription).toHaveBeenCalledTimes(2));
   });
 });
 

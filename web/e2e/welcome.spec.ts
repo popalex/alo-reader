@@ -6,11 +6,22 @@ import { resetSeedData } from "./reset";
 // whose main action is importing an OPML file. The seeded user is emptied first, and
 // the seed is put back afterwards for the next spec file.
 
+// The API rate-limits each user (RATE_LIMIT_RPS=10, RATE_LIMIT_BURST=30). Deleting the
+// seeded 20 feeds in a burst spends most of that, and the test's own page load and
+// subscribes then got 429s ("1 could not be added"). So a refused delete is retried,
+// and after a big cleanup the bucket gets time to refill before the test starts.
 async function unsubscribeAll(request: APIRequestContext): Promise<void> {
   const subs = (await (await request.get("/api/v1/subscriptions")).json()) as { id: number }[];
   for (const s of subs) {
-    expect((await request.delete(`/api/v1/subscriptions/${s.id}`)).status()).toBe(204);
+    let status = 0;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      status = (await request.delete(`/api/v1/subscriptions/${s.id}`)).status();
+      if (status !== 429) break;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    expect(status).toBe(204);
   }
+  if (subs.length > 5) await new Promise((r) => setTimeout(r, 3000));
 }
 
 const opml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -49,6 +60,22 @@ test.describe("welcome screen (an account with no feeds)", () => {
     await page.getByRole("button", { name: "Add a feed" }).click();
     await expect(page.getByRole("heading", { name: "Add a feed" })).toBeVisible();
     await expect(page.getByLabel(/feed or site url/i)).toBeVisible();
+  });
+
+  test("ticking starter feeds and subscribing brings the reader back with them", async ({ page }) => {
+    await page.goto("/app/");
+    await expect(page.getByRole("button", { name: "Subscribe to ticked feeds" })).toBeDisabled();
+
+    await page.getByLabel(/NASA Image of the Day/).check();
+    await page.getByLabel(/Quanta Magazine/).check();
+    await page.getByRole("button", { name: "Subscribe to 2 feeds" }).click();
+
+    // Both are subscribed before the welcome screen gives way. Whether the feeds can
+    // be fetched from here does not matter: the subscriptions exist either way.
+    await expect(page.getByText("Subscribed to 2 feeds.")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Welcome to alo reader" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /NASA Image of the Day/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Quanta Magazine/ })).toBeVisible();
   });
 
   test("on a phone, both ways in and the drawer are on screen", async ({ page }) => {
