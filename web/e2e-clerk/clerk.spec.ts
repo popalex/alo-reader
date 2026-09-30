@@ -170,6 +170,26 @@ test.describe.serial("clerk mode", () => {
     expect(statuses.filter((s) => s === 401)).toEqual([]);
   });
 
+  test("the account button sits in the sidebar, and the app fits the screen", async ({ page }) => {
+    await signIn(page);
+    // It used to have a bar of its own above the app, 44 px the screen did not have.
+    const account = page.locator("aside").getByRole("button", { name: /open user menu/i });
+    await expect(account).toBeVisible();
+    const fits = () =>
+      page.evaluate(() => document.scrollingElement!.scrollHeight <= window.innerHeight);
+    expect(await fits()).toBe(true);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/app/");
+    await expect(page.locator("[data-index]").first()).toBeVisible();
+    expect(await fits()).toBe(true);
+    // On a phone the sidebar, account included, is in the drawer.
+    await page.getByRole("button", { name: "Open feeds" }).click();
+    await expect(
+      page.getByRole("dialog").getByRole("button", { name: /open user menu/i }),
+    ).toBeVisible();
+  });
+
   test("sign-out goes to the landing page, and the app asks to sign in again", async ({
     page,
   }) => {
@@ -344,7 +364,27 @@ test.describe.serial("clerk mode", () => {
       prepared = page.waitForResponse((r) => isPrepare(r.url()) && r.ok());
       await page.getByRole("button", { name: "Continue", exact: true }).click();
     }
-    await enterTestCode(page, prepared);
+
+    // The code step says where the code went (Clerk's header, hidden only on the
+    // first step), and every code box has a visible edge: the --text-faint outline
+    // from SignedOutShell.module.css, not Clerk's 11% hairline.
+    await prepared;
+    await expect(page.getByText("Verify your email")).toBeVisible();
+    await expect(page.getByText(signupEmail.slice(0, 20))).toBeVisible();
+    const faint = await page.evaluate(() => {
+      const probe = document.createElement("span");
+      probe.style.color = "var(--text-faint)";
+      document.body.append(probe);
+      const rgb = getComputedStyle(probe).color;
+      probe.remove();
+      return rgb;
+    });
+    const outlines = await page
+      .locator(".cl-otpCodeFieldInput")
+      .evaluateAll((els) => els.map((el) => getComputedStyle(el).boxShadow));
+    expect(outlines.length).toBe(6);
+    for (const outline of outlines) expect(outline).toContain(faint);
+    await enterTestCode(page, Promise.resolve());
 
     await expect(page).toHaveURL(/localhost\/app\/?/, { timeout: 30_000 });
     await expect(page.getByRole("button", { name: "Subscribe", exact: true })).toBeVisible();
