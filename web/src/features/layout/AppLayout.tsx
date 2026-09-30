@@ -7,13 +7,16 @@ import { useEffect, useState } from "react";
 
 import { Outlet, useRouterState } from "@tanstack/react-router";
 
+import type { Subscription } from "../../api/endpoints";
 import { useFolders, usePendingFeedPolling } from "../../api/queries";
 import { UnreadAnnouncer } from "../../app/UnreadAnnouncer";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { lazyDialog } from "../../components/lazyDialog";
 import { useIsMobile } from "../../lib/useMediaQuery";
 import { Sidebar } from "../sidebar/Sidebar";
+import { FeedSettingsFlow } from "../subscribe/FeedSettingsFlow";
 import { AddFeedContext } from "./addFeed";
+import { FeedSettingsContext } from "./feedSettings";
 import { MobileNavContext } from "./mobileNav";
 import styles from "./AppLayout.module.css";
 
@@ -26,6 +29,7 @@ export function AppLayout() {
   const isMobile = useIsMobile();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [addFeedOpen, setAddFeedOpen] = useState(false);
+  const [settingsSub, setSettingsSub] = useState<Subscription | null>(null);
   const folders = useFolders();
   usePendingFeedPolling(); // auto-refresh a just-added feed until the worker fills it in
 
@@ -36,38 +40,41 @@ export function AppLayout() {
   return (
     <MobileNavContext.Provider value={{ openSidebar: () => setDrawerOpen(true) }}>
       <AddFeedContext.Provider value={{ openAddFeed: () => setAddFeedOpen(true) }}>
-        <div className={styles.shell}>
-          {!isMobile && <Sidebar />}
-          <div className={styles.content}>
-            {/* A render error in one stream shouldn't blank the whole app; reset on
-                navigation so moving to another view recovers. */}
-            <ErrorBoundary
-              resetKey={pathname}
-              fallback={
-                <div className={styles.crash} role="alert">
-                  <p className={styles.crashTitle}>Something went wrong</p>
-                  <p>This view ran into an error. Try reloading the page.</p>
-                  <button
-                    type="button"
-                    className={styles.crashBtn}
-                    onClick={() => window.location.reload()}
-                  >
-                    Reload
-                  </button>
-                </div>
-              }
-            >
-              <Outlet />
-            </ErrorBoundary>
+        <FeedSettingsContext.Provider value={{ openFeedSettings: setSettingsSub }}>
+          <div className={styles.shell}>
+            {!isMobile && <Sidebar />}
+            <div className={styles.content}>
+              {/* A render error in one stream shouldn't blank the whole app; reset on
+                  navigation so moving to another view recovers. */}
+              <ErrorBoundary
+                resetKey={pathname}
+                fallback={
+                  <div className={styles.crash} role="alert">
+                    <p className={styles.crashTitle}>Something went wrong</p>
+                    <p>This view ran into an error. Try reloading the page.</p>
+                    <button
+                      type="button"
+                      className={styles.crashBtn}
+                      onClick={() => window.location.reload()}
+                    >
+                      Reload
+                    </button>
+                  </div>
+                }
+              >
+                <Outlet />
+              </ErrorBoundary>
+            </div>
+            <UnreadAnnouncer />
           </div>
-          <UnreadAnnouncer />
-        </div>
-        {isMobile && <MobileSidebar open={drawerOpen} onOpenChange={setDrawerOpen} />}
-        <AddSubscriptionDialog
-          open={addFeedOpen}
-          onOpenChange={setAddFeedOpen}
-          folders={folders.data ?? []}
-        />
+          {isMobile && <MobileSidebar open={drawerOpen} onOpenChange={setDrawerOpen} />}
+          <AddSubscriptionDialog
+            open={addFeedOpen}
+            onOpenChange={setAddFeedOpen}
+            folders={folders.data ?? []}
+          />
+          <FeedSettingsFlow sub={settingsSub} onClose={() => setSettingsSub(null)} />
+        </FeedSettingsContext.Provider>
       </AddFeedContext.Provider>
     </MobileNavContext.Provider>
   );

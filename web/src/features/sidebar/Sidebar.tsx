@@ -10,10 +10,11 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { ChevronDown, Inbox, Loader2, Pencil, Plus, Settings2, Star, Trash2 } from "lucide-react";
 
 import type { Folder, Subscription } from "../../api/endpoints";
-import { useDeleteFolder, useDeleteSubscription, useUpdateFolder } from "../../api/feedMutations";
+import { useDeleteFolder, useUpdateFolder } from "../../api/feedMutations";
 import { useCounts, useFolders, useSubscriptions } from "../../api/queries";
 import { Favicon } from "../../components/Favicon";
 import { lazyDialog } from "../../components/lazyDialog";
+import { useFeedSettings } from "../layout/feedSettings";
 import styles from "./Sidebar.module.css";
 
 const ConfirmDialog = lazyDialog(() =>
@@ -21,9 +22,6 @@ const ConfirmDialog = lazyDialog(() =>
 );
 const AddSubscriptionDialog = lazyDialog(() =>
   import("../subscribe/AddSubscriptionDialog").then((m) => m.AddSubscriptionDialog),
-);
-const FeedSettingsDialog = lazyDialog(() =>
-  import("../subscribe/FeedSettingsDialog").then((m) => m.FeedSettingsDialog),
 );
 
 function FeedLink({
@@ -170,10 +168,8 @@ export function Sidebar() {
   const counts = useCounts();
   const [collapsed, setCollapsed] = useState<ReadonlySet<number>>(() => new Set<number>());
   const [addOpen, setAddOpen] = useState(false);
-  const [settingsSub, setSettingsSub] = useState<Subscription | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<Subscription | null>(null);
   const [pendingDeleteFolder, setPendingDeleteFolder] = useState<Folder | null>(null);
-  const deleteSub = useDeleteSubscription();
+  const { openFeedSettings } = useFeedSettings();
   const deleteFolder = useDeleteFolder();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -245,14 +241,6 @@ export function Sidebar() {
         folders={folders.data ?? []}
       />
 
-      <FeedSettingsDialog
-        sub={settingsSub}
-        open={settingsSub !== null}
-        onOpenChange={(open) => !open && setSettingsSub(null)}
-        folders={folders.data ?? []}
-        onDelete={setPendingDelete}
-      />
-
       <ConfirmDialog
         open={pendingDeleteFolder !== null}
         onOpenChange={(open) => !open && setPendingDeleteFolder(null)}
@@ -280,27 +268,6 @@ export function Sidebar() {
         }}
       />
 
-      <ConfirmDialog
-        open={pendingDelete !== null}
-        onOpenChange={(open) => !open && setPendingDelete(null)}
-        title="Delete this feed?"
-        body={`"${pendingDelete?.title || "Untitled feed"}" will be removed along with its articles and your read/star history. Re-subscribing later starts fresh.`}
-        confirmLabel="Delete"
-        onConfirm={() => {
-          if (!pendingDelete) return;
-          const { id, title, feed_id } = pendingDelete;
-          deleteSub.mutate(
-            { id, title },
-            {
-              // If we're viewing the feed we just left, go back to All items so the
-              // list + reader don't keep showing the removed feed's content.
-              onSuccess: () => {
-                if (pathname === `/feed/${feed_id}`) void navigate({ to: "/" });
-              },
-            },
-          );
-        }}
-      />
 
       <nav className={styles.views} aria-label="Views">
         <Link
@@ -342,7 +309,7 @@ export function Sidebar() {
                 />
                 {!isCollapsed &&
                   feeds.map((sub) => (
-                    <FeedLink key={sub.id} sub={sub} unread={unreadBySub.get(sub.id) ?? 0} onSettings={setSettingsSub} />
+                    <FeedLink key={sub.id} sub={sub} unread={unreadBySub.get(sub.id) ?? 0} onSettings={openFeedSettings} />
                   ))}
               </div>
             );
@@ -354,7 +321,7 @@ export function Sidebar() {
                 .slice()
                 .sort(byTitle)
                 .map((sub) => (
-                  <FeedLink key={sub.id} sub={sub} unread={unreadBySub.get(sub.id) ?? 0} onSettings={setSettingsSub} />
+                  <FeedLink key={sub.id} sub={sub} unread={unreadBySub.get(sub.id) ?? 0} onSettings={openFeedSettings} />
                 ))}
             </div>
           )}
