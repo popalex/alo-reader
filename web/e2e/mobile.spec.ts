@@ -41,8 +41,7 @@ test.describe("mobile shell", () => {
     await expect(menu).toBeVisible();
     await expect(menu.getByRole("menuitem", { name: /Refresh/ })).toBeVisible();
 
-    await menu.getByRole("menuitemradio", { name: /Dark/ }).click();
-    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await menu.getByRole("menuitem", { name: /Refresh/ }).click();
     await expect(page.getByRole("menu")).toHaveCount(0);
 
     // Once loaded it is the real Radix trigger: reopen, Esc closes, focus returns.

@@ -1,14 +1,13 @@
 // The list header's actions collapsed into a single overflow menu on mobile
-// (refresh, mark-all-read, theme) so the top app bar stays `☰ · title · ⋯`.
+// (refresh, mark-all-read) so the top app bar stays `☰ · title · ⋯`. The theme
+// switch is in the sidebar's footer, which on a phone is in the drawer.
 // Desktop keeps the inline controls; this trigger is CSS-hidden there.
 
 import { useRef } from "react";
 
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Check, CheckCheck, MoreVertical, RefreshCw } from "lucide-react";
+import { CheckCheck, MoreVertical, RefreshCw } from "lucide-react";
 
-import { useTheme, type ThemeChoice } from "../../app/theme";
-import { THEME_OPTIONS } from "../../app/themeOptions";
 import styles from "./MobileActionsMenu.module.css";
 
 export function MobileActionsMenu({
@@ -28,7 +27,6 @@ export function MobileActionsMenu({
    *  menu container. */
   focusFirstItem?: boolean;
 }) {
-  const [theme, setTheme] = useTheme();
   const focusedFirst = useRef(false);
   return (
     <DropdownMenu.Root defaultOpen={defaultOpen}>
@@ -64,21 +62,6 @@ export function MobileActionsMenu({
           >
             <CheckCheck size={15} /> Mark all read
           </DropdownMenu.Item>
-          <DropdownMenu.Separator className={styles.sep} />
-          <DropdownMenu.Label className={styles.label}>Theme</DropdownMenu.Label>
-          <DropdownMenu.RadioGroup
-            value={theme}
-            onValueChange={(v) => setTheme(v as ThemeChoice)}
-          >
-            {THEME_OPTIONS.map(({ value, Icon, label }) => (
-              <DropdownMenu.RadioItem key={value} className={styles.item} value={value}>
-                <Icon size={15} /> {label}
-                <DropdownMenu.ItemIndicator className={styles.indicator}>
-                  <Check size={14} />
-                </DropdownMenu.ItemIndicator>
-              </DropdownMenu.RadioItem>
-            ))}
-          </DropdownMenu.RadioGroup>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>

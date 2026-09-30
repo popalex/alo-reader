@@ -22,13 +22,46 @@
   padding-inline: 12px;
 }
 
-/* The account control (clerk mode). */
+/* App-wide settings: the account control (clerk mode), the theme, the shortcut
+   sheet. */
 .foot {
   display: flex;
   align-items: center;
   gap: 8px;
   padding-top: 12px;
   border-top: 1px solid var(--border);
+}
+
+.footSpacer {
+  flex: 1;
+}
+
+.shortcuts {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.shortcuts:hover {
+  color: var(--text);
+}
+
+.shortcuts:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Keyboard shortcuts are for keyboards: none on a phone. */
+@media (max-width: 768px) {
+  .shortcuts {
+    display: none;
+  }
 }
 
 .head {

@@ -1,12 +1,11 @@
 // The entry list's top bar: mobile hamburger, stream title, and the actions
-// (refresh, mark-all-read, density, theme). On desktop the actions are inline;
+// (refresh, mark-all-read, density). On desktop the actions are inline;
 // on mobile they collapse into a lazy-loaded overflow menu.
 
 import { type ComponentProps, useEffect, useState } from "react";
 
 import { CheckCheck, Loader2, Menu, MoreVertical, RefreshCw } from "lucide-react";
 
-import { ThemeToggle } from "../../app/ThemeToggle";
 import { pushToast } from "../../app/toast";
 import { DensityToggle } from "./DensityToggle";
 import type { Density } from "./density";
@@ -144,7 +143,6 @@ export function EntryListHeader({
           </button>
           <span className={styles.sep} />
           <DensityToggle value={density} onChange={setDensity} />
-          <ThemeToggle />
         </div>
         {isMobile && (
           <LazyMobileActionsMenu

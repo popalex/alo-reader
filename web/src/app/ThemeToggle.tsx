@@ -1,4 +1,5 @@
-// Light / Dark / System segmented control. Sits in the list-pane header.
+// Light / Dark / System segmented control. Sits in the sidebar's footer, and on the
+// signed-out screen.
 
 import styles from "./ThemeToggle.module.css";
 import { useTheme } from "./theme";

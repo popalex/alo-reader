@@ -22,6 +22,7 @@ import { usePrefetchEntry, useStreamEntries, useSubscriptions } from "../../api/
 import { useOnline } from "../../app/offline/useOffline";
 import { lazyDialog } from "../../components/lazyDialog";
 import { useFeedSettings } from "../layout/feedSettings";
+import { useKeyboardHelp } from "../layout/keyboardHelp";
 import { useMobileNav } from "../layout/mobileNav";
 import { useAnyModalOpen } from "../../keyboard/modalLock";
 import { useKeyboard, type KeyboardActions } from "../../keyboard/useKeyboard";
@@ -40,9 +41,6 @@ import styles from "./EntryList.module.css";
 
 const ConfirmDialog = lazyDialog(() =>
   import("../../components/ConfirmDialog").then((m) => m.ConfirmDialog),
-);
-const KeyboardHelp = lazyDialog(() =>
-  import("../../keyboard/KeyboardHelp").then((m) => m.KeyboardHelp),
 );
 
 function EmptyList({ starred, fetching }: { starred: boolean; fetching: boolean }) {
@@ -79,6 +77,7 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
   const [density, setDensity] = useDensity();
   const { cursorId, openId, setCursor, open, close } = useSelection();
   const retryFeed = useRetryFeed();
+  const { openKeyboardHelp } = useKeyboardHelp();
   const { openFeedSettings } = useFeedSettings();
   const setState = useSetEntryState();
   const { mutate: mutateEntryState } = setState;
@@ -90,7 +89,6 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
   const isMobile = useIsMobile();
   const prefetchEntry = usePrefetchEntry();
 
-  const [helpOpen, setHelpOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   // Search (WP-13) — state + debounce + active-stream derivation live in the hook.
@@ -257,14 +255,14 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
     goAll: () => void navigate({ to: "/" }),
     goStarred: () => void navigate({ to: "/starred" }),
     focusSearch: () => searchRef.current?.focus(),
-    help: () => setHelpOpen(true),
+    help: openKeyboardHelp,
   };
   // The global handler stands down while a modal owns the keyboard.
   // Any modal anywhere owns the keyboard, not just this component's two: the
   // sidebar's dialogs left every shortcut live underneath them, so `A` stacked a
   // second confirm on the first and `g a` navigated the list behind the dialog.
   const modalOpen = useAnyModalOpen();
-  useKeyboard(actions, !helpOpen && !modalOpen);
+  useKeyboard(actions, !modalOpen);
 
   const feedSub = stream.kind === "feed" ? subs.data?.find((s) => s.feed_id === stream.id) : undefined;
   const feedError = feedSub?.last_error ?? null;
@@ -387,7 +385,6 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
       ) : null}
       {body}
 
-      <KeyboardHelp open={helpOpen} onOpenChange={setHelpOpen} />
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}

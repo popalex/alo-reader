@@ -7,6 +7,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 
 import { groupedBindings } from "./bindings";
+import { useModalKeyboardLock } from "./modalLock";
 import styles from "./KeyboardHelp.module.css";
 
 function keyLabel(key: string): string {
@@ -33,6 +34,9 @@ export function KeyboardHelp({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  // Registered like the other dialogs, so the list's shortcuts pause while it is open
+  // wherever it was opened from.
+  useModalKeyboardLock(open);
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
