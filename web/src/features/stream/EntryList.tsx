@@ -77,7 +77,7 @@ const WARM_SPACING_MS = 250;
 
 export function EntryList({ stream, title }: { stream: StreamDescriptor; title: string }) {
   const [density, setDensity] = useDensity();
-  const { cursorId, openId, setCursor, open, close } = useSelection();
+  const { cursorId, openId, setCursor, open, close, setReadingOrder } = useSelection();
   const retryFeed = useRetryFeed();
   const { openFeedSettings } = useFeedSettings();
   const setState = useSetEntryState();
@@ -106,6 +106,12 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
 
   const query = useStreamEntries(activeStream, searching ? searchTerm : undefined);
   const entries = useMemo(() => query.data?.pages.flatMap((p) => p.entries) ?? [], [query.data]);
+
+  // The reader offers "next article" from this order: what the list shows, in the
+  // order it shows it (search results included).
+  useEffect(() => {
+    setReadingOrder(entries.map((e) => ({ id: e.id, title: e.title, is_read: e.is_read })));
+  }, [entries, setReadingOrder]);
 
   // State-backed ref so the virtualizer re-initializes once the scroll element
   // mounts (a plain useRef doesn't trigger a render, which can leave the list
@@ -216,9 +222,35 @@ export function EntryList({ stream, title }: { stream: StreamDescriptor; title: 
     focusRowSoon(index);
   };
 
+  // With an article open, j/k read on: they open the next or previous article, as
+  // in Feedly and Google Reader before it. Without one, they only move the cursor.
+  const openAdjacent = (delta: 1 | -1) => {
+    const index = entries.findIndex((e) => e.id === openId);
+    const target = entries[index + delta];
+    if (index < 0 || !target) return;
+    openEntry(target);
+  };
+
+  // Keep the open article's row in view when something other than a click opens it
+  // (j/k, or the reader's Next button). On a phone the list is hidden but laid out
+  // while reading, so Back then lands on the last article read.
+  useEffect(() => {
+    if (openId == null) return;
+    const index = entries.findIndex((e) => e.id === openId);
+    if (index >= 0) virtualizer.scrollToIndex(index, { align: "auto" });
+    // entries/virtualizer change on every page load; follow only the open article.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openId]);
+
   const actions: KeyboardActions = {
-    next: () => moveCursor(cursorIndex < 0 ? 0 : Math.min(cursorIndex + 1, entries.length - 1)),
-    prev: () => moveCursor(cursorIndex < 0 ? 0 : Math.max(cursorIndex - 1, 0)),
+    next: () =>
+      openId != null
+        ? openAdjacent(1)
+        : moveCursor(cursorIndex < 0 ? 0 : Math.min(cursorIndex + 1, entries.length - 1)),
+    prev: () =>
+      openId != null
+        ? openAdjacent(-1)
+        : moveCursor(cursorIndex < 0 ? 0 : Math.max(cursorIndex - 1, 0)),
     open: () => {
       const e = cursorIndex < 0 ? entries[0] : entries[cursorIndex];
       if (!e) return;
