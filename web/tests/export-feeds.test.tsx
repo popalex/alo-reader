@@ -57,16 +57,19 @@ describe("ExportFeedsButton", () => {
     await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:export"));
   });
 
-  it("says so when the export fails, and saves nothing", async () => {
+  it.each([
+    { online: true, message: "Couldn't export your feeds — try again." },
+    { online: false, message: "You're offline. Export your feeds when you're back online." },
+  ])("says so when the export fails (online: $online), and saves nothing", async ({ online, message }) => {
+    // Restored by vi.restoreAllMocks in afterEach.
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(online);
     const pushToast = vi.spyOn(toast, "pushToast");
-    exportOpml.mockRejectedValue(new ApiError(500, "internal", "boom"));
+    exportOpml.mockRejectedValue(online ? new ApiError(500, "internal", "boom") : new TypeError("Failed to fetch"));
     renderButton();
 
     fireEvent.click(screen.getByRole("button", { name: "Export feeds (OPML)" }));
 
-    await waitFor(() =>
-      expect(pushToast).toHaveBeenCalledWith("Couldn't export your feeds — try again.", "error"),
-    );
+    await waitFor(() => expect(pushToast).toHaveBeenCalledWith(message, "error"));
     expect(saved).toHaveLength(0);
     const button = screen.getByRole<HTMLButtonElement>("button", { name: "Export feeds (OPML)" });
     await waitFor(() => expect(button.disabled).toBe(false));
