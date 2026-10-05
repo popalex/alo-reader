@@ -15,7 +15,7 @@
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--border);
 }
 
 .menuBtn {
@@ -68,7 +68,7 @@
 
 .option {
   padding: 20px;
-  border: 1px solid var(--line-2);
+  border: 1px solid var(--border-2);
   border-radius: 10px;
   background: var(--surface);
 }
@@ -117,7 +117,7 @@
 
 .btnSecondary {
   composes: btn;
-  border: 1px solid var(--line-2);
+  border: 1px solid var(--border-2);
   background: var(--bg);
   color: var(--text);
 }
@@ -148,7 +148,7 @@
 .starters {
   margin-top: 12px;
   padding: 20px;
-  border: 1px solid var(--line-2);
+  border: 1px solid var(--border-2);
   border-radius: 10px;
   background: var(--surface);
 }
