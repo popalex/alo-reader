@@ -3,7 +3,7 @@
 // transport (auth header, error envelope). Every call takes the bearer token
 // from the auth seam — null in AUTH_MODE=none, a Clerk JWT otherwise.
 
-import { apiFetch, apiFetchVoid } from "./client";
+import { apiFetch, apiFetchBlob, apiFetchVoid } from "./client";
 import type { components } from "./schema";
 
 export type Folder = components["schemas"]["FolderResponse"];
@@ -61,6 +61,11 @@ export function createSubscription(
  *  already refreshed within the cooldown (SUBSCRIPTION_REFRESH_WINDOW_S). */
 export function refreshSubscription(token: string | null, id: number): Promise<unknown> {
   return apiFetch<unknown>(`/subscriptions/${id}/refresh`, { token, method: "POST" });
+}
+
+/** Download every subscription, in its folder, as one OPML file. */
+export function exportOpml(token: string | null): Promise<Blob> {
+  return apiFetchBlob("/opml", { token });
 }
 
 /** Import an OPML file (multipart) and return the per-file import report. */

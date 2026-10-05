@@ -1,4 +1,4 @@
-// Feed-management mutations: subscribe to a new feed and import an OPML file.
+// Feed-management mutations: subscribe to a new feed, import an OPML file, export one.
 // Most of these skip the optimistic cache surgery the read/star mutations do,
 // because a new or deleted subscription changes folders, subscriptions and counts
 // all at once; on success we invalidate those three queries and let them refetch.
@@ -10,11 +10,13 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { useTokenGetter } from "../app/auth";
 import { pushToast } from "../app/toast";
+import { localDateStamp, saveFile } from "../lib/download";
 import { ApiError } from "./client";
 import {
   createSubscription,
   deleteFolder,
   deleteSubscription,
+  exportOpml,
   importOpml,
   refreshSubscription,
   updateFolder,
@@ -233,5 +235,24 @@ export function useImportOpml() {
       const failures = failed ? ` ${failed} could not be added (${reason}).` : "";
       pushToast(`Imported ${n} feed${n === 1 ? "" : "s"}.${failures}`, "info");
     },
+  });
+}
+
+/** Download the subscriptions as OPML. A mutation rather than a query: it runs once
+ *  per click, and nothing should cache it or refetch it on focus. */
+export function useExportOpml() {
+  const getToken = useTokenGetter();
+  return useMutation({
+    mutationFn: async (): Promise<void> => {
+      const blob = await exportOpml(await getToken());
+      saveFile(blob, `alo-reader-${localDateStamp()}.opml`);
+    },
+    onError: () =>
+      pushToast(
+        navigator.onLine
+          ? "Couldn't export your feeds — try again."
+          : "You're offline. Export your feeds when you're back online.",
+        "error",
+      ),
   });
 }

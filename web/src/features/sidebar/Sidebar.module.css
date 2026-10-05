@@ -22,8 +22,8 @@
   padding-inline: 12px;
 }
 
-/* App-wide settings: the account control (clerk mode), the theme, the shortcut
-   sheet. */
+/* App-wide settings: the account control (clerk mode), the theme, the feeds
+   export, the shortcut sheet. */
 .foot {
   display: flex;
   align-items: center;
@@ -36,7 +36,7 @@
   flex: 1;
 }
 
-.shortcuts {
+.footButton {
   display: grid;
   place-items: center;
   width: 30px;
@@ -48,13 +48,25 @@
   cursor: pointer;
 }
 
-.shortcuts:hover {
+.footButton:hover {
   color: var(--text);
 }
 
-.shortcuts:focus-visible {
+.footButton:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+.footButton:disabled {
+  cursor: progress;
+}
+
+.footButton:disabled:hover {
+  color: var(--text-dim);
+}
+
+.footSpin {
+  animation: spin 800ms linear infinite;
 }
 
 /* Keyboard shortcuts are for keyboards: none on a phone. */
