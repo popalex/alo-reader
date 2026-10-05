@@ -235,7 +235,7 @@
   padding: 14px 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--bg);
+  background: var(--raised);
   color: var(--text-dim);
   text-align: left;
   cursor: pointer;

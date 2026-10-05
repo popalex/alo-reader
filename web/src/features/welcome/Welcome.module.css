@@ -118,7 +118,7 @@
 .btnSecondary {
   composes: btn;
   border: 1px solid var(--border-2);
-  background: var(--bg);
+  background: var(--raised);
   color: var(--text);
 }
 
@@ -171,7 +171,7 @@
 }
 
 .starter:hover {
-  background: var(--bg);
+  background: var(--hover);
 }
 
 .starter input {
