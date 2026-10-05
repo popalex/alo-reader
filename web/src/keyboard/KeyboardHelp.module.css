@@ -2,7 +2,7 @@
   position: fixed;
   inset: 0;
   z-index: 70; /* above app-level banners; consistent with the other dialogs */
-  background: rgba(9, 12, 16, 0.44);
+  background: var(--scrim);
   animation: fade 120ms ease-out;
 }
 

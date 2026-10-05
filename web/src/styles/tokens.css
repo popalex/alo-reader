@@ -29,6 +29,8 @@
      Darker than the page here, lighter in dark mode, where depth reads the other
      way round. */
   --raised: #f6f7f9;
+  /* Behind dialogs and the phone drawer. */
+  --scrim: rgba(9, 12, 16, 0.44);
 
   --text: #1b1f24;
   --text-2: #2b3138;
@@ -69,6 +71,8 @@
   --surface-2: #1c2027;
   --hover: #1c2027;
   --raised: #1c2027;
+  /* The light scrim barely darkens a page that is already this dark. */
+  --scrim: rgba(0, 0, 0, 0.62);
 
   --text: #eef1f5;
   --text-2: #c4ccd6;
@@ -104,6 +108,8 @@
     --surface-2: #1c2027;
     --hover: #1c2027;
     --raised: #1c2027;
+    /* The light scrim barely darkens a page that is already this dark. */
+    --scrim: rgba(0, 0, 0, 0.62);
 
     --text: #eef1f5;
     --text-2: #c4ccd6;
