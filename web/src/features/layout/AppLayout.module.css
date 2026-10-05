@@ -38,7 +38,7 @@
   padding: 8px 14px;
   border-radius: 8px;
   background: var(--accent);
-  color: var(--accent-fg, #fff);
+  color: var(--accent-contrast);
   font-size: 13px;
   font-weight: 500;
 }
