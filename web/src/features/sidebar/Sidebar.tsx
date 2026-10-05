@@ -18,6 +18,7 @@ import { Favicon } from "../../components/Favicon";
 import { lazyDialog } from "../../components/lazyDialog";
 import { useFeedSettings } from "../layout/feedSettings";
 import { useKeyboardHelp } from "../layout/keyboardHelp";
+import { ExportFeedsButton } from "./ExportFeedsButton";
 import styles from "./Sidebar.module.css";
 
 const ConfirmDialog = lazyDialog(() =>
@@ -354,15 +355,17 @@ export function Sidebar() {
         )}
       </div>
 
-      {/* Account (clerk mode), theme and the shortcut sheet: settings for the whole
-          app, so they sit with the sidebar rather than in the article list's toolbar. */}
+      {/* Account (clerk mode), theme, feeds export and the shortcut sheet: settings
+          for the whole app, so they sit with the sidebar rather than in the article
+          list's toolbar. */}
       <div className={styles.foot}>
         {account}
         <span className={styles.footSpacer} />
         <ThemeToggle />
+        <ExportFeedsButton />
         <button
           type="button"
-          className={styles.shortcuts}
+          className={`${styles.footButton} ${styles.shortcuts}`}
           aria-label="Keyboard shortcuts"
           title="Keyboard shortcuts (?)"
           onClick={openKeyboardHelp}

@@ -55,7 +55,7 @@ async def export_opml(user: CurrentUser, session: Session) -> Response:
     if None in by_folder:  # uncategorized feeds at the top level
         groups.append((None, by_folder[None]))
 
-    body = build_opml("alo-reader subscriptions", groups)
+    body = build_opml("Alo Reader subscriptions", groups)
     return Response(
         content=body,
         media_type="text/x-opml; charset=utf-8",

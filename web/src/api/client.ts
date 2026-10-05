@@ -86,6 +86,12 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   return (await response.json()) as T;
 }
 
+/** Call an endpoint that answers with a file (the OPML export) and return its bytes. */
+export async function apiFetchBlob(path: string, options: RequestOptions = {}): Promise<Blob> {
+  const response = await request(path, options);
+  return response.blob();
+}
+
 /** Call an endpoint whose success is 204 No Content (the DELETEs) — no body read,
  *  so there's no `undefined as T` cast. */
 export async function apiFetchVoid(path: string, options: RequestOptions = {}): Promise<void> {
