@@ -56,6 +56,8 @@ async def test_export_import_round_trip(api_client: httpx.AsyncClient, pat_user:
     assert export.status_code == 200
     assert "opml" in export.headers["content-type"]
     opml_bytes = export.content
+    # Other readers show this title for the imported file.
+    assert b"<title>Alo Reader subscriptions</title>" in opml_bytes
 
     # Import into a fresh user; the folder structure must survive.
     other = await make_pat_user("import@example.com")
