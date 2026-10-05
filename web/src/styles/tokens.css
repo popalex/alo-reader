@@ -79,7 +79,8 @@
   --text: #eef1f5;
   --text-2: #c4ccd6;
   --text-dim: #949cab;
-  --text-faint: #7f8792;
+  /* #7f8792 read 4.49:1 on --hover, a hovered list row's timestamp. */
+  --text-faint: #838b96;
 
   --border: #262a32;
   --border-2: #262a32;
@@ -116,7 +117,7 @@
     --text: #eef1f5;
     --text-2: #c4ccd6;
     --text-dim: #949cab;
-    --text-faint: #7f8792;
+    --text-faint: #838b96;
 
     --border: #262a32;
     --border-2: #262a32;
