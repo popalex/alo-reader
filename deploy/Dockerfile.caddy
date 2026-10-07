@@ -2,11 +2,13 @@
 # Build context is the repo root.
 FROM node:24-slim AS build
 WORKDIR /web
-RUN corepack enable
 # The lockfile comes too: without it pnpm resolves fresh from the registry, so the
 # bundle CI publishes is built from a different dependency tree than the one every
 # other job tested with --frozen-lockfile.
 COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
+# pnpm at the version package.json pins (no corepack in Node 25+).
+COPY web/scripts/install-pnpm.sh scripts/
+RUN scripts/install-pnpm.sh
 RUN pnpm install --frozen-lockfile
 COPY web/ ./
 RUN pnpm build

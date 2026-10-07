@@ -53,7 +53,7 @@ services:
     # web_node_modules volume and the content store in the pnpm_store volume (via
     # --store-dir). The host's ./web is bind-mounted for source only — its
     # node_modules and any store are shadowed by volumes and never written.
-    command: sh -c "corepack enable && pnpm install --store-dir /pnpm-store && pnpm dev --host"
+    command: sh -c "scripts/install-pnpm.sh && pnpm install --store-dir /pnpm-store && pnpm dev --host"
     volumes:
       - ../web:/web
       - web_node_modules:/web/node_modules
