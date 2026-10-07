@@ -44,7 +44,7 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    image: node:24-slim
+    image: node:26-slim
     working_dir: /web
     # CI=true makes pnpm non-interactive (no purge prompt).
     environment:
