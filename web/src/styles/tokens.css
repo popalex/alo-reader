@@ -25,6 +25,12 @@
   --surface: #ffffff;
   --surface-2: #fafbfc;
   --hover: #f2f3f5;
+  /* A panel set into a surface, like the Next article button under an article.
+     Darker than the page here, lighter in dark mode, where depth reads the other
+     way round. */
+  --raised: #f6f7f9;
+  /* Behind dialogs and the phone drawer. */
+  --scrim: rgba(9, 12, 16, 0.44);
 
   --text: #1b1f24;
   --text-2: #2b3138;
@@ -47,7 +53,9 @@
   --accent-border: #bcdcd5;
 
   --star: #d99a12;
-  --danger: #ef4444;
+  /* Deeper than the #ef4444 it was, which read 3.6:1 behind the failing-feed
+     banner's message. This passes AA on every light surface, --hover included. */
+  --danger: #c62828;
 
   --code-bg: #1b1f27;
   --code-text: #e7ebf1;
@@ -64,11 +72,15 @@
   --surface: #181b21;
   --surface-2: #1c2027;
   --hover: #1c2027;
+  --raised: #1c2027;
+  /* The light scrim barely darkens a page that is already this dark. */
+  --scrim: rgba(0, 0, 0, 0.62);
 
   --text: #eef1f5;
   --text-2: #c4ccd6;
   --text-dim: #949cab;
-  --text-faint: #7f8792;
+  /* #7f8792 read 4.49:1 on --hover, a hovered list row's timestamp. */
+  --text-faint: #838b96;
 
   --border: #262a32;
   --border-2: #262a32;
@@ -98,11 +110,14 @@
     --surface: #181b21;
     --surface-2: #1c2027;
     --hover: #1c2027;
+    --raised: #1c2027;
+    /* The light scrim barely darkens a page that is already this dark. */
+    --scrim: rgba(0, 0, 0, 0.62);
 
     --text: #eef1f5;
     --text-2: #c4ccd6;
     --text-dim: #949cab;
-    --text-faint: #7f8792;
+    --text-faint: #838b96;
 
     --border: #262a32;
     --border-2: #262a32;

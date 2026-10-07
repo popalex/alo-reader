@@ -2,7 +2,7 @@
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: rgba(9, 12, 16, 0.44);
+  background: var(--scrim);
   animation: fade 140ms ease-out;
 }
 
