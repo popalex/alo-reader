@@ -39,7 +39,7 @@ const TYPES: Record<string, string> = {
 let workDir = "";
 let builds: Record<"a" | "b", string> = { a: "", b: "" };
 let serving: "a" | "b" = "a";
-let server: Server;
+let server: Server | undefined;
 let origin = "";
 
 function build(name: "a" | "b"): string {
@@ -84,7 +84,7 @@ test.beforeAll(async () => {
   test.setTimeout(240_000);
   workDir = mkdtempSync(join(tmpdir(), "alo-deploy-"));
   builds = { a: build("a"), b: build("b") };
-  server = createServer((req, res) => {
+  const srv = createServer((req, res) => {
     const { status, file, cache } = serve(new URL(req.url ?? "/", "http://x").pathname);
     if (!file) {
       res.writeHead(status, { "Content-Type": "text/plain" }).end("not found");
@@ -95,15 +95,18 @@ test.beforeAll(async () => {
     if (cache) headers["Cache-Control"] = cache;
     res.writeHead(status, headers).end(readFileSync(file));
   });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  server = srv;
+  await new Promise<void>((resolve) => srv.listen(0, "127.0.0.1", resolve));
   // localhost, not 127.0.0.1, in the page's origin: both are secure contexts, but this
   // keeps the URL shaped like the real one. Its own port, so it can't share a service
   // worker with the e2e stack on :80.
-  origin = `http://localhost:${(server.address() as AddressInfo).port}`;
+  origin = `http://localhost:${(srv.address() as AddressInfo).port}`;
 });
 
 test.afterAll(async () => {
-  await new Promise<void>((resolve) => server?.close(() => resolve()));
+  // No server when a build failed in beforeAll; awaiting its close would never resolve.
+  const running = server;
+  if (running) await new Promise<void>((resolve) => running.close(() => resolve()));
   if (workDir) rmSync(workDir, { recursive: true, force: true });
 });
 
