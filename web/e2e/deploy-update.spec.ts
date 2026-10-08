@@ -125,6 +125,10 @@ function entryIn(name: "a" | "b"): string {
 test("after a deploy, the next visit is the old build from cache and the one after is the new build", async ({
   page,
 }) => {
+  // Its own budget: up to 20 s for A's worker plus 30 s for B's, above the 30 s the
+  // config gives a test, so a worker that never updates fails with the poll's message
+  // rather than a generic timeout. (beforeAll's setTimeout covers only the builds.)
+  test.setTimeout(90_000);
   const [a, b] = [entryIn("a"), entryIn("b")];
   expect(a).not.toBe(b);
 
