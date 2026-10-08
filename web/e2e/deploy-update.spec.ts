@@ -15,8 +15,9 @@ import { expect, test, type Page } from "@playwright/test";
 // build until they clear site data, which is what `make dev` did to a stale production
 // worker on 2026-10-08, because the dev server answers /app/sw.js with index.html.
 //
-// Two real builds of the same source, differing only by a comment banner on every
-// chunk (e2e/deploy-build.config.ts), so B has new hashes and a new precache manifest.
+// Two real builds of the same source, differing only by one marker statement that
+// e2e/deploy-build.config.ts appends to src/main.tsx, so B has new hashes and a new
+// precache manifest.
 // A small server stands in for Caddy's /app/ rules (deploy/Caddyfile) and switches
 // from A to B mid-test, the way a deploy swaps the files. It doesn't use the e2e
 // stack: the API isn't needed to see which build a page loaded.
