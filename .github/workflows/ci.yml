@@ -40,10 +40,7 @@ jobs:
       # api/pyproject.toml. `mypy api` from the root silently ran on defaults.
       - run: mypy .
         working-directory: api
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "24"
-      - run: corepack enable && corepack prepare pnpm@latest --activate
+      - uses: ./.github/actions/setup-web
       - run: pnpm -C web install
       - run: pnpm -C web tsc
       - run: pnpm -C web lint
@@ -74,10 +71,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "24"
-      - run: corepack enable && corepack prepare pnpm@latest --activate
+      - uses: ./.github/actions/setup-web
       - run: pnpm -C web install
       - run: pnpm -C web test
 
@@ -86,10 +80,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "24"
-      - run: corepack enable && corepack prepare pnpm@latest --activate
+      - uses: ./.github/actions/setup-web
       - run: pnpm -C web install
       - run: pnpm -C web build
       - run: pnpm -C web size
@@ -104,10 +95,7 @@ jobs:
         with:
           python-version: "3.14"
       - run: python -m pip install -r api/requirements-dev.txt && python -m pip install -e ./api --no-deps
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "24"
-      - run: corepack enable && corepack prepare pnpm@latest --activate
+      - uses: ./.github/actions/setup-web
       - run: pnpm -C web install
       - name: Regenerate typed client
         run: |
@@ -157,10 +145,7 @@ jobs:
       - run: python -m pip install -r api/requirements-dev.txt pip-audit && python -m pip install -e ./api --no-deps
       - name: pip-audit (Python deps)
         run: pip-audit --skip-editable
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "24"
-      - run: corepack enable && corepack prepare pnpm@latest --activate
+      - uses: ./.github/actions/setup-web
       - run: pnpm -C web install --frozen-lockfile
       - name: pnpm audit (shipped web deps)
         run: pnpm -C web audit --prod --audit-level high
@@ -185,10 +170,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "24"
-      - run: corepack enable && corepack prepare pnpm@latest --activate
+      - uses: ./.github/actions/setup-web
       - run: pnpm -C web install
       - name: Install Playwright Chromium
         run: pnpm -C web exec playwright install --with-deps chromium
@@ -233,11 +215,7 @@ jobs:
       - if: steps.secrets.outputs.present == 'true'
         uses: actions/checkout@v7
       - if: steps.secrets.outputs.present == 'true'
-        uses: actions/setup-node@v7
-        with:
-          node-version: "24"
-      - if: steps.secrets.outputs.present == 'true'
-        run: corepack enable && corepack prepare pnpm@latest --activate
+        uses: ./.github/actions/setup-web
       - if: steps.secrets.outputs.present == 'true'
         run: pnpm -C web install
       - name: Install Playwright Chromium
@@ -265,10 +243,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "24"
-      - run: corepack enable && corepack prepare pnpm@latest --activate
+      - uses: ./.github/actions/setup-web
       - run: pnpm -C web install
       - name: Install Chromium for Lighthouse
         # Populates ~/.cache/ms-playwright so lighthouse.sh finds a Chrome.

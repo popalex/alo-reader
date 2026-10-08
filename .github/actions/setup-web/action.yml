@@ -1,0 +1,13 @@
+# Node and pnpm for every job that touches web/. Node's version comes from .nvmrc
+# (the same file `nvm use` reads locally) and pnpm's from web/package.json, so
+# neither is repeated across the workflows. Needs the repo checked out first.
+name: Set up Node and pnpm
+description: Node at the version in .nvmrc, and the pnpm web/package.json pins.
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v7
+      with:
+        node-version-file: .nvmrc
+    - shell: bash
+      run: web/scripts/install-pnpm.sh

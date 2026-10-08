@@ -42,7 +42,9 @@ updates:
   # The Jul 13 nightly died on a pnpm/action-setup outage, not on our code. Pinned
   # actions that get bumped deliberately beat floating ones that break overnight.
   - package-ecosystem: github-actions
-    directory: /
+    # "/" covers .github/workflows; the local composite actions (setup-web pins
+    # actions/setup-node) live in their own directories and are listed separately.
+    directories: ["/", "/.github/actions/*"]
     schedule:
       interval: weekly
       day: monday
