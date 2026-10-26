@@ -15,7 +15,7 @@ dependencies = [
     "pydantic-settings>=2.3",
     "python-dotenv>=1.0",
     # Ceiling set by OpenTelemetry, not by SQLAlchemy. opentelemetry-instrumentation-
-    # sqlalchemy (0.66b0) declares sqlalchemy<2.1, and an instrumentor outside its range
+    # sqlalchemy (0.66b1) declares sqlalchemy<2.1, and an instrumentor outside its range
     # does not fail: it logs nothing and instruments nothing, so every DB span vanishes
     # from Tempo while tests, lint and mypy all stay green. Lift it only once the
     # instrumentation's range admits 2.1, and check for SELECT spans in Tempo.
@@ -45,13 +45,13 @@ dependencies = [
 # (Dockerfile PIP_INSTALL_SPEC=".[otel]"); the default image and tests omit it, so
 # app.telemetry must import OTel lazily. Pinned (SDK 1.x paired with 0.xxb0 instrumentation).
 otel = [
-    "opentelemetry-exporter-otlp==1.45.0",
-    "opentelemetry-instrumentation-fastapi==0.66b0",
-    "opentelemetry-instrumentation-httpx==0.66b0",
-    "opentelemetry-instrumentation-logging==0.66b0",
-    "opentelemetry-instrumentation-sqlalchemy==0.66b0",
-    "opentelemetry-sdk==1.45.0",
-    "opentelemetry-semantic-conventions==0.66b0",
+    "opentelemetry-exporter-otlp==1.45.1",
+    "opentelemetry-instrumentation-fastapi==0.66b1",
+    "opentelemetry-instrumentation-httpx==0.66b1",
+    "opentelemetry-instrumentation-logging==0.66b1",
+    "opentelemetry-instrumentation-sqlalchemy==0.66b1",
+    "opentelemetry-sdk==1.45.1",
+    "opentelemetry-semantic-conventions==0.66b1",
 ]
 # Dev tooling is pinned exactly: with no Python lockfile, `>=` let CI float to
 # the latest release, and a mypy/ruff bump could add rules that fail CI on
