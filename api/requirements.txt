@@ -19,7 +19,7 @@ asyncpg==0.31.0
     # via alo-reader-api (pyproject.toml)
 attrs==26.1.0
     # via svix
-certifi==2026.7.22
+certifi==2026.10.23
     # via
     #   httpcore
     #   httpx
