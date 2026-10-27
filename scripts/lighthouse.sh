@@ -77,13 +77,17 @@ SCORES=()
 for run in $(seq 1 "$RUNS"); do
   for attempt in $(seq 0 "$RETRIES"); do
     log "Running Lighthouse against $URL ($run of $RUNS)"
-    if "$LIGHTHOUSE" "$URL" \
+    # stderr goes to a file and is printed afterwards, not through `tee` in a process
+    # substitution: bash does not wait for that, so the grep below could read the file
+    # before the error was in it and refuse a retry that was due.
+    status=0
+    "$LIGHTHOUSE" "$URL" \
       --only-categories=performance \
       --output=json --output-path="$OUT_DIR/lighthouse-$run.json" \
       --chrome-flags="--headless=new --no-sandbox --disable-gpu" \
-      --quiet 2> >(tee "$OUT_DIR/stderr-$run.txt" >&2); then
-      break
-    fi
+      --quiet 2>"$OUT_DIR/stderr-$run.txt" || status=$?
+    cat "$OUT_DIR/stderr-$run.txt" >&2
+    [[ $status -eq 0 ]] && break
     grep -q "Runtime error encountered" "$OUT_DIR/stderr-$run.txt" \
       || fail "Lighthouse failed on run $run (not a trace-recording error, so not retried)"
     [[ $attempt -lt $RETRIES ]] || fail "Lighthouse hit a runtime error on run $run, $((RETRIES + 1)) times in a row"
