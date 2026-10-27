@@ -3,10 +3,11 @@
 #
 # Brings up the stack (AUTH_MODE=none) so Caddy serves the production build on
 # :80, runs Lighthouse (via pnpm dlx — no project dependency added) against it,
-# and fails if the performance score is below the budget.
+# and fails if the median performance score of LH_RUNS runs is below the budget.
 #
 #   ./scripts/lighthouse.sh              # up, measure, tear down
 #   LH_MIN_PERF=95 ./scripts/lighthouse.sh
+#   LH_RUNS=5 ./scripts/lighthouse.sh    # more runs, steadier median
 #   KEEP_UP=1 ./scripts/lighthouse.sh    # leave the stack running
 set -euo pipefail
 
@@ -20,7 +21,11 @@ URL="http://localhost/app/"
 # project name that deleted the database of whatever stack `make up` was running.
 COMPOSE=(docker compose -p alo-lighthouse -f deploy/docker-compose.yml)
 MIN_PERF=${LH_MIN_PERF:-90}
-OUT="$(mktemp -d)/lighthouse.json"
+# One run on a shared CI runner swings by about five points on unchanged code (88 to 93
+# across October 2026), so a single score against a budget of 90 failed at random. The
+# median of three is what Lighthouse's own variability guide recommends.
+RUNS=${LH_RUNS:-3}
+OUT_DIR="$(mktemp -d)"
 
 # The API refuses to boot without an explicit AUTH_MODE; none = single user.
 export AUTH_MODE=none
@@ -54,15 +59,20 @@ for i in $(seq 1 60); do
   sleep 2
 done
 
-log "Running Lighthouse against $URL"
-pnpm dlx lighthouse "$URL" \
-  --only-categories=performance \
-  --output=json --output-path="$OUT" \
-  --chrome-flags="--headless=new --no-sandbox --disable-gpu" \
-  --quiet
+SCORES=()
+for run in $(seq 1 "$RUNS"); do
+  log "Running Lighthouse against $URL ($run of $RUNS)"
+  pnpm dlx lighthouse "$URL" \
+    --only-categories=performance \
+    --output=json --output-path="$OUT_DIR/lighthouse-$run.json" \
+    --chrome-flags="--headless=new --no-sandbox --disable-gpu" \
+    --quiet
+  SCORES+=("$(python3 -c "import json; print(round(json.load(open('$OUT_DIR/lighthouse-$run.json'))['categories']['performance']['score'] * 100))")")
+  log "Run $run: ${SCORES[-1]}"
+done
 
-SCORE=$(python3 -c "import json; print(round(json.load(open('$OUT'))['categories']['performance']['score'] * 100))")
-log "Performance score: ${SCORE} (budget ${MIN_PERF})"
+SCORE=$(printf '%s\n' "${SCORES[@]}" | sort -n | python3 -c "import sys, statistics; print(round(statistics.median(int(l) for l in sys.stdin)))")
+log "Performance score: ${SCORE}, median of ${SCORES[*]} (budget ${MIN_PERF})"
 [[ "$SCORE" -ge "$MIN_PERF" ]] || fail "performance ${SCORE} below budget ${MIN_PERF}"
 
 printf '\n\033[32mPASS: Lighthouse performance %s >= %s.\033[0m\n' "$SCORE" "$MIN_PERF"
