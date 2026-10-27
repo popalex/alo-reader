@@ -68,14 +68,27 @@ log "Installing Lighthouse from scripts/lighthouse/pnpm-lock.yaml"
 pnpm --dir scripts/lighthouse install --frozen-lockfile --silent
 LIGHTHOUSE=scripts/lighthouse/node_modules/.bin/lighthouse
 
+# Lighthouse sometimes fails to record Chrome's trace (NO_NAVSTART and similar) and
+# says to run it again. Such a run produces no score, so it is retried, at most
+# LH_RETRIES times. Any other failure, and any score under budget, still fails.
+RETRIES=${LH_RETRIES:-2}
+
 SCORES=()
 for run in $(seq 1 "$RUNS"); do
-  log "Running Lighthouse against $URL ($run of $RUNS)"
-  "$LIGHTHOUSE" "$URL" \
-    --only-categories=performance \
-    --output=json --output-path="$OUT_DIR/lighthouse-$run.json" \
-    --chrome-flags="--headless=new --no-sandbox --disable-gpu" \
-    --quiet
+  for attempt in $(seq 0 "$RETRIES"); do
+    log "Running Lighthouse against $URL ($run of $RUNS)"
+    if "$LIGHTHOUSE" "$URL" \
+      --only-categories=performance \
+      --output=json --output-path="$OUT_DIR/lighthouse-$run.json" \
+      --chrome-flags="--headless=new --no-sandbox --disable-gpu" \
+      --quiet 2> >(tee "$OUT_DIR/stderr-$run.txt" >&2); then
+      break
+    fi
+    grep -q "Runtime error encountered" "$OUT_DIR/stderr-$run.txt" \
+      || fail "Lighthouse failed on run $run (not a trace-recording error, so not retried)"
+    [[ $attempt -lt $RETRIES ]] || fail "Lighthouse hit a runtime error on run $run, $((RETRIES + 1)) times in a row"
+    log "Run $run hit a Lighthouse runtime error; retrying ($((attempt + 1)) of $RETRIES)"
+  done
   SCORES+=("$(python3 -c "import json; print(round(json.load(open('$OUT_DIR/lighthouse-$run.json'))['categories']['performance']['score'] * 100))")")
   log "Run $run: ${SCORES[-1]}"
 done
