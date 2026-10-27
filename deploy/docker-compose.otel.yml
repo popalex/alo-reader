@@ -85,7 +85,7 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    image: grafana/otel-lgtm:0.28.0
+    image: grafana/otel-lgtm:0.38.1
     restart: unless-stopped
     environment:
       # otel-lgtm ships Grafana with anonymous Admin access for convenience. Since Grafana
@@ -143,13 +143,17 @@ services:
         -compactor.retention-enabled
         -compactor.delete-request-store=filesystem
         -store.retention=${LOKI_RETENTION:-72h}
+      #
+      # Tempo 3 (otel-lgtm 0.38) removed the compactor and renamed the retention flags
+      # (`compaction.compaction.block-retention` became `compaction.block-retention`).
+      # Tempo exits on a flag it does not know, and otel-lgtm then restarts the whole
+      # container, so after an image bump check that Tempo starts before anything else.
       TEMPO_EXTRA_ARGS: >-
         -distributor.ingestion-rate-limit-bytes=${TEMPO_INGEST_RATE_BYTES:-500000}
         -distributor.ingestion-burst-size-bytes=${TEMPO_INGEST_BURST_BYTES:-20000000}
         -ingester.max-bytes-per-trace=${TEMPO_MAX_TRACE_BYTES:-5000000}
-        -compactor.compaction.compaction.block-retention=${TEMPO_RETENTION:-48h}
-        -backend-scheduler.provider.work.compaction.compaction.block-retention=${TEMPO_RETENTION:-48h}
-        -backend-worker.compaction.compaction.block-retention=${TEMPO_RETENTION:-48h}
+        -backend-scheduler.provider.work.compaction.block-retention=${TEMPO_RETENTION:-48h}
+        -backend-worker.compaction.block-retention=${TEMPO_RETENTION:-48h}
       # Pushover credentials for the alert floor (see alerting/notifications.yml).
       # Unset means the contact point still provisions and alerts still show in
       # Grafana; only delivery fails, and Grafana logs Pushover's own rejection.
