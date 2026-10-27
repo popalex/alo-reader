@@ -34,6 +34,14 @@ updates:
       # Listed first: a dependency joins the first group it matches.
       react-and-clerk:
         patterns: ["react", "react-dom", "@types/react", "@types/react-dom", "@clerk/*"]
+      # Every OpenTelemetry package in one PR, majors included. The experimental
+      # 0.x packages pin the stable 2.x/3.x ones exactly, so moving one side alone
+      # leaves two OTel trees in the lock and browser spans stop arriving, with no
+      # error and no failing test. #136 did exactly that: instrumentation 0.300 counts
+      # as a minor bump, core 3.0 as a major, and the minor group took only the first.
+      # Merge this group only after checking spans reach Tempo end to end.
+      opentelemetry:
+        patterns: ["@opentelemetry/*"]
       web-minor-and-patch:
         update-types: [minor, patch]
     commit-message:
@@ -54,7 +62,18 @@ updates:
     commit-message:
       prefix: ci
 
+  # The docker ecosystem reads Dockerfiles only. Images named in the compose files
+  # (cloudflared, alloy, otel-lgtm, nginx) need their own entry: cloudflared sat on a
+  # release that trusted the weak emSign intermediates until a Cloudflare email
+  # flagged it, and Dependabot never opened a PR for it.
   - package-ecosystem: docker
+    directory: /deploy
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: build(deploy)
+
+  - package-ecosystem: docker-compose
     directory: /deploy
     schedule:
       interval: monthly
