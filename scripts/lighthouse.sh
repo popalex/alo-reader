@@ -2,8 +2,9 @@
 # WP-09 acceptance: Lighthouse performance budget on the built SPA.
 #
 # Brings up the stack (AUTH_MODE=none) so Caddy serves the production build on
-# :80, runs Lighthouse (via pnpm dlx — no project dependency added) against it,
-# and fails if the median performance score of LH_RUNS runs is below the budget.
+# :80, runs Lighthouse against it, and fails if the median performance score of
+# LH_RUNS runs is below the budget. Lighthouse comes from scripts/lighthouse, its own
+# locked project, so every run uses the same dependency tree.
 #
 #   ./scripts/lighthouse.sh              # up, measure, tear down
 #   LH_MIN_PERF=95 ./scripts/lighthouse.sh
@@ -59,14 +60,39 @@ for i in $(seq 1 60); do
   sleep 2
 done
 
+# A locked install, not `pnpm dlx lighthouse`: dlx fetched the newest Lighthouse and
+# resolved its dependencies afresh on every run, so two CI runs of the same commit
+# could measure with different trees. Kept out of web/: Lighthouse's Sentry brings its own
+# OpenTelemetry packages, and web/ must hold exactly one OTel tree.
+log "Installing Lighthouse from scripts/lighthouse/pnpm-lock.yaml"
+pnpm --dir scripts/lighthouse install --frozen-lockfile --silent
+LIGHTHOUSE=scripts/lighthouse/node_modules/.bin/lighthouse
+
+# Lighthouse sometimes fails to record Chrome's trace (NO_NAVSTART and similar) and
+# says to run it again. Such a run produces no score, so it is retried, at most
+# LH_RETRIES times. Any other failure, and any score under budget, still fails.
+RETRIES=${LH_RETRIES:-2}
+
 SCORES=()
 for run in $(seq 1 "$RUNS"); do
-  log "Running Lighthouse against $URL ($run of $RUNS)"
-  pnpm dlx lighthouse "$URL" \
-    --only-categories=performance \
-    --output=json --output-path="$OUT_DIR/lighthouse-$run.json" \
-    --chrome-flags="--headless=new --no-sandbox --disable-gpu" \
-    --quiet
+  for attempt in $(seq 0 "$RETRIES"); do
+    log "Running Lighthouse against $URL ($run of $RUNS)"
+    # stderr goes to a file and is printed afterwards, not through `tee` in a process
+    # substitution: bash does not wait for that, so the grep below could read the file
+    # before the error was in it and refuse a retry that was due.
+    status=0
+    "$LIGHTHOUSE" "$URL" \
+      --only-categories=performance \
+      --output=json --output-path="$OUT_DIR/lighthouse-$run.json" \
+      --chrome-flags="--headless=new --no-sandbox --disable-gpu" \
+      --quiet 2>"$OUT_DIR/stderr-$run.txt" || status=$?
+    cat "$OUT_DIR/stderr-$run.txt" >&2
+    [[ $status -eq 0 ]] && break
+    grep -q "Runtime error encountered" "$OUT_DIR/stderr-$run.txt" \
+      || fail "Lighthouse failed on run $run (not a trace-recording error, so not retried)"
+    [[ $attempt -lt $RETRIES ]] || fail "Lighthouse hit a runtime error on run $run, $((RETRIES + 1)) times in a row"
+    log "Run $run hit a Lighthouse runtime error; retrying ($((attempt + 1)) of $RETRIES)"
+  done
   SCORES+=("$(python3 -c "import json; print(round(json.load(open('$OUT_DIR/lighthouse-$run.json'))['categories']['performance']['score'] * 100))")")
   log "Run $run: ${SCORES[-1]}"
 done
