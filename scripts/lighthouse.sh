@@ -2,8 +2,9 @@
 # WP-09 acceptance: Lighthouse performance budget on the built SPA.
 #
 # Brings up the stack (AUTH_MODE=none) so Caddy serves the production build on
-# :80, runs Lighthouse (via pnpm dlx — no project dependency added) against it,
-# and fails if the median performance score of LH_RUNS runs is below the budget.
+# :80, runs Lighthouse against it, and fails if the median performance score of
+# LH_RUNS runs is below the budget. Lighthouse comes from scripts/lighthouse, its own
+# locked project, so every run uses the same dependency tree.
 #
 #   ./scripts/lighthouse.sh              # up, measure, tear down
 #   LH_MIN_PERF=95 ./scripts/lighthouse.sh
@@ -59,10 +60,18 @@ for i in $(seq 1 60); do
   sleep 2
 done
 
+# A locked install, not `pnpm dlx lighthouse`: dlx fetched the newest Lighthouse and
+# resolved its dependencies afresh on every run, so two CI runs of the same commit
+# could measure with different trees. Kept out of web/: Lighthouse's Sentry brings its own
+# OpenTelemetry packages, and web/ must hold exactly one OTel tree.
+log "Installing Lighthouse from scripts/lighthouse/pnpm-lock.yaml"
+pnpm --dir scripts/lighthouse install --frozen-lockfile --silent
+LIGHTHOUSE=scripts/lighthouse/node_modules/.bin/lighthouse
+
 SCORES=()
 for run in $(seq 1 "$RUNS"); do
   log "Running Lighthouse against $URL ($run of $RUNS)"
-  pnpm dlx lighthouse "$URL" \
+  "$LIGHTHOUSE" "$URL" \
     --only-categories=performance \
     --output=json --output-path="$OUT_DIR/lighthouse-$run.json" \
     --chrome-flags="--headless=new --no-sandbox --disable-gpu" \

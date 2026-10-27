@@ -1,0 +1,8 @@
+{
+  "name": "alo-lighthouse",
+  "private": true,
+  "description": "Lighthouse for scripts/lighthouse.sh, locked here so every run uses the same dependency tree. Kept out of web/ on purpose: its Sentry brings its own OpenTelemetry packages.",
+  "dependencies": {
+    "lighthouse": "13.5.0"
+  }
+}

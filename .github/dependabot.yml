@@ -47,6 +47,18 @@ updates:
     commit-message:
       prefix: build(web)
 
+  # Lighthouse for scripts/lighthouse.sh, locked in its own directory (see the
+  # comment there). Monthly and in one group: it only measures, it never ships.
+  - package-ecosystem: npm
+    directory: /scripts/lighthouse
+    schedule:
+      interval: monthly
+    groups:
+      lighthouse:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci
+
   # The Jul 13 nightly died on a pnpm/action-setup outage, not on our code. Pinned
   # actions that get bumped deliberately beat floating ones that break overnight.
   - package-ecosystem: github-actions
