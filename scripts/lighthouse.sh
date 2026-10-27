@@ -71,8 +71,11 @@ for run in $(seq 1 "$RUNS"); do
   log "Run $run: ${SCORES[-1]}"
 done
 
-SCORE=$(printf '%s\n' "${SCORES[@]}" | sort -n | python3 -c "import sys, statistics; print(round(statistics.median(int(l) for l in sys.stdin)))")
+# Compared unrounded: with an even LH_RUNS the median can fall between two scores,
+# and rounding 89.5 up would pass a run that is under budget.
+SCORE=$(python3 -c "import statistics, sys; print(f'{statistics.median(int(s) for s in sys.argv[1:]):g}')" "${SCORES[@]}")
 log "Performance score: ${SCORE}, median of ${SCORES[*]} (budget ${MIN_PERF})"
-[[ "$SCORE" -ge "$MIN_PERF" ]] || fail "performance ${SCORE} below budget ${MIN_PERF}"
+python3 -c "import sys; sys.exit(float(sys.argv[1]) < float(sys.argv[2]))" "$SCORE" "$MIN_PERF" \
+  || fail "performance ${SCORE} below budget ${MIN_PERF}"
 
 printf '\n\033[32mPASS: Lighthouse performance %s >= %s.\033[0m\n' "$SCORE" "$MIN_PERF"
