@@ -173,7 +173,11 @@ jobs:
       - uses: ./.github/actions/setup-web
       - run: pnpm -C web install
       - name: Install Playwright Chromium
-        run: pnpm -C web exec playwright install --with-deps chromium
+        # No --with-deps: the runner image already has every library Chromium needs,
+        # so all it added was nine font packages over apt, and Ubuntu's Azure mirror
+        # sometimes serves those at 33 kB/s (10m43s for 21 MB on 2026-10-26). No test
+        # compares screenshots, so those fonts never affect a result.
+        run: pnpm -C web exec playwright install chromium
       - name: make e2e
         run: make e2e
       - name: Upload Playwright traces
@@ -220,7 +224,7 @@ jobs:
         run: pnpm -C web install
       - name: Install Playwright Chromium
         if: steps.secrets.outputs.present == 'true'
-        run: pnpm -C web exec playwright install --with-deps chromium
+        run: pnpm -C web exec playwright install chromium
       - name: make e2e-clerk
         if: steps.secrets.outputs.present == 'true'
         run: make e2e-clerk
@@ -247,6 +251,6 @@ jobs:
       - run: pnpm -C web install
       - name: Install Chromium for Lighthouse
         # Populates ~/.cache/ms-playwright so lighthouse.sh finds a Chrome.
-        run: pnpm -C web exec playwright install --with-deps chromium
+        run: pnpm -C web exec playwright install chromium
       - name: make lighthouse
         run: make lighthouse
