@@ -197,6 +197,40 @@ One more thing at these rates: Loki's flag takes a float and reads back verbatim
 real traffic drops telemetry rather than filling the disk slowly. Check the Loki and
 Tempo logs for ingestion rejections before assuming the numbers are free.
 
+## Checking an upgrade
+
+Telemetry upgrades break without failing anything. An instrumentor outside its
+supported library range instruments nothing and says nothing; an otel-lgtm release that
+renames a Tempo flag leaves the container restarting. Tests, lint and types stay green
+through both. So around any change to the OpenTelemetry packages (web or API), FastAPI,
+Alloy or otel-lgtm, run the end-to-end check on both sides of it:
+
+```sh
+git switch main && ./scripts/otel-verify.sh before
+git switch my-branch && BASELINE=before ./scripts/otel-verify.sh after
+```
+
+Each run brings up its own stack (`alo-otel-verify`, torn down afterwards, so it does
+not touch `make otel-up`'s data; published on loopback only and ignoring `.env`), drives
+the SPA in Chromium, and checks what reached the stores:
+
+- a browser click, the API request it caused and that request's SQL in one trace, and
+  the same for discover's outbound httpx call
+- the worker's poll with its httpx and SQL spans
+- API server spans and `http_server_*` metrics from the contrib instrumentation only.
+  FastAPI has had its own telemetry since 0.142; with both on, its spans replace the
+  contrib server span and every request is counted twice
+- every metric fresh, API and worker logs in Loki carrying trace ids
+- nothing refused by the collector or dropped after its export retries
+- the dashboards and alert rules provisioned, every rule evaluating
+- every instrumentor's dependency check passing inside the api and worker images
+
+The report lands in `.otel-verify/<label>/`; with `BASELINE` set the run also lists the
+spans, metrics, package versions and component versions that changed. Like `make e2e`,
+it needs port 80 free and Playwright's Chromium (`pnpm -C web exec playwright install
+chromium`). `OVERRIDE=file.yml` adds a compose overlay, for trying a candidate
+otel-lgtm or Alloy tag before changing the overlay itself.
+
 ## Notes
 
 - **Edge / CDN**: the browser posts to `/otlp` same-origin through Caddy (the app never

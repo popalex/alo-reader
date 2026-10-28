@@ -37,6 +37,7 @@ default; these overlays turn it on and add the collector + Grafana stack:
 make otel-up      # prod-topology stack + telemetry; Grafana on http://localhost:3001
 make dev-otel     # hot-reload dev stack + telemetry (app :3000, Grafana :3001)
 make otel-down    # stop the OTel stack
+make otel-verify  # end-to-end check that traces, metrics and logs all arrive
 ```
 
 See [`deploy/observability/README.md`](deploy/observability/README.md) for the

@@ -32,7 +32,7 @@ COMPOSE_DEV_OTEL := $(DC) -f deploy/docker-compose.yml -f deploy/docker-compose.
 # (see `make db`). Postgres itself is never installed on the host.
 TEST_DATABASE_URL ?= postgresql+asyncpg://alo:alo@localhost:5432/alo
 
-.PHONY: venv lock lock-upgrade lint typecheck test-api test-web e2e e2e-clerk social-card lighthouse size up tunnel-up tunnel-down seed dev down db db-down migrate generate-client bench-search loadtest pg-image
+.PHONY: venv lock lock-upgrade lint typecheck test-api test-web e2e e2e-clerk social-card lighthouse otel-verify size up tunnel-up tunnel-down seed dev down db db-down migrate generate-client bench-search loadtest pg-image
 
 ## Optional: a local virtualenv, for editor tooling (autocomplete, go-to-def).
 ## The gates below do not use it — they run in the toolchain container — so this
@@ -151,6 +151,12 @@ tunnel-down:
 
 otel-down:
 	$(COMPOSE_OTEL) down
+
+## Telemetry end to end: its own stack, a real browser, then Tempo, Prometheus, Loki and
+## Grafana queried for what arrived. Run before and after an OTel, FastAPI, Alloy or
+## otel-lgtm upgrade; see deploy/observability/README.md.
+otel-verify:
+	./scripts/otel-verify.sh
 
 ## Hot-reload dev stack + OpenTelemetry (app on :3000, Grafana on :3001).
 dev-otel:
