@@ -32,6 +32,12 @@ report = {
     "otel": {k: v for k, v in sorted(installed.items()) if k.startswith("opentelemetry")},
     "libs": {k: installed.get(k) for k in libs},
     "conflicts": {k: str(v) if v is not None else None for k, v in conflicts.items()},
-    "pip_check": pip_check.stdout.strip() if pip_check.returncode else "",
+    # Empty means it passed. A failure keeps all its output, and its exit code in case
+    # it printed nothing, so report.py cannot mistake it for a pass.
+    "pip_check": (
+        f"exit {pip_check.returncode}: {(pip_check.stdout + pip_check.stderr).strip()}"
+        if pip_check.returncode
+        else ""
+    ),
 }
 print(json.dumps(report, indent=1))
