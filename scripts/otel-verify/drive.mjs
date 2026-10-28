@@ -1,8 +1,9 @@
 // Drives the SPA so the browser emits its ui.* spans, and records each OTLP POST.
 //   node drive.mjs subscribe   ui.subscribe (discover, then POST /subscriptions)
 //   node drive.mjs read        ui.open_article, ui.search
-// Prints one JSON object: the steps and how each went, OTLP response statuses, and
-// console errors. A failed step is recorded, not thrown, so the checks still run.
+// Prints one JSON object: the steps and how each went, OTLP response statuses (0 when a
+// request got none), and console errors. A failed step is recorded, not thrown, so the
+// checks still run.
 import { createRequire } from "node:module";
 
 // Playwright comes from web/, the only place it is installed.
@@ -17,6 +18,11 @@ const page = await browser.newPage();
 page.on("console", (m) => m.type() === "error" && out.consoleErrors.push(m.text()));
 page.on("response", (r) => {
   if (r.url().includes("/otlp/")) out.otlp.push(r.status());
+});
+// An export that gets no response at all (reset, timeout) never reaches the collector's
+// counters either, so record it here, as status 0.
+page.on("requestfailed", (r) => {
+  if (r.url().includes("/otlp/")) out.otlp.push(0);
 });
 
 const step = async (name, fn) => {
