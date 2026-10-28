@@ -49,8 +49,11 @@ cleanup() {
 }
 trap cleanup EXIT
 
-[[ -z "${BASELINE:-}" || -f ".otel-verify/$BASELINE/report.json" ]] \
-  || fail "no earlier run named $BASELINE in .otel-verify/"
+if [[ -n "${BASELINE:-}" ]]; then
+  # Same label: the run would delete the baseline, then compare itself with itself.
+  [[ $BASELINE != "$LABEL" ]] || fail "BASELINE and this run are both named $LABEL; name this run"
+  [[ -f ".otel-verify/$BASELINE/report.json" ]] || fail "no earlier run named $BASELINE in .otel-verify/"
+fi
 rm -rf "$OUT" && mkdir -p "$OUT"
 
 log "Building and starting the stack with the OTel overlay ($LABEL)"
