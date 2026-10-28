@@ -66,8 +66,11 @@ def test_init_options(settings: Callable[..., Settings], monkeypatch: pytest.Mon
     # Sentry must not start tracing: Tempo owns traces, and two tracing systems in one
     # process double-instrument every request.
     assert captured["traces_sample_rate"] == 0.0
-    # Feed URLs, article bodies and auth headers are not error context.
-    assert captured["send_default_pii"] is False
+    # Feed URLs, article bodies and auth headers are not error context. The deprecated
+    # flag must stay unset: with data_collection also given, the SDK ignores it and warns.
+    assert "send_default_pii" not in captured
+    assert captured["data_collection"]["http_bodies"] == []
+    assert captured["data_collection"]["stack_frame_variables"] is False
 
 
 def test_empty_environment_becomes_none(
@@ -145,8 +148,8 @@ def test_records_still_reach_other_handlers_after_init(settings: Callable[..., S
 
 
 def test_query_string_never_leaves_the_process() -> None:
-    # send_default_pii=False does not cover the query string: verified against
-    # sentry-sdk 2.69.1, a 500 on /streams/all/entries?q=... arrives carrying
+    # The backstop for data_collection's url_query_params. Under send_default_pii=False
+    # (sentry-sdk 2.69.1) a 500 on /streams/all/entries?q=... arrived carrying
     # query_string='q=my+private+search+terms'. Search terms are the most personal
     # thing this API takes in a URL.
     event: Any = {
@@ -168,8 +171,9 @@ def test_transactions_are_scrubbed_too(
     """With SENTRY_TRACES_SAMPLE_RATE above 0, every request becomes a transaction.
 
     Those skip before_send and go through before_send_transaction, carrying the same
-    ASGI query_string. Drives a real request through the SDK and reads what the
-    transport would have sent, so a hook left unregistered fails here.
+    request block. Drives a real request through the SDK and reads what the transport
+    would have sent. data_collection already drops the query string, so the hook has
+    nothing left to scrub here; it is checked by registration instead.
     """
     import sentry_sdk
     from fastapi import FastAPI
@@ -188,6 +192,8 @@ def test_transactions_are_scrubbed_too(
     settings(sentry_dsn="https://key@example.invalid/1", sentry_traces_sample_rate=1.0)
     try:
         sentry.configure_sentry(service_name="alo-api", version="1.0.0")
+        options = sentry_sdk.get_client().options
+        assert options["before_send_transaction"] is sentry._scrub_query_string
 
         app = FastAPI()
 
@@ -199,8 +205,71 @@ def test_transactions_are_scrubbed_too(
         sentry_sdk.flush()
 
         transactions = [e for e in sent if '"type":"transaction"' in e]
-        assert transactions, "no transaction was sent; the test is not exercising the hook"
+        assert transactions, "no transaction was sent; the test is not exercising the SDK"
         assert all("private" not in e for e in transactions)
-        assert any("[scrubbed]" in e for e in transactions)
+    finally:
+        real_init(dsn="")
+
+
+# Kept away from the route below: an error event carries a few lines of source around
+# each frame, and a literal written next to the route would show up in it.
+_FEED_URL = "https://private.example/feed.xml"
+_QUERY = "q=private+terms"
+_COOKIE = "cookie-value"
+_TOKEN = "token-value"
+_CLIENT_IP = "203.0.113.9"
+
+
+def test_error_events_carry_no_private_data(
+    settings: Callable[..., Settings], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failing POST sends its stack and route, not what the user sent.
+
+    send_default_pii=False did not stop this: the JSON body and every frame's local
+    variables went out with the event, so a crash in subscribe would have carried the
+    feed URL twice. Reads the envelope the transport would have sent.
+    """
+    import sentry_sdk
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from pydantic import BaseModel
+    from sentry_sdk.transport import Transport
+
+    sent: list[str] = []
+
+    class Capture(Transport):
+        def capture_envelope(self, envelope: Any) -> None:
+            sent.append(envelope.serialize().decode())
+
+    real_init = sentry_sdk.init
+    monkeypatch.setattr(sentry_sdk, "init", lambda **kw: real_init(transport=Capture(), **kw))
+
+    settings(sentry_dsn="https://key@example.invalid/1")
+    try:
+        sentry.configure_sentry(service_name="alo-api", version="1.0.0")
+
+        app = FastAPI()
+
+        class Subscribe(BaseModel):
+            url: str
+
+        @app.post("/subscriptions")
+        def subscribe(body: Subscribe) -> None:
+            feed = body.url  # a local the frame would carry
+            raise RuntimeError(f"cannot subscribe to {len(feed)}-char url")
+
+        client = TestClient(app, raise_server_exceptions=False, cookies={"session": _COOKIE})
+        client.post(
+            f"/subscriptions?{_QUERY}",
+            json={"url": _FEED_URL},
+            headers={"Authorization": f"Bearer {_TOKEN}", "X-Real-IP": _CLIENT_IP},
+        )
+        sentry_sdk.flush()
+
+        events = [e for e in sent if '"type":"event"' in e]
+        assert events, "no error event was sent; the test is not exercising the SDK"
+        assert "cannot subscribe" in events[0]
+        for private in (_FEED_URL, _QUERY, _COOKIE, _TOKEN, _CLIENT_IP):
+            assert all(private not in e for e in events), private
     finally:
         real_init(dsn="")
