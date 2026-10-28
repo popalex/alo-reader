@@ -221,6 +221,7 @@ the SPA in Chromium, and checks what reached the stores:
   FastAPI has had its own telemetry since 0.142; with both on, its spans replace the
   contrib server span and every request is counted twice
 - every metric fresh, API and worker logs in Loki carrying trace ids
+- nothing refused by the collector or dropped after its export retries
 - the dashboards and alert rules provisioned, every rule evaluating
 - every instrumentor's dependency check passing inside the api and worker images
 

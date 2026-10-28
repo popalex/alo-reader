@@ -120,17 +120,30 @@ report["tempo"]["span_count"] = len(all_spans)
 report["tempo"]["spans_per_service"] = {
     k: sum(1 for s in all_spans if s["svc"] == k) for k in SERVICES
 }
-# What the collector accepted, browser spans included, against what Tempo returned.
-try:
-    with urllib.request.urlopen(COLLECTOR_METRICS, timeout=10) as m:
-        lines = m.read().decode().splitlines()
-    report["tempo"]["collector_accepted_spans"] = sum(
-        float(line.rsplit(" ", 1)[1])
-        for line in lines
-        if line.startswith("otelcol_receiver_accepted_spans_total{")
-    )
-except Exception as e:  # noqa: BLE001
-    report["tempo"]["collector_accepted_spans"] = f"error: {e}"
+# The collector's own counters. Accepted spans, browser ones included, are there to set
+# against what Tempo returned. Refused and failed counts are telemetry lost on the way:
+# a batch the receiver turned away, or one the exporter gave up on after its retries.
+# Retries that succeed count nowhere, so a store still starting up does not trip this.
+LOSS_PREFIXES = (
+    "otelcol_receiver_refused_",
+    "otelcol_processor_refused_",
+    "otelcol_exporter_send_failed_",
+    "otelcol_exporter_enqueue_failed_",
+)
+with urllib.request.urlopen(COLLECTOR_METRICS, timeout=10) as m:
+    collector: dict[str, float] = {}
+    for line in m.read().decode().splitlines():
+        if line.startswith("otelcol_") and not line.startswith("#"):
+            name = line.split("{", 1)[0].split(" ", 1)[0]
+            collector[name] = collector.get(name, 0.0) + float(line.rsplit(" ", 1)[1])
+report["tempo"]["collector_accepted_spans"] = collector.get(
+    "otelcol_receiver_accepted_spans_total", 0.0
+)
+report["collector_loss"] = {
+    k: v for k, v in sorted(collector.items()) if k.startswith(LOSS_PREFIXES)
+}
+lost = {k: v for k, v in report["collector_loss"].items() if v}
+check("collector: nothing refused or dropped", not lost, str(lost))
 
 check(
     "tempo: all three services",
