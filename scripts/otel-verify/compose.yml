@@ -1,0 +1,7 @@
+# Overlay for scripts/otel-verify.sh. The worker gets FETCH_ALLOW_HOSTS from the base
+# file; the API needs it too, so that discover can reach the fixture feed and its
+# outbound httpx span shows up in the same trace as the browser's request.
+services:
+  api:
+    environment:
+      FETCH_ALLOW_HOSTS: feedfixture
