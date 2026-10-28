@@ -34,6 +34,7 @@ COMPOSE=(docker compose -p "$PROJECT"
 export AUTH_MODE=none FETCH_ALLOW_HOSTS=feedfixture
 # Caddy accepts browser OTLP only from ALO_OTLP_ALLOW_IPS. Chromium on the host reaches
 # Caddy through the docker bridge, not from 127.0.0.1, so the default would refuse it.
+# Opening it is safe only because compose.yml publishes Caddy on loopback alone.
 export ALO_OTLP_ALLOW_IPS="0.0.0.0/0 ::/0"
 # No --env-file, so .env is not read and Grafana keeps its default login; check.py uses it.
 

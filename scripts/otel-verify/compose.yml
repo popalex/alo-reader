@@ -1,7 +1,22 @@
-# Overlay for scripts/otel-verify.sh. The worker gets FETCH_ALLOW_HOSTS from the base
-# file; the API needs it too, so that discover can reach the fixture feed and its
-# outbound httpx span shows up in the same trace as the browser's request.
+# Overlay for scripts/otel-verify.sh.
 services:
+  # otel-verify.sh lets Caddy accept browser OTLP from any address, so publish it on
+  # loopback only: nobody else can post telemetry into the stack, KEEP_UP=1 included.
+  caddy:
+    ports: !override
+      - "127.0.0.1:80:80"
+  # The run must not depend on whoever's .env is in the checkout: a long
+  # WORKER_POLL_INTERVAL_S there, say, would outlast the wait for ingestion.
+  migrate:
+    env_file: !reset []
   api:
+    env_file: !reset []
+    # The worker gets FETCH_ALLOW_HOSTS from the base file; the API needs it too, so
+    # that discover can reach the fixture feed and its outbound httpx span shows up in
+    # the same trace as the browser's request.
     environment:
       FETCH_ALLOW_HOSTS: feedfixture
+  worker:
+    env_file: !reset []
+  backup:
+    env_file: !reset []

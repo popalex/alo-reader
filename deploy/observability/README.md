@@ -211,8 +211,8 @@ git switch my-branch && BASELINE=before ./scripts/otel-verify.sh after
 ```
 
 Each run brings up its own stack (`alo-otel-verify`, torn down afterwards, so it does
-not touch `make otel-up`'s data), drives the SPA in Chromium, and checks what reached
-the stores:
+not touch `make otel-up`'s data; published on loopback only and ignoring `.env`), drives
+the SPA in Chromium, and checks what reached the stores:
 
 - a browser click, the API request it caused and that request's SQL in one trace, and
   the same for discover's outbound httpx call
