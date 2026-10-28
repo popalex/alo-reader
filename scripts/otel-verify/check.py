@@ -20,7 +20,7 @@ SERVICES = ["alo-web", "alo-api", "alo-worker"]
 # span or metric under that scope means both are running, or the wrong one is.
 CONTRIB = "opentelemetry.instrumentation."
 FASTAPI_NATIVE_SCOPE = "fastapi"
-# Grafana's default login: otel-verify.sh runs compose without .env, so nothing changes it.
+# Grafana's default login, which otel-verify.sh pins for its stack.
 GRAFANA_AUTH = "Basic " + base64.b64encode(b"admin:admin").decode()
 
 

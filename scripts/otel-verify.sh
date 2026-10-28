@@ -26,7 +26,7 @@ OUT=".otel-verify/$LABEL"
 BASE_URL="http://localhost"
 # Its own compose project, like e2e.sh and lighthouse.sh: the teardown runs `down -v`.
 PROJECT=alo-otel-verify
-COMPOSE=(docker compose -p "$PROJECT"
+COMPOSE=(docker compose -p "$PROJECT" --env-file /dev/null
   -f deploy/docker-compose.yml -f deploy/docker-compose.otel.yml
   -f deploy/docker-compose.smoke.yml -f "$HERE/compose.yml"
   ${OVERRIDE:+-f "$OVERRIDE"})
@@ -36,7 +36,10 @@ export AUTH_MODE=none FETCH_ALLOW_HOSTS=feedfixture
 # Caddy through the docker bridge, not from 127.0.0.1, so the default would refuse it.
 # Opening it is safe only because compose.yml publishes Caddy on loopback alone.
 export ALO_OTLP_ALLOW_IPS="0.0.0.0/0 ::/0"
-# No --env-file, so .env is not read and Grafana keeps its default login; check.py uses it.
+# No .env anywhere: /dev/null above for compose's own interpolation, the overlay for the
+# services' env_file. A Grafana login exported in the shell would still win, so pin the
+# default that check.py logs in with.
+export GRAFANA_ADMIN_USER=admin GRAFANA_ADMIN_PASSWORD=admin
 
 log() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 fail() { printf '\033[31mFAIL: %s\033[0m\n' "$*" >&2; exit 1; }
