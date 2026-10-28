@@ -275,7 +275,8 @@ g["version"] = grafana("/api/health").get("version")
 g["dashboards"] = sorted(
     f"{d.get('folderTitle', '')}/{d['title']}" for d in grafana("/api/search?type=dash-db")
 )
-g["alert_rules"] = sorted(r["uid"] for r in grafana("/api/v1/provisioning/alert-rules"))
+provisioned = {r["uid"]: r["title"] for r in grafana("/api/v1/provisioning/alert-rules")}
+g["alert_rules"] = sorted(provisioned)
 g["contact_points"] = sorted(
     f"{c['name']}:{c['type']}" for c in grafana("/api/v1/provisioning/contact-points")
 )
@@ -303,9 +304,13 @@ check(
     "alo-pushover:pushover" in g["contact_points"] and g["root_receiver"] == "alo-pushover",
     f"{g['contact_points']} root={g['root_receiver']}",
 )
-bad = {k: v for k, v in health.items() if not v.startswith("ok")}
+# The evaluator names a rule by its uid label when it has one, else by its title.
+rule_health = {uid: health.get(uid) or health.get(title) for uid, title in provisioned.items()}
+bad = {k: v for k, v in rule_health.items() if not (v and v.startswith("ok"))}
 check(
-    "grafana: every alert rule evaluates (health ok)", bool(health) and not bad, str(bad or health)
+    "grafana: every alert rule evaluates (health ok)",
+    bool(rule_health) and not bad,
+    str(bad or rule_health),
 )
 
 versions = {"grafana": g["version"]}
