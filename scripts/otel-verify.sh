@@ -59,6 +59,9 @@ if [[ -n "${BASELINE:-}" ]]; then
 fi
 rm -rf "$OUT" && mkdir -p "$OUT"
 
+# A stack left by KEEP_UP=1 would bring its database and stores along: the subscribe
+# step would hit "already subscribed", and old traces would sit in the search window.
+"${COMPOSE[@]}" down -v >/dev/null 2>&1 || true
 log "Building and starting the stack with the OTel overlay ($LABEL)"
 "${COMPOSE[@]}" up -d --build >"$OUT/up.log" 2>&1 || { tail -30 "$OUT/up.log"; fail "compose up failed"; }
 
