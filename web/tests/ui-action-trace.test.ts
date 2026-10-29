@@ -11,8 +11,8 @@ import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
   StackContextManager,
-  WebTracerProvider,
-} from "@opentelemetry/sdk-trace-web";
+  TracerProvider,
+} from "@opentelemetry/sdk-trace";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createSubscription, getCounts } from "../src/api/endpoints";
@@ -26,8 +26,9 @@ beforeAll(() => {
   globalThis.fetch = vi.fn(() =>
     Promise.resolve(new Response(JSON.stringify({ id: 1 }), { status: 201 })),
   ) as typeof fetch;
-  const provider = new WebTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] });
-  provider.register({ contextManager: new StackContextManager() });
+  const provider = new TracerProvider({ spanProcessors: [new SimpleSpanProcessor({ exporter })] });
+  trace.setGlobalTracerProvider(provider);
+  context.setGlobalContextManager(new StackContextManager().enable());
   teardown = registerInstrumentations({
     tracerProvider: provider,
     instrumentations: [new FetchInstrumentation()],

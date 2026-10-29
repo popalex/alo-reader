@@ -4,6 +4,10 @@
 // telemetry is off. Document-load + fetch instrumentation propagate `traceparent` into
 // /api requests, so a browser trace continues into the backend as one waterfall.
 
+// Static, unlike the SDK below: the API package is small, and client.ts and
+// traceUiAction.ts already put it in the initial bundle.
+import { context, propagation, trace } from "@opentelemetry/api";
+
 let initialized = false;
 
 export interface BrowserTelemetryOptions {
@@ -63,7 +67,7 @@ export function initBrowserTelemetry({ serviceName, exportUrl }: BrowserTelemetr
     import("@opentelemetry/instrumentation"),
     import("@opentelemetry/instrumentation-fetch"),
     import("@opentelemetry/resources"),
-    import("@opentelemetry/sdk-trace-web"),
+    import("@opentelemetry/sdk-trace"),
     import("@opentelemetry/core"),
   ])
     .then(
@@ -73,27 +77,28 @@ export function initBrowserTelemetry({ serviceName, exportUrl }: BrowserTelemetr
         { registerInstrumentations },
         { FetchInstrumentation },
         { resourceFromAttributes },
-        { BatchSpanProcessor, WebTracerProvider },
+        { BatchSpanProcessor, TracerProvider },
         { W3CTraceContextPropagator },
       ]) => {
-        const provider = new WebTracerProvider({
+        const provider = new TracerProvider({
           resource: resourceFromAttributes({ "service.name": serviceName }),
           // The scrubber first: processors run in order, so the batch never holds a
           // span that still has the query on it.
           spanProcessors: [
             queryScrubProcessor,
-            new BatchSpanProcessor(new OTLPTraceExporter({ url: exportUrl })),
+            new BatchSpanProcessor({ exporter: new OTLPTraceExporter({ url: exportUrl }) }),
           ],
         });
+        // SDK 3.0 has no provider.register(), so the three globals are set here.
         // ZoneContextManager keeps the active span across async boundaries, so a ui.*
-        // span stays the parent of the fetch it triggers. The propagator MUST be set
-        // explicitly: in a browser bundle register() can't build it from env vars, so
-        // without this no `traceparent` is injected into /api calls and the backend
-        // starts a separate trace (no end-to-end linkage).
-        provider.register({
-          contextManager: new ZoneContextManager(),
-          propagator: new W3CTraceContextPropagator(),
-        });
+        // span stays the parent of the fetch it triggers. It does nothing until
+        // enable() is called, which register() used to do: without it active() is
+        // always the root context and every fetch starts its own trace. Without the
+        // propagator no `traceparent` goes out on /api calls and the backend starts a
+        // separate trace. tests/telemetry-init.test.ts checks both.
+        trace.setGlobalTracerProvider(provider);
+        propagation.setGlobalPropagator(new W3CTraceContextPropagator());
+        context.setGlobalContextManager(new ZoneContextManager().enable());
         // Only fetch instrumentation: each browser API call becomes a clean
         // "METHOD /path" span that propagates into the backend. Document-load is
         // omitted on purpose — its documentFetch/resourceFetch spans (every JS/CSS/
