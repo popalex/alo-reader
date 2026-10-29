@@ -7,8 +7,8 @@ import { FetchInstrumentation } from "@opentelemetry/instrumentation-fetch";
 import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
-  WebTracerProvider,
-} from "@opentelemetry/sdk-trace-web";
+  TracerProvider,
+} from "@opentelemetry/sdk-trace";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { queryScrubProcessor, scrubQueryString } from "../src/app/telemetry";
@@ -66,8 +66,8 @@ describe("queryScrubProcessor with the real fetch instrumentation", () => {
   async function exportedUrlsFor(fetchImpl: typeof fetch): Promise<string[]> {
     globalThis.fetch = fetchImpl;
     const exporter = new InMemorySpanExporter();
-    const provider = new WebTracerProvider({
-      spanProcessors: [queryScrubProcessor, new SimpleSpanProcessor(exporter)],
+    const provider = new TracerProvider({
+      spanProcessors: [queryScrubProcessor, new SimpleSpanProcessor({ exporter })],
     });
     teardown = registerInstrumentations({
       tracerProvider: provider,
