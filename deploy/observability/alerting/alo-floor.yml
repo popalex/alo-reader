@@ -7,6 +7,13 @@
 # Editing: change a threshold in the evaluator params below and restart the otel-lgtm
 # container. Rules provisioned from a file cannot be edited in the Grafana UI, which is
 # the point. They come back identically on every recreate.
+#
+# Each rule's annotations are what its push says (the layout is in notifications.yml):
+# summary, current (the value the rule read, against its limit), description (what it
+# breaks), and runbook_url. current is a template filled in at evaluation; when there
+# is no value, which happens on NoData and on a query error, it says so instead.
+# Grafana expands ${VAR} in provisioning files, but $values reaches the template as
+# written.
 apiVersion: 1
 
 groups:
@@ -35,9 +42,14 @@ groups:
           service: alo-worker
         annotations:
           summary: The feed worker is not draining its queue
+          current: >-
+            {{ if $values }}The oldest due feed has waited
+            {{ humanizeDuration $values.QUERY.Value }} (limit 5m).{{ else }}No
+            data: the API is down, or its telemetry is not reaching the
+            collector.{{ end }}
           description: >-
-            The oldest due-but-unclaimed feed has been waiting over 5 minutes for
-            10 minutes straight. Feeds are going stale. See docs/ALERTS.md#worker-lag.
+            Feeds are going stale: no new articles arrive until the worker catches up.
+          runbook_url: https://github.com/popalex/alo-reader/blob/main/docs/ALERTS.md#worker-lag
         noDataState: Alerting
         execErrState: Alerting
         data:
@@ -80,9 +92,12 @@ groups:
           service: alo-api
         annotations:
           summary: The API is returning server errors
+          current: >-
+            {{ if $values }}{{ printf "%.1f" $values.QUERY.Value }}% of API
+            responses are 5xx (limit 5%).{{ else }}The query failed.{{ end }}
           description: >-
-            Over 5% of API responses have been 5xx for 10 minutes. Every one of them
-            is a request a reader lost. See docs/ALERTS.md#api-5xx-rate.
+            Every one of them is a request a reader lost.
+          runbook_url: https://github.com/popalex/alo-reader/blob/main/docs/ALERTS.md#api-5xx-rate
         noDataState: OK
         execErrState: Alerting
         data:
@@ -134,10 +149,14 @@ groups:
           service: alo-backup
         annotations:
           summary: No verified database backup in over a day
+          current: >-
+            {{ if $values }}The newest verified backup is
+            {{ humanizeDuration $values.QUERY.Value }} old (limit 26h).{{ else }}No
+            backup metric at all: nothing reports that this instance is backed
+            up.{{ end }}
           description: >-
-            The newest verified backup on the volume is more than 26 hours old, so at
-            least one nightly run has not produced a usable dump.
-            See docs/ALERTS.md#backup-freshness.
+            At least one nightly run has not produced a usable dump.
+          runbook_url: https://github.com/popalex/alo-reader/blob/main/docs/ALERTS.md#backup-freshness
         noDataState: Alerting
         execErrState: Alerting
         data:
@@ -184,10 +203,13 @@ groups:
           service: host
         annotations:
           summary: A host filesystem is nearly full
+          current: >-
+            {{ if $values }}{{ printf "%.0f" $values.QUERY.Value }}% free on the
+            fullest filesystem (limit 15%).{{ else }}The query failed.{{ end }}
           description: >-
-            Less than 15% free for 15 minutes. Postgres stops accepting writes on a
-            full disk and the nightly backup stops producing usable dumps.
-            See docs/ALERTS.md#disk.
+            Postgres stops accepting writes on a full disk, and the nightly backup
+            stops producing usable dumps.
+          runbook_url: https://github.com/popalex/alo-reader/blob/main/docs/ALERTS.md#disk
         noDataState: OK
         execErrState: Alerting
         data:

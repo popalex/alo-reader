@@ -26,6 +26,8 @@ import yaml
 RULES_PATH = "deploy/observability/alerting/alo-floor.yml"
 TELEMETRY_PATH = "api/app/telemetry.py"
 BACKUP_SCRIPT_PATH = "deploy/backup.sh"
+DOCS_PATH = "docs/ALERTS.md"
+RUNBOOK_PAGE = "https://github.com/popalex/alo-reader/blob/main/docs/ALERTS.md"
 
 # The suffixes the OTel Prometheus exporter appends. Stripped before a name is
 # matched against the instrument it came from.
@@ -115,8 +117,24 @@ def test_every_rule_can_fire() -> None:
         assert rule["noDataState"] in {"OK", "Alerting", "NoData"}
         assert rule["execErrState"] in {"OK", "Alerting", "Error"}
         assert rule["annotations"]["summary"]
-        assert "docs/ALERTS.md" in rule["annotations"]["description"], (
-            f"{title!r} does not point at its runbook"
+        # The push shows this line as "what is it reading now, against what limit".
+        assert "$values" in rule["annotations"]["current"], f"{title!r} has no current value"
+
+
+def test_every_runbook_link_lands_on_its_section() -> None:
+    """runbook_url is a link on a phone, so a renamed heading would break it quietly."""
+    docs = _repo_file(DOCS_PATH).read_text(encoding="utf-8")
+    # GitHub's anchor for a heading: lowercased, punctuation dropped, spaces to hyphens.
+    anchors = {
+        re.sub(r"[^a-z0-9 -]", "", heading.strip().lower()).replace(" ", "-")
+        for heading in re.findall(r"^#+ (.+)$", docs, re.MULTILINE)
+    }
+    for rule in _rules():
+        url = rule["annotations"]["runbook_url"]
+        page, _, anchor = url.partition("#")
+        assert page == RUNBOOK_PAGE, f"{rule['title']!r} links to {page}"
+        assert anchor in anchors, (
+            f"{rule['title']!r} links to #{anchor}, which is not a heading in {DOCS_PATH}"
         )
 
 
