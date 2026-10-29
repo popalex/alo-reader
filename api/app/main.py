@@ -143,7 +143,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await get_engine().dispose()
 
 
-app = FastAPI(title="alo-reader", version=APP_VERSION, lifespan=lifespan)
+# FastAPI 0.142+ has its own OpenTelemetry instrumentation, which turns itself on once a
+# global provider exists. It steps aside only for the ASGI instrumentation, not for
+# FastAPIInstrumentor, so left on it adds a second server span per request (demoting
+# ours to INTERNAL), traces /healthz, and double-counts http_server_active_requests.
+# app.telemetry owns all three signals.
+app = FastAPI(
+    title="alo-reader",
+    version=APP_VERSION,
+    lifespan=lifespan,
+    telemetry={"tracing": False, "metrics": False, "logs": False},
+)
 register_exception_handlers(app)
 app.add_middleware(AuthMiddleware)
 # Added last → outermost: security headers land on every response, including the

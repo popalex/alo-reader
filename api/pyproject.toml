@@ -8,7 +8,9 @@ description = "alo-reader API (FastAPI) and worker"
 license = "AGPL-3.0-or-later"
 requires-python = "==3.14.*"
 dependencies = [
-    "fastapi>=0.115",
+    # The floor is for FastAPI(telemetry=...), which app/main.py uses to turn off
+    # FastAPI's own OpenTelemetry. 0.162 is the version that was checked.
+    "fastapi>=0.162",
     "python-multipart>=0.0.9",
     "uvicorn[standard]>=0.30",
     "pydantic>=2.7",
@@ -36,8 +38,10 @@ dependencies = [
     # Error reporting, off unless SENTRY_DSN is set. A base dependency rather than an
     # extra like otel below: it is one pure-Python package, and making it an extra would
     # mean rebuilding the image to turn errors on, where the whole point is that one
-    # variable does it. Major-pinned because 3.x will move the init contract.
-    "sentry-sdk>=2.20,<3",
+    # variable does it. Major-pinned because 3.x will move the init contract. The floor
+    # is for the data_collection option app/sentry.py passes; 2.73 is the version that
+    # was checked.
+    "sentry-sdk>=2.73,<3",
 ]
 
 [project.optional-dependencies]
