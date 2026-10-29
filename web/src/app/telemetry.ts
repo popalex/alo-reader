@@ -1,8 +1,8 @@
 // Browser OpenTelemetry, initialised only when /config reports otel_enabled. The SDK
 // is heavy (~tens of kB), so it's brought in via dynamic import() — a separate lazy
 // chunk that never touches the initial bundle (nor the size-limit budget) when
-// telemetry is off. Document-load + fetch instrumentation propagate `traceparent` into
-// /api requests, so a browser trace continues into the backend as one waterfall.
+// telemetry is off. The fetch instrumentation propagates `traceparent` into /api
+// requests, so a browser trace continues into the backend as one waterfall.
 
 // Static, unlike the SDK below: the API package is small, and client.ts and
 // traceUiAction.ts already put it in the initial bundle.

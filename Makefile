@@ -195,6 +195,12 @@ migrate:
 ## is exported in-process (no server needed); sorted keys keep it deterministic
 ## so CI can diff-check for drift. web/src/api/schema.d.ts is committed; the
 ## intermediate openapi.json is gitignored.
+##
+## The export runs in the toolchain container, like the other Python gates: it
+## imports the app, so a host .venv built on an older Python fails on syntax the
+## project already uses. It writes to a temp file first, because a failed export
+## redirected straight into openapi.json used to leave it empty.
 generate-client:
-	cd api && AUTH_MODE=none ../$(VENV)/bin/python -c "import json,sys; from app.main import app; json.dump(app.openapi(), sys.stdout, sort_keys=True)" > $(CURDIR)/web/openapi.json
+	$(PY_RUN) '$(PY_INSTALL) && AUTH_MODE=none python -c "import json,sys; from app.main import app; json.dump(app.openapi(), sys.stdout, sort_keys=True)"' > web/openapi.json.tmp || { rm -f web/openapi.json.tmp; exit 1; }
+	mv web/openapi.json.tmp web/openapi.json
 	cd web && pnpm exec openapi-typescript openapi.json -o src/api/schema.d.ts
