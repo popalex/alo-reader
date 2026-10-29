@@ -95,7 +95,7 @@ export function initBrowserTelemetry({ serviceName, exportUrl }: BrowserTelemetr
         // enable() is called, which register() used to do: without it active() is
         // always the root context and every fetch starts its own trace. Without the
         // propagator no `traceparent` goes out on /api calls and the backend starts a
-        // separate trace.
+        // separate trace. tests/telemetry-init.test.ts checks both.
         trace.setGlobalTracerProvider(provider);
         propagation.setGlobalPropagator(new W3CTraceContextPropagator());
         context.setGlobalContextManager(new ZoneContextManager().enable());
