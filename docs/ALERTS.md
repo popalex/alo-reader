@@ -269,7 +269,9 @@ Two stages. It posts straight to Pushover with the keys from `.env`, which separ
 wrong keys from wrong wiring, then creates a temporary rule that breaches immediately so
 Grafana notifies through the same contact point and policy the real alerts use. Deleting
 the rule sends the resolved notification, so you see both ends. Expect two pushes, three
-counting the credential check. `--no-probe` skips the first stage.
+counting the credential check. `--no-probe` skips the first stage. The test alert is
+named after the time it started (`alert self-test 11:12:10`), so a second run never
+looks like a repeat that Grafana would hold back.
 
 Expect one push while it runs and a second about five minutes later: deleting the test
 rule does not resolve the alert, it lets it expire, and the resolved notification goes
