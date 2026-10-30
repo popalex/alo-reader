@@ -70,6 +70,12 @@ if [[ -z $folder ]]; then
 fi
 
 uid="alo-alert-selftest"
+# A new name every run. Alertmanager logs each alert it has sent and stays quiet about
+# the same alert for repeat_interval (12h), unless the resolved push went out in
+# between. That push comes about five minutes after a run, so a second run inside that
+# window, or after a Grafana restart that dropped the alert, fired a duplicate that was
+# never sent and failed with "never attempted a delivery".
+title="alert self-test $(date -u +%H:%M:%S)"
 cleanup() {
 	"${CURL[@]}" -o /dev/null -X DELETE -H 'X-Disable-Provenance: true' \
 		"${GRAFANA}/api/v1/provisioning/alert-rules/${uid}" 2>/dev/null || true
@@ -79,7 +85,7 @@ trap cleanup EXIT
 # vector(1) > 0 is true the moment it is evaluated, and "for": "0s" means no pending
 # period, so this goes straight to Alerting on the next evaluation tick.
 "${CURL[@]}" -o /dev/null -X POST -H 'Content-Type: application/json' -H 'X-Disable-Provenance: true' \
-	-d '{"uid":"'"$uid"'","title":"alert self-test","folderUID":"'"$folder"'","ruleGroup":"verify",
+	-d '{"uid":"'"$uid"'","title":"'"$title"'","folderUID":"'"$folder"'","ruleGroup":"verify",
        "orgID":1,"condition":"THRESHOLD","for":"0s","noDataState":"OK","execErrState":"Alerting",
        "annotations":{"summary":"self-test from scripts/test-alerts.sh, nothing is wrong"},
        "data":[{"refId":"QUERY","datasourceUid":"prometheus","relativeTimeRange":{"from":600,"to":0},
@@ -119,7 +125,7 @@ for _ in $(seq 1 24); do
 		python3 -c '
 import json, sys
 rules = [r for g in json.load(sys.stdin)["data"]["groups"] for r in g["rules"]]
-print(next((r["state"] for r in rules if r["name"] == "alert self-test"), ""))')
+print(next((r["state"] for r in rules if r["name"] == sys.argv[1]), ""))' "$title")
 	[[ $state == firing ]] && break
 done
 
