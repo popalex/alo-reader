@@ -39,6 +39,11 @@ contactPoints:
           # reader; the right call for something that pages a rota.
           priority: 1
           okPriority: -1
+          # The templates below. Without these Grafana sends its generic layout: a
+          # "[FIRING:1] ..." title, every label and annotation as a list, and four
+          # links built from GRAFANA_ROOT_URL, which on a phone is mostly noise.
+          title: '{{ template "alo.title" . }}'
+          message: '{{ template "alo.message" . }}'
 
 policies:
   - orgId: 1
@@ -50,3 +55,45 @@ policies:
     group_wait: 30s
     group_interval: 5m
     repeat_interval: 12h
+
+# What a push says. Pushover renders a small set of HTML in the message (Grafana sends
+# it with html=1) but not in the title, which is plain text.
+#
+# Firing: the summary in bold, the rule's current value against its limit (the
+# "current" annotation in alo-floor.yml, filled in when the rule is evaluated), what
+# it breaks, the runbook, and the rule in Grafana. Each URL is its own link text, so
+# it can be copied as well as tapped. The rule link is there because the "Show alert
+# rule" button under the message is Grafana's: its label is fixed and it opens the
+# whole alert list. Both Grafana links are built from GRAFANA_ROOT_URL, so on the
+# default they point at localhost. No timestamp: Pushover shows when the push arrived,
+# in the phone's own time zone.
+#
+# Resolved: how long it lasted. The title already says which alert it was.
+#
+# Annotations a rule leaves out are skipped, so scripts/test-alerts.sh's temporary
+# rule, which has only a summary, still renders cleanly.
+templates:
+  - orgID: 1
+    name: alo-pushover
+    template: |
+      {{ define "alo.title" -}}
+      {{ if eq .Status "firing" }}{{ .CommonLabels.alertname }}{{ else }}Resolved: {{ .CommonLabels.alertname }}{{ end }}
+      {{- end }}
+
+      {{ define "alo.message" -}}
+      {{ range .Alerts.Firing -}}
+      <b>{{ .Annotations.summary }}</b>
+      {{ if .Annotations.current }}{{ .Annotations.current }}
+      {{ end }}{{ if .Annotations.description }}
+      {{ .Annotations.description }}
+      {{ end }}{{ if .Annotations.runbook_url }}
+      What to do: <a href="{{ .Annotations.runbook_url }}">{{ .Annotations.runbook_url }}</a>
+      {{ end }}{{ if .GeneratorURL }}
+      Alert rule: <a href="{{ .GeneratorURL }}">{{ .GeneratorURL }}</a>
+      {{ end }}
+      {{ end -}}
+      {{ range .Alerts.Resolved -}}
+      <b>Back to normal</b>
+      Lasted {{ printf "%.0f" (.EndsAt.Sub .StartsAt).Minutes }} min.
+      {{ end -}}
+      {{- end }}

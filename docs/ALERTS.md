@@ -75,8 +75,15 @@ Four things worth knowing up front:
   which retries until you acknowledge it, add `retry` and `expire` alongside it in the
   same file. That is the right setting for something that pages a rota, and overkill
   for a feed reader.
-- **Set `GRAFANA_ROOT_URL` to your public URL.** Every link in the notification is
-  built from it, so on the default it sends you to `localhost`.
+- **Set `GRAFANA_ROOT_URL` to your public URL.** The two Grafana links in a push, the
+  "Alert rule" line and the "Show alert rule" button under it, are built from it, so on
+  the default they send you to `localhost`. The "What to do" link goes to this page on
+  GitHub and works from anywhere.
+- **A push is short on purpose.** The title is the rule's name. The message gives the
+  summary in bold, the value the rule is reading against its limit, what it breaks,
+  and the two links, each written out in full so it can be copied. The all-clear says
+  how long it lasted. The templates are at the bottom of `notifications.yml`; the
+  value line is each rule's `current` annotation in `alo-floor.yml`.
 - **Notifications are batched, not instant.** One 30s after a rule fires, at most one
   more every 5 minutes while alerts join the group, then a reminder every 12 hours
   while it keeps firing. Change `group_wait` / `repeat_interval` in the same file.
