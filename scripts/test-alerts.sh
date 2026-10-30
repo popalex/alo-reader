@@ -92,6 +92,9 @@ trap cleanup EXIT
 # Grafana's alertmanager records the last delivery attempt per integration, which is
 # the only authoritative answer to "did it actually send". Remember where it stands
 # before the test so a stale attempt from an earlier run cannot be mistaken for ours.
+# An integration that has never sent reports Go's zero time, not an empty field. That
+# is printed as nothing: counted as an attempt, it let a run against a Grafana that had
+# just started report "delivered at 0001-01-01" and delete the rule before any send.
 notify_state() {
 	"${CURL[@]}" "${GRAFANA}/api/alertmanager/grafana/config/api/v1/receivers" |
 		python3 -c '
@@ -99,7 +102,10 @@ import json, sys
 for receiver in json.load(sys.stdin):
     for integration in receiver.get("integrations", []):
         if receiver["name"] == sys.argv[1]:
-            print(integration.get("lastNotifyAttempt", ""), integration.get("lastNotifyAttemptError", ""), sep="\t")
+            attempt = integration.get("lastNotifyAttempt", "")
+            if attempt.startswith("0001-01-01"):
+                attempt = ""
+            print(attempt, integration.get("lastNotifyAttemptError", ""), sep="\t")
 ' "$RECEIVER"
 }
 
