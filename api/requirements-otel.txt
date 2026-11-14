@@ -76,7 +76,7 @@ markupsafe==3.0.4
     # via mako
 nh3==0.3.7
     # via alo-reader-api (pyproject.toml)
-opentelemetry-api==1.45.1
+opentelemetry-api==1.45.2
     # via
     #   fastapi
     #   opentelemetry-exporter-http-transport
