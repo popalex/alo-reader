@@ -5,3 +5,12 @@ allowBuilds:
   '@clerk/shared': true
   esbuild: true
 verifyDepsBeforeRun: false
+
+overrides:
+  # workbox-build 7.4.1 (via vite-plugin-pwa, build time only) is the latest release and
+  # still asks for glob ^11, which brings minimatch 10: GHSA-g3hv-75wg-m249 (minimatch
+  # < 11.0.1) and GHSA-3g3m-2fjr-6pw4 (glob <= 14.0.1). Its only call is
+  # globSync(pattern, {cwd, follow, ignore}), which glob 14 keeps, CommonJS build
+  # included. The generated service worker and precache list were byte-identical with
+  # glob 14. Drop this once workbox-build moves to glob >= 14.0.2.
+  'workbox-build>glob': ^14.0.6
