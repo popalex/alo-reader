@@ -84,6 +84,13 @@ updates:
       interval: monthly
     commit-message:
       prefix: build(deploy)
+    ignore:
+      # Temporary, revisit around 2026-12-25. On python:3.15-slim the API image does
+      # not build: zstandard 0.25.0 has wheels only up to cp314 and the slim image
+      # has no gcc to compile it (#157). Drop this once zstandard ships cp315 wheels,
+      # and move requires-python and PY_IMAGE in the same change.
+      - dependency-name: python
+        versions: ["3.15.x"]
 
   - package-ecosystem: docker-compose
     directory: /deploy
